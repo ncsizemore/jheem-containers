@@ -77,11 +77,31 @@ RUN R -e "pak::pkg_install('renv')" && \
 
 RUN echo "source('renv/activate.R')" > .Rprofile
 
-# Handle problematic packages by installing them from source.
-# We are now adding 'sf' to this list.
-RUN echo "📦 Pre-installing tricky packages as binaries..." && \
-  R -e "renv::install(c('units', 'gert', 'V8'))" && \
-  echo "✅ Tricky packages installed."
+# Debug: Show what libraries are available and verify symlinks
+RUN echo "🔍 Diagnosing library setup..." && \
+  ARCH_LIB_DIR=$(dpkg-architecture -q DEB_HOST_MULTIARCH) && \
+  echo "=== libgit2 libraries ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libgit2* 2>/dev/null || echo "No libgit2 found" && \
+  echo "=== libnode libraries ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libnode* 2>/dev/null || echo "No libnode found" && \
+  echo "=== libudunits2 libraries ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libudunits2* 2>/dev/null || echo "No libudunits2 found" && \
+  echo "=== Symlink verification ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libgit2.so.1.5 2>/dev/null || echo "libgit2.so.1.5 symlink missing" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libnode.so.108 2>/dev/null || echo "libnode.so.108 symlink missing"
+
+# Install tricky packages one at a time from SOURCE to avoid RSPM binary issues
+RUN echo "📦 Installing units from source..." && \
+  R -e "renv::install('units', type = 'source')" && \
+  echo "✅ units installed."
+
+RUN echo "📦 Installing gert from source..." && \
+  R -e "renv::install('gert', type = 'source')" && \
+  echo "✅ gert installed."
+
+RUN echo "📦 Installing V8 from source..." && \
+  R -e "renv::install('V8', type = 'source')" && \
+  echo "✅ V8 installed."
 
 RUN echo "📦 Pre-installing problematic packages from source..." && \
   R -e "renv::install('sf', type = 'source')" && \
