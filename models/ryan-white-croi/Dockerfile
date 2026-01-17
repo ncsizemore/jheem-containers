@@ -118,6 +118,12 @@ RUN  echo "📦 Installing remaining packages as binaries..." && \
   R -e "renv::restore()" && \
   echo "✅ All packages installed successfully"
 
+# Update jheem2 to latest from GitHub (overrides renv.lock version)
+# This ensures compatibility with latest jheem_analyses HEAD
+RUN echo "📦 Updating jheem2 to latest from GitHub..." && \
+  R -e "renv::install('tfojo1/jheem2')" && \
+  R -e "cat('✅ jheem2 version:', as.character(packageVersion('jheem2')), '\n')"
+
 # Test that all packages are working
 RUN R --slave -e "\
   library(jheem2); \
