@@ -42,22 +42,22 @@ parser$add_argument("--input-dir", type = "character", default = "/data/raw",
                     help = "Directory containing raw simset files")
 parser$add_argument("--output-dir", type = "character", default = "/data/trimmed",
                     help = "Directory for trimmed output files")
-parser$add_argument("--interventions", type = "character", default = NULL,
+parser$add_argument("--interventions", type = "character", default = "",
                     help = "Comma-separated intervention codes (default: all CROI interventions)")
 parser$add_argument("--dry-run", action = "store_true", default = FALSE,
                     help = "Show what would be done without actually trimming")
 parser$add_argument("--benchmark", action = "store_true", default = FALSE,
                     help = "Run benchmark mode (trim one file and report timing)")
 
-args <- parser$parse_args()
+cli_args <- parser$parse_args()
 
 # =============================================================================
 # Setup
 # =============================================================================
 cat("=== CROI Simset Trimmer ===\n")
-cat(sprintf("State: %s\n", args$state))
-cat(sprintf("Input directory: %s\n", args$input_dir))
-cat(sprintf("Output directory: %s\n", args$output_dir))
+cat(sprintf("State: %s\n", cli_args[["state"]]))
+cat(sprintf("Input directory: %s\n", cli_args$input_dir))
+cat(sprintf("Output directory: %s\n", cli_args$output_dir))
 cat(sprintf("Target simulations: %d\n", N_SIM_FOR_WEB))
 cat(sprintf("Time range: %d-%d\n", WEB_FROM_YEAR, WEB_TO_YEAR))
 cat("\n")
@@ -76,11 +76,23 @@ ont_mgr <- get("ONTOLOGY.MAPPING.MANAGER", envir = asNamespace("jheem2"))
 for (name in names(.jheem2_state$ontology_mapping_manager)) {
   assign(name, .jheem2_state$ontology_mapping_manager[[name]], envir = ont_mgr)
 }
-cat("jheem2 state restored\n\n")
+cat("jheem2 state restored\n")
+
+# Restore R6 class generators needed for simulation operations
+if ("r6_class_generators" %in% names(.jheem2_state)) {
+  for (class_name in names(.jheem2_state$r6_class_generators)) {
+    assign(class_name, .jheem2_state$r6_class_generators[[class_name]], envir = .GlobalEnv)
+  }
+  cat(sprintf("R6 class generators restored: %s\n",
+              paste(names(.jheem2_state$r6_class_generators), collapse = ", ")))
+} else {
+  cat("WARNING: r6_class_generators not found in workspace - simulation operations may fail\n")
+}
+cat("\n")
 
 # Determine interventions to process
-if (!is.null(args$interventions)) {
-  interventions <- strsplit(args$interventions, ",")[[1]]
+if ("interventions" %in% names(cli_args) && !is.null(cli_args[["interventions"]]) && nchar(cli_args[["interventions"]]) > 0) {
+  interventions <- strsplit(cli_args[["interventions"]], ",")[[1]]
 } else {
   interventions <- CROI_INTERVENTION_CODES
 }
@@ -89,11 +101,11 @@ if (!is.null(args$interventions)) {
 # Find input files
 # =============================================================================
 # Expected naming: rw_final.ehe.state-1000_{STATE}_{intervention}.Rdata
-file_pattern <- sprintf("*_%s_*.Rdata", args$state)
-input_files <- list.files(args$input_dir, pattern = glob2rx(file_pattern), full.names = TRUE)
+file_pattern <- sprintf("*_%s_*.Rdata", cli_args$state)
+input_files <- list.files(cli_args$input_dir, pattern = glob2rx(file_pattern), full.names = TRUE)
 
 if (length(input_files) == 0) {
-  cat(sprintf("ERROR: No files found matching pattern '%s' in %s\n", file_pattern, args$input_dir))
+  cat(sprintf("ERROR: No files found matching pattern '%s' in %s\n", file_pattern, cli_args$input_dir))
   quit(status = 1)
 }
 
@@ -104,8 +116,8 @@ for (f in input_files) {
 cat("\n")
 
 # Create output directory
-if (!args$dry_run) {
-  dir.create(args$output_dir, recursive = TRUE, showWarnings = FALSE)
+if (!cli_args$dry_run) {
+  dir.create(cli_args$output_dir, recursive = TRUE, showWarnings = FALSE)
 }
 
 # =============================================================================
@@ -131,7 +143,7 @@ for (input_file in input_files) {
   cat(sprintf("=== Processing: %s ===\n", filename))
   cat(sprintf("Intervention: %s\n", intervention))
 
-  if (args$dry_run) {
+  if (cli_args$dry_run) {
     cat("  [DRY RUN] Would trim this file\n\n")
     next
   }
@@ -181,8 +193,8 @@ for (input_file in input_files) {
 
     # Step 4: Save trimmed simset
     # Output naming: {STATE}_{intervention}_web.Rdata
-    output_filename <- sprintf("%s_%s_web.Rdata", args$state, intervention)
-    output_path <- file.path(args$output_dir, output_filename)
+    output_filename <- sprintf("%s_%s_web.Rdata", cli_args$state, intervention)
+    output_path <- file.path(cli_args$output_dir, output_filename)
 
     cat(sprintf("  Saving to %s...\n", output_filename))
     save_start <- Sys.time()
@@ -209,7 +221,7 @@ for (input_file in input_files) {
     cat(sprintf("  DONE in %.1f seconds\n\n", file_time))
 
     # In benchmark mode, stop after first file
-    if (args$benchmark) {
+    if (cli_args$benchmark) {
       cat("=== BENCHMARK MODE: Stopping after first file ===\n")
       break
     }

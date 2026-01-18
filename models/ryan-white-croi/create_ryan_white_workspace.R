@@ -120,10 +120,25 @@ if (length(ont_mgr$mappings) > 0) {
   cat("  🔍 Mapping names:", paste(names(ont_mgr$mappings), collapse = ", "), "\n")
 }
 
+# Capture R6 class generators needed for simulation operations (thin, rerun, etc.)
+cat("  📦 Capturing R6 class generators...\n")
+r6_class_names <- c("JHEEM.RUN.METADATA", "SIMULATION.METADATA", "SOLVER.METADATA",
+                    "SPECIFICATION.METADATA", "OUTCOME.METADATA", "MODEL.OUTCOME.METADATA")
+r6_classes <- list()
+for (class_name in r6_class_names) {
+  if (exists(class_name, envir = asNamespace("jheem2"))) {
+    r6_classes[[class_name]] <- get(class_name, envir = asNamespace("jheem2"))
+    cat("    ✅", class_name, "\n")
+  } else {
+    cat("    ⚠️", class_name, "not found\n")
+  }
+}
+
 # Create the hidden object with both states using consistent approach
 .jheem2_state <- list(
   version_manager = as.list(vm),
   ontology_mapping_manager = as.list(ont_mgr),  # Consistent with version_manager approach
+  r6_class_generators = r6_classes,  # R6 classes needed for simulation operations
   captured_at = Sys.time(),
   jheem2_version = packageVersion("jheem2")
 )
