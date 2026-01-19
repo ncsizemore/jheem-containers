@@ -212,6 +212,11 @@ FROM jheem-base AS ryan-white-model
 # Copy only the generated workspace from builder stage
 COPY --from=workspace-builder /app/ryan_white_workspace.RData ./
 
+# Copy the object_for_version_cache needed for simulation operations
+# The cache lookup uses path '../jheem_analyses/commoncode/object_for_version_cache'
+# relative to working dir /app, so we need to create /jheem_analyses/commoncode/
+COPY --from=workspace-builder /app/jheem_analyses/commoncode/object_for_version_cache /jheem_analyses/commoncode/object_for_version_cache
+
 # Copy runtime scripts and modules from container directory
 COPY lambda_handler.R ./
 COPY plotting_minimal.R ./
