@@ -221,6 +221,10 @@ COPY --from=workspace-builder /app/jheem_analyses/commoncode/object_for_version_
 # The idu_input_manager.R looks for files at '../jheem_analyses/data_files/idu_initiation'
 COPY --from=workspace-builder /app/jheem_analyses/data_files /jheem_analyses/data_files
 
+# Copy cached data files needed for COVID mobility (google_mobility_data.Rdata)
+# The covid_mobility_manager.R loads from '../jheem_analyses/cached/google_mobility_data.Rdata'
+COPY --from=workspace-builder /app/jheem_analyses/cached /jheem_analyses/cached
+
 # Copy runtime scripts and modules from container directory
 COPY lambda_handler.R ./
 COPY plotting_minimal.R ./
