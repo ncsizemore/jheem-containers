@@ -118,10 +118,10 @@ RUN  echo "📦 Installing remaining packages as binaries..." && \
   R -e "renv::restore()" && \
   echo "✅ All packages installed successfully"
 
-# Update jheem2 to latest from GitHub (overrides renv.lock version)
-# This ensures compatibility with latest jheem_analyses HEAD
-RUN echo "📦 Updating jheem2 to latest from GitHub..." && \
-  R -e "renv::install('tfojo1/jheem2')" && \
+# Update jheem2 from dev branch (must match jheem_analyses expectations)
+# The default branch has breaking changes - dev branch is required for compatibility
+RUN echo "📦 Updating jheem2 from dev branch..." && \
+  R -e "renv::install('tfojo1/jheem2@dev')" && \
   R -e "cat('✅ jheem2 version:', as.character(packageVersion('jheem2')), '\n')"
 
 # Test that all packages are working
