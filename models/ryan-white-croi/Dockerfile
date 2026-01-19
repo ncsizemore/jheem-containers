@@ -217,6 +217,10 @@ COPY --from=workspace-builder /app/ryan_white_workspace.RData ./
 # relative to working dir /app, so we need to create /jheem_analyses/commoncode/
 COPY --from=workspace-builder /app/jheem_analyses/commoncode/object_for_version_cache /jheem_analyses/commoncode/object_for_version_cache
 
+# Copy data_files needed for IDU initiation rates (used by get.idu.incidence.rates)
+# The idu_input_manager.R looks for files at '../jheem_analyses/data_files/idu_initiation'
+COPY --from=workspace-builder /app/jheem_analyses/data_files /jheem_analyses/data_files
+
 # Copy runtime scripts and modules from container directory
 COPY lambda_handler.R ./
 COPY plotting_minimal.R ./
