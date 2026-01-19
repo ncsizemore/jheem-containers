@@ -10,6 +10,7 @@
 
 suppressPackageStartupMessages({
   library(jheem2)
+  library(locations)  # Required for get.contained.locations() used in specification helpers
   library(argparse)
 })
 
