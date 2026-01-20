@@ -49,8 +49,13 @@ parser$add_argument("--dry-run", action = "store_true", default = FALSE,
                     help = "Show what would be done without actually trimming")
 parser$add_argument("--benchmark", action = "store_true", default = FALSE,
                     help = "Run benchmark mode (trim one file and report timing)")
+parser$add_argument("--target-sims", type = "integer", default = 80,
+                    help = "Target number of simulations (default: 80, use fewer for memory testing)")
 
 cli_args <- parser$parse_args()
+
+# Override N_SIM_FOR_WEB if --target-sims is specified
+N_SIM_FOR_WEB <- cli_args$target_sims
 
 # =============================================================================
 # Setup
