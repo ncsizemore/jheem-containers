@@ -77,6 +77,20 @@ tryCatch(
   }
 )
 
+# 3.6. Load Ryan White interventions (required for rerun.simulations)
+cat("🔧 Loading Ryan White interventions...\n")
+RW.ANCHOR.YEAR <- 2026  # CROI 2026 anchor year - needed for intervention suffix
+tryCatch(
+  {
+    source("../jheem_analyses/applications/ryan_white/ryan_white_interventions.R")
+    cat("✅ Ryan White interventions loaded successfully\n")
+  },
+  error = function(e) {
+    cat("❌ ERROR loading interventions:", e$message, "\n")
+    quit(status = 1)
+  }
+)
+
 # 4. Verify key objects are available
 cat("🔍 Verifying key objects...\n")
 required_objects <- c("RW.SPECIFICATION", "RW.DATA.MANAGER")
@@ -134,10 +148,18 @@ for (class_name in r6_class_names) {
   }
 }
 
+# Get INTERVENTION.MANAGER (stores registered interventions)
+int_mgr <- get("INTERVENTION.MANAGER", envir = asNamespace("jheem2"))
+cat("  📊 Registered interventions:", length(int_mgr$interventions), "\n")
+if (length(int_mgr$interventions) > 0) {
+  cat("  🔍 Intervention codes:", paste(names(int_mgr$interventions), collapse = ", "), "\n")
+}
+
 # Create the hidden object with both states using consistent approach
 .jheem2_state <- list(
   version_manager = as.list(vm),
   ontology_mapping_manager = as.list(ont_mgr),  # Consistent with version_manager approach
+  intervention_manager = as.list(int_mgr),  # Registered interventions for rerun.simulations
   r6_class_generators = r6_classes,  # R6 classes needed for simulation operations
   captured_at = Sys.time(),
   jheem2_version = packageVersion("jheem2")

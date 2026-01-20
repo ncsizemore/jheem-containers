@@ -10,7 +10,8 @@
 
 suppressPackageStartupMessages({
   library(jheem2)
-  library(locations)  # Required for get.contained.locations() used in specification helpers
+  library(locations)      # Required for get.contained.locations() used in specification helpers
+  library(distributions)  # Required for generate.random.samples() used in rerun.simulations
   library(argparse)
 })
 
@@ -81,6 +82,17 @@ for (name in names(.jheem2_state$version_manager)) {
 ont_mgr <- get("ONTOLOGY.MAPPING.MANAGER", envir = asNamespace("jheem2"))
 for (name in names(.jheem2_state$ontology_mapping_manager)) {
   assign(name, .jheem2_state$ontology_mapping_manager[[name]], envir = ont_mgr)
+}
+# Restore INTERVENTION.MANAGER (registered interventions)
+if ("intervention_manager" %in% names(.jheem2_state)) {
+  int_mgr <- get("INTERVENTION.MANAGER", envir = asNamespace("jheem2"))
+  for (name in names(.jheem2_state$intervention_manager)) {
+    assign(name, .jheem2_state$intervention_manager[[name]], envir = int_mgr)
+  }
+  cat(sprintf("Interventions restored: %s\n",
+              paste(names(int_mgr$interventions), collapse = ", ")))
+} else {
+  cat("WARNING: intervention_manager not found in workspace\n")
 }
 cat("jheem2 state restored\n")
 
@@ -157,6 +169,15 @@ for (input_file in input_files) {
   file_start <- Sys.time()
 
   tryCatch({
+    # Helper to report memory
+    report_mem <- function(label) {
+      gc_info <- gc(verbose = FALSE)
+      used_mb <- sum(gc_info[,2])  # Mb used
+      cat(sprintf("    [MEM] %s: %.0f MB\n", label, used_mb))
+    }
+
+    report_mem("Before load")
+
     # Step 1: Load raw simset
     cat("  Loading raw simset...\n")
     load_start <- Sys.time()
@@ -164,6 +185,7 @@ for (input_file in input_files) {
     full_simset <- get(loaded_names[1])
     load_time <- difftime(Sys.time(), load_start, units = "secs")
     cat(sprintf("    Loaded in %.1f seconds\n", load_time))
+    report_mem("After load")
 
     if (!is.null(full_simset$n.sim)) {
       cat(sprintf("    Original simulations: %d\n", full_simset$n.sim))
@@ -175,6 +197,12 @@ for (input_file in input_files) {
     thinned_simset <- full_simset$thin(keep = N_SIM_FOR_WEB)
     thin_time <- difftime(Sys.time(), thin_start, units = "secs")
     cat(sprintf("    Thinned in %.1f seconds\n", thin_time))
+    report_mem("After thin (both in memory)")
+
+    # Free the full simset
+    rm(full_simset)
+    invisible(gc())
+    report_mem("After freeing full_simset")
 
     # Step 3: Rerun simulations with truncated time range
     # Use different sub.version and time range for seed vs intervention
@@ -185,14 +213,23 @@ for (input_file in input_files) {
 
     cat(sprintf("  Rerunning simulations (sub.version=%s, %d-%d)...\n",
                 sub_version, from_year, to_year))
+    cat("    Starting rerun.simulations() call...\n")
+    flush.console()
     rerun_start <- Sys.time()
-    web_simset <- rerun.simulations(
-      thinned_simset,
-      sub.version = sub_version,
-      from.year = from_year,
-      to.year = to_year,
-      verbose = FALSE
-    )
+    web_simset <- tryCatch({
+      rerun.simulations(
+        thinned_simset,
+        sub.version = sub_version,
+        from.year = from_year,
+        to.year = to_year,
+        verbose = TRUE
+      )
+    }, error = function(e) {
+      cat(sprintf("    ERROR in rerun.simulations: %s\n", e$message))
+      cat("    Traceback:\n")
+      traceback()
+      stop(e)
+    })
     rerun_time <- difftime(Sys.time(), rerun_start, units = "secs")
     cat(sprintf("    Rerun completed in %.1f seconds (%.1f minutes)\n",
                 as.numeric(rerun_time), as.numeric(rerun_time) / 60))
