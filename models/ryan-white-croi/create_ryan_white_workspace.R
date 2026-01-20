@@ -45,6 +45,18 @@ for (fn_name in internal_fns) {
 }
 cat("✅", functions_exported_count, "internal functions exported to .GlobalEnv\n")
 
+# Export key internal environments needed for simulation operations
+cat("🔓 Exporting jheem2 internal environments...\n")
+internal_envs <- c("JHEEM.SOLVER.TRACKING")
+for (env_name in internal_envs) {
+  if (exists(env_name, pkg_env, inherits = FALSE)) {
+    env_obj <- get(env_name, pkg_env, inherits = FALSE)
+    assign(env_name, env_obj, envir = .GlobalEnv)
+    cat("  ✅", env_name, "\n")
+  } else {
+    cat("  ⚠️", env_name, "not found\n")
+  }
+}
 
 use_package_file <- "../jheem_analyses/use_jheem2_package_setting.R"
 ryan_white_spec_file <- "../jheem_analyses/applications/ryan_white/ryan_white_specification.R"
