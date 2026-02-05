@@ -38,11 +38,18 @@ RUN apt-get update && apt-get install -y \
   git \
   && rm -rf /var/lib/apt/lists/* \
   && ARCH_LIB_DIR=$(dpkg-architecture -q DEB_HOST_MULTIARCH) \
-  # Symlink for gert (libgit2)
-  && ln -s "/usr/lib/${ARCH_LIB_DIR}/libgit2.so.1.9" "/usr/lib/${ARCH_LIB_DIR}/libgit2.so.1.5" \
-  # Symlink for V8 (libnode)
-  && ln -s "/usr/lib/${ARCH_LIB_DIR}/libnode.so.115" "/usr/lib/${ARCH_LIB_DIR}/libnode.so.108" \
-  # Symlink for sf (libgdal) - find actual version and link to .32 that RSPM expects
+  # Dynamic symlinks for RSPM binary compatibility
+  # Find actual library versions and create symlinks to versions RSPM binaries expect
+  && echo "Creating dynamic library symlinks for RSPM compatibility..." \
+  # Symlink for gert (libgit2) - RSPM expects 1.5
+  && LIBGIT2_ACTUAL=$(ls /usr/lib/${ARCH_LIB_DIR}/libgit2.so.* 2>/dev/null | grep -E 'libgit2\.so\.[0-9]+\.[0-9]+$' | head -1) \
+  && echo "Found libgit2: ${LIBGIT2_ACTUAL}" \
+  && if [ -n "${LIBGIT2_ACTUAL}" ]; then ln -sf "${LIBGIT2_ACTUAL}" "/usr/lib/${ARCH_LIB_DIR}/libgit2.so.1.5"; fi \
+  # Symlink for V8 (libnode) - RSPM expects .108
+  && LIBNODE_ACTUAL=$(ls /usr/lib/${ARCH_LIB_DIR}/libnode.so.* 2>/dev/null | head -1) \
+  && echo "Found libnode: ${LIBNODE_ACTUAL}" \
+  && if [ -n "${LIBNODE_ACTUAL}" ]; then ln -sf "${LIBNODE_ACTUAL}" "/usr/lib/${ARCH_LIB_DIR}/libnode.so.108"; fi \
+  # Symlink for sf (libgdal) - RSPM expects .32
   && GDAL_ACTUAL=$(ls /usr/lib/${ARCH_LIB_DIR}/libgdal.so.* 2>/dev/null | head -1) \
   && echo "Found GDAL: ${GDAL_ACTUAL}" \
   && if [ -n "${GDAL_ACTUAL}" ]; then ln -sf "${GDAL_ACTUAL}" "/usr/lib/${ARCH_LIB_DIR}/libgdal.so.32"; fi
@@ -67,20 +74,40 @@ RUN R -e "pak::pkg_install('renv')" && \
 
 RUN echo "source('renv/activate.R')" > .Rprofile
 
-# Handle problematic packages by installing them from source.
-# We are now adding 'sf' to this list.
-RUN echo "📦 Pre-installing tricky packages as binaries..." && \
-  R -e "renv::install(c('units', 'gert', 'V8'))" && \
-  echo "✅ Tricky packages installed."
+# Debug: Show what libraries are available and verify symlinks
+RUN echo "🔍 Diagnosing library setup..." && \
+  ARCH_LIB_DIR=$(dpkg-architecture -q DEB_HOST_MULTIARCH) && \
+  echo "=== libgit2 libraries ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libgit2* 2>/dev/null || echo "No libgit2 found" && \
+  echo "=== libnode libraries ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libnode* 2>/dev/null || echo "No libnode found" && \
+  echo "=== libudunits2 libraries ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libudunits2* 2>/dev/null || echo "No libudunits2 found" && \
+  echo "=== Symlink verification ===" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libgit2.so.1.5 2>/dev/null || echo "libgit2.so.1.5 symlink missing" && \
+  ls -la /usr/lib/${ARCH_LIB_DIR}/libnode.so.108 2>/dev/null || echo "libnode.so.108 symlink missing"
 
-RUN echo "📦 Pre-installing problematic packages from source..." && \
+# Install tricky packages one at a time from SOURCE to avoid RSPM binary issues
+RUN echo "📦 Installing units from source..." && \
+  R -e "renv::install('units', type = 'source')" && \
+  echo "✅ units installed."
+
+RUN echo "📦 Installing gert from source..." && \
+  R -e "renv::install('gert', type = 'source')" && \
+  echo "✅ gert installed."
+
+RUN echo "📦 Installing V8 from source..." && \
+  R -e "renv::install('V8', type = 'source')" && \
+  echo "✅ V8 installed."
+
+RUN echo "📦 Installing sf from source..." && \
   R -e "renv::install('sf', type = 'source')" && \
-  echo "✅ sf installed from source."
+  echo "✅ sf installed."
 
-# Snapshot to update lockfile with the versions we just installed
+# Snapshot to update lockfile with the versions we just installed from source
 # This prevents renv::restore from trying to downgrade them
 RUN echo "📸 Updating lockfile with installed versions..." && \
-  R -e "renv::snapshot(packages = c('sf', 'units', 'gert', 'V8'), update = TRUE)" && \
+  R -e "renv::snapshot(packages = c('units', 'gert', 'V8', 'sf'), update = TRUE)" && \
   echo "✅ Lockfile updated"
 
 # Install remaining packages as binaries
