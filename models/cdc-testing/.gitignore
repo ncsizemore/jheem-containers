@@ -1,0 +1,29 @@
+# Test outputs
+test_output/
+output/
+output_data/
+
+# macOS
+.DS_Store
+
+# R
+.Rhistory
+.RData
+*.rdata
+!cached/*.Rdata
+
+# renv library (but keep lockfile)
+renv/library/
+renv/local/
+renv/staging/
+
+# Large simulation files
+simulations/
+*.RData
+
+# IDE
+.vscode/
+.idea/
+
+# Local testing
+test_debug_output/

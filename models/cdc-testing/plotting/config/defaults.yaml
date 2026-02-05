@@ -1,0 +1,238 @@
+# src/ui/config/defaults.yaml
+# Default configurations used across the application
+
+# Core application-wide defaults and shared configurations
+defaults:
+  panel:
+    width: 300
+    collapsible: true
+    defaultVisible: true
+  display:
+    plot:
+      height: "600px"
+      defaultType: "static"
+  buttons:
+    generate:
+      label: "Generate Projections"
+      primary_class: "btn-primary"
+  feedback:
+    generate:
+      message: "This will take 10-30 seconds"
+      show_message: false
+      show_chime: false
+      chime_label: "Play a chime when done"
+
+# Display settings
+display:
+  plot:
+    height: "600px"
+    defaultType: "static"
+    container_class: "plot-container"
+  loading:
+    message: "Generating plot..."
+    class: "loading-indicator"
+
+# Section configurations
+sections:
+  # NOTE: Some sections (like timing and components) are defined here but handled manually in the code.
+  # See create_custom_intervention_content() for implementation details.
+  location:
+    title: "Location"
+    description: "Select the geographic area for the model"
+    selectors: ["location"]
+  scenario:
+    title: "Funding Scenario"
+    description: "Select whether Ryan White funding is briefly interrupted, completely ceases, or interrupted for an extended period"
+    selectors: ["scenario"]
+  timing:
+    title: "Programs Change Timeline"
+    description: "Define when Ryan White programs end and when they begin to return"
+  components:
+    title: "Viral Suppression Loss"
+    description: "Configure viral suppression loss for each recipient group"
+
+# Panel configurations
+panels:
+  left:
+    id: "intervention-panel"
+    header: "Ryan White Funding Impact"
+    description: "Explore the impact of changes to Ryan White program funding on HIV transmission and viral suppression."
+    width: 300
+    collapsible: true
+    defaultVisible: true
+  right:
+    id: "settings-panel"
+    header: "Figure Settings"
+    description: "Customize how the results are displayed."
+    width: 300
+    collapsible: true
+    defaultVisible: true
+
+# Input type defaults - used across all pages
+input_types:
+  select:
+    default_style: "choices"
+    multiple: false
+  radio:
+    default_style: "native"
+    multiple: false
+  checkbox:
+    default_style: "native"
+    multiple: true
+  numeric:
+    default_style: "native"
+    multiple: false
+
+# Common selectors used across multiple pages
+selectors:
+  location:
+    type: "select"
+    label: "Location"
+    description: "Select the geographic area for the model"
+    show_label: false
+    show_description: false
+    placeholder: "Select a location..."
+    value: "C.12580"  # Default to Baltimore-Columbia-Towson, MD
+    options:
+      atlanta:
+        id: "C.12060"
+        label: "Atlanta-Sandy Springs-Roswell, GA"
+      austin:
+        id: "C.12420"
+        label: "Austin-Round Rock, TX"
+      baltimore:
+        id: "C.12580"
+        label: "Baltimore-Columbia-Towson, MD"
+      baton_rouge:
+        id: "C.12940"
+        label: "Baton Rouge, LA"
+      boston:
+        id: "C.14460"
+        label: "Boston-Cambridge-Newton, MA-NH"
+      charlotte:
+        id: "C.16740"
+        label: "Charlotte-Concord-Gastonia, NC-SC"
+      chicago:
+        id: "C.16980"
+        label: "Chicago-Naperville-Elgin, IL-IN-WI"
+      #cincinnati:
+      #  id: "C.17140"
+      #  label: "Cincinnati, OH-KY-IN"
+      cleveland:
+        id: "C.17460"
+        label: "Cleveland-Elyria, OH"
+      columbus:
+        id: "C.18140"
+        label: "Columbus, OH"
+      dallas:
+        id: "C.19100"
+        label: "Dallas-Fort Worth-Arlington, TX"
+      detroit:
+        id: "C.19820"
+        label: "Detroit-Warren-Dearborn, MI"
+      houston:
+        id: "C.26420"
+        label: "Houston-The Woodlands-Sugar Land, TX"
+      indianapolis:
+        id: "C.26900"
+        label: "Indianapolis-Carmel-Anderson, IN"
+      jacksonville:
+        id: "C.27260"
+        label: "Jacksonville, FL"
+      las_vegas:
+        id: "C.29820"
+        label: "Las Vegas-Henderson-Paradise, NV"
+      los_angeles:
+        id: "C.31080"
+        label: "Los Angeles-Long Beach-Anaheim, CA"
+      memphis:
+        id: "C.32820"
+        label: "Memphis, TN-MS-AR"
+      miami:
+        id: "C.33100"
+        label: "Miami-Fort Lauderdale-West Palm Beach, FL"
+      new_orleans:
+        id: "C.35380"
+        label: "New Orleans-Metairie, LA"
+      new_york:
+        id: "C.35620"
+        label: "New York-Newark-Jersey City, NY-NJ-PA"
+      orlando:
+        id: "C.36740"
+        label: "Orlando-Kissimmee-Sanford, FL"
+      philadelphia:
+        id: "C.37980"
+        label: "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD"
+      phoenix:
+        id: "C.38060"
+        label: "Phoenix-Mesa-Scottsdale, AZ"
+      riverside:
+        id: "C.40140"
+        label: "Riverside-San Bernardino-Ontario, CA"
+      sacramento:
+        id: "C.40900"
+        label: "Sacramento-Roseville-Arden-Arcade, CA"
+      #st_louis:
+      #  id: "C.41180"
+      #  label: "St. Louis, MO-IL"
+      san_antonio:
+        id: "C.41700"
+        label: "San Antonio-New Braunfels, TX"
+      san_diego:
+        id: "C.41740"
+        label: "San Diego-Carlsbad, CA"
+      san_francisco:
+        id: "C.41860"
+        label: "San Francisco-Oakland-Hayward, CA"
+      seattle:
+        id: "C.42660"
+        label: "Seattle-Tacoma-Bellevue, WA"
+      tampa:
+        id: "C.45300"
+        label: "Tampa-St. Petersburg-Clearwater, FL"
+      washington:
+        id: "C.47900"
+        label: "Washington-Arlington-Alexandria, DC-VA-MD-WV"
+
+
+# Model dimension mappings - used for translating UI to model values
+model_dimensions:
+  age:
+    ui_field: "age_groups"
+    mappings:
+      "13-24": "13-24 years"
+      "25-34": "25-34 years"
+      "35-44": "35-44 years"
+      "45-54": "45-54 years"
+      "55plus": "55+ years"
+  
+  sex:
+    ui_field: "biological_sex"
+    mappings:
+      "heterosexual_male": "heterosexual_male"
+      "msm": "msm"
+      "female": "female"
+  
+  risk:
+    ui_field: "risk_factor"
+    mappings:
+      "never_IDU": "never_IDU"
+      "active_IDU": "active_IDU"
+      "IDU_in_remission": "IDU_in_remission"
+  
+  race:
+    ui_field: "race_ethnicity"
+    mappings:
+      "black": "black"
+      "hispanic": "hispanic"
+      "other": "other"
+
+# Testing mode configuration
+testing:
+  enabled: false  # Set to true for test mode
+  simulations:
+    prerun:
+      file: "test/prerun/C.12580/permanent_loss.Rdata"
+    custom:
+      file: "test/custom/base/C.12580_base.Rdata"
+
