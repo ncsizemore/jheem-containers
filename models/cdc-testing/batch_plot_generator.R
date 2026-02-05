@@ -26,12 +26,12 @@ for (fn in internal_fns) {
   }
 }
 
-# CONTAINER MODIFICATION: Use workspace data instead of sourcing ryan_white_specification.R
+# CONTAINER MODIFICATION: Use workspace data instead of sourcing specification files
 cat("Loading workspace data...\n")
-load("ryan_white_workspace.RData")
+load("cdc_testing_workspace.RData")
 cat("✅ Workspace loaded with", length(ls()), "objects\n")
-cat("✅ RW.SPECIFICATION available:", exists("RW.SPECIFICATION"), "\n")
-cat("✅ RW.DATA.MANAGER available:", exists("RW.DATA.MANAGER"), "\n")
+cat("✅ CDCT.SPECIFICATION available:", exists("CDCT.SPECIFICATION"), "\n")
+cat("✅ WEB.DATA.MANAGER available:", exists("WEB.DATA.MANAGER"), "\n")
 
 # CONTAINER MODIFICATION: Restore jheem2 internal state from workspace
 # Restore VERSION.MANAGER
