@@ -160,6 +160,8 @@ COPY create_cdc_testing_workspace.R workspace_build/
 
 RUN echo "🔧 Applying path fixes..." && \
   sed -i 's/USE.JHEEM2.PACKAGE = F/USE.JHEEM2.PACKAGE = T/' jheem_analyses/use_jheem2_package_setting.R && \
+  # Create case-insensitive symlink for EHE directory (Windows dev wrote lowercase paths)
+  ln -s EHE jheem_analyses/applications/ehe && \
   echo "✅ Path fixes applied"
 
 # This single RUN command does EVERYTHING: creates the workspace, and then
