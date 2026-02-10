@@ -1,0 +1,54 @@
+# Application-wide settings
+application:
+  name: "JHEEM2"
+  version: "2.0.0"
+  title: "JHEEM 2 - Ryan White Program"
+  defaults:
+    selected_tab: 'prerun'
+
+# Simulation directory configuration
+simulation_root: "simulations/ryan-white"  # Root directory for simulation files
+
+# Model specification settings
+model_specification:
+  name: "ryan_white"
+  main_file: "ryan_white_specification.R"
+  development_path: "../jheem_analyses/applications/ryan_white/"
+  deployment_path: "external/jheem_analyses/applications/ryan_white/"
+
+# Theme configuration
+theme:
+  spacing:
+    padding: 15
+    headerPadding: "12px 15px"
+  transitions:
+    duration: 300
+  
+  styles:
+    base: 
+      - "css/base/variables.css"
+      - "css/main_layout.css"
+    layout:
+      - "css/layout/three-panel.css"
+    components:
+      - "css/components/display_panel.css"
+      - "css/components/custom_controls.css"
+      - "css/components/plot_controls.css"
+      - "css/components/plot_panel.css"
+      - "css/components/table_panel.css"
+      - "css/components/toggle.css"
+      - "css/components/notifications.css"
+      - "css/components/errors.css"
+    themes:
+      - "css/color_schemes/color_scheme_jh.css"
+    pages:
+      - "css/pages/prerun.css"
+      - "css/pages/custom.css"
+      - "css/pages/about.css"
+      - "css/pages/overview.css"
+      - "css/pages/contact.css" 
+  
+  scripts:
+    - "js/layout/panel-controls.js"
+    - "js/interactions/setup_tooltips.js"
+

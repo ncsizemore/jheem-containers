@@ -1,0 +1,19 @@
+local({
+  r <- getOption("repos")
+  
+  # Use Posit Package Manager for Linux binaries
+  # Detects Ubuntu/Debian automatically and serves binaries
+  cran <- "https://packagemanager.posit.co/cran/__linux__/bookworm/latest"
+  r["CRAN"] <- cran
+  
+  options(repos = r)
+  
+  # Override renv repository settings to use RSPM
+  options(renv.config.repos.override = r)
+  
+  # Set proper user agent for binary detection
+  options(HTTPUserAgent = sprintf("R/%s R (%s)", 
+                                  getRversion(), 
+                                  paste(getRversion(), R.version$platform, 
+                                        R.version$arch, R.version$os)))
+})

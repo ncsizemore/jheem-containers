@@ -1,0 +1,22 @@
+# R
+.Rhistory
+.RData
+.Rproj.user
+renv/library/
+renv/local/
+renv/staging/
+
+# Output
+output/
+output_data/
+plots/
+*.html
+!plotting/README.md
+
+# Test files
+test_*.rdata
+test_output*/
+
+# System
+.DS_Store
+*.log

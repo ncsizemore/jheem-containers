@@ -1,0 +1,30 @@
+page:
+  title: "The Johns Hopkins Epidemiologic and Economic Model"
+  subtitle: "A Mathematical Model in Service of Ending the HIV Epidemic in the US"
+  description: "The JHEEM is a mathematical model of HIV transmission calibrated to 32 US cities. It generates local predictions of the HIV epidemic under potential interventions that include HIV testing, viral suppression among people with HIV (PWH), and pre-exposure prophylaxis (PrEP)."
+
+demo:
+  title: "Projected HIV Incidence for Baltimore, MD"
+  image: "images/baltimore_demo.png"
+  caption: "The modeled intervention achieves 90% viral suppression among people with HIV who are aware of their diagnosis"
+  width: "400px"
+
+getting_started:
+  title: "Getting Started:"
+  sections:
+    - title: "Prerun Interventions"
+      link: "prerun_interventions"
+      description: "let you quickly visualize projections for interventions that we have already defined and run ahead of time."
+    
+    - title: "Custom Interventions"
+      link: "custom_interventions"
+      description: "let you simulate in real time any combination of HIV testing, viral suppression among PWH, and/or PrEP, targeted to demographic subgroups of your choosing."
+
+layout:
+  container:
+    class: "overview-container"
+    min_width: "750px"
+    max_width: "850px"
+  header:
+    class: "overview-header"
+    padding: "var(--spacing-md) var(--spacing-lg)" 

@@ -1,0 +1,236 @@
+# Dynamic outcomes configuration
+# -----------------------------
+# The outcomes list can be generated dynamically from a simulation file
+# Precedence order:
+# 1. If outcomes_file is specified and exists, it will be used directly
+# 2. If not, it will try to use file patterns from prerun/custom configs with default_location and default_scenario
+# 3. If dynamic loading fails, it falls back to the static outcomes list below
+
+dynamic_outcomes: true
+
+# Direct file path (highest precedence)
+outcomes_file: "simulations/ryan-white/prerun/C.12580/cessation.Rdata"
+
+# Default location and scenario for pattern-based approach
+default_location: "C.12580"
+default_scenario: "cessation"
+
+# Optional mapping for specific outcome display names
+# Used by get_dynamic_outcomes in load_config.R
+# If an outcome ID is found here, this name is used.
+# Otherwise, a default name is generated (e.g., 'diagnosed.prevalence' -> 'Diagnosed Prevalence')
+outcome_display_names:
+  new: "New Diagnoses"
+  rw.clients: "Ryan White Clients"
+  adap.clients: "ADAP Clients"
+  oahs.clients: "OAHS Clients"
+  prep.uptake: "PrEP Uptake"
+  non.adap.clients: "Non-ADAP Clients" # Added
+  adap.proportion: "ADAP Proportion"   # Added
+  oahs.suppression: "OAHS Suppression" # Added
+  adap.suppression: "ADAP Suppression" # Added
+  awareness: "Awareness of HIV Status" # Added
+  testing: "Proportion Tested"         # Added
+  # Add other specific overrides here if needed
+
+# Plot control configurations
+plot_controls:
+  # Outcome Selection
+  # Maps user-friendly labels to simulation outcome IDs (from simset$outcomes)
+  outcomes:
+    type: "choices-select"
+    label: "Outcomes"
+    defaults: ["incidence", "diagnosed.prevalence"]
+    options:
+      # New HIV infections
+      incidence:
+        id: "incidence"
+        label: "Incidence"
+        description: "Rate of new HIV infections"
+        
+      # New diagnoses
+      new:
+        id: "new"
+        label: "New Diagnoses"
+        description: "New HIV diagnoses"
+
+      # HIV diagnoses tracking
+      #diagnoses:
+      #  id: "hiv.diagnoses"
+      #  label: "Reported Diagnoses"
+      #  description: "Number of people diagnosed with HIV"
+
+      # Overall HIV prevalence
+      prevalence:
+        id: "diagnosed.prevalence"
+        label: "Prevalence (Diagnosed)"
+        description: "Proportion of population with diagnosed HIV"
+
+      # Death rates
+      #mortality:
+      #  id: "hiv.mortality"
+      #  label: "HIV Mortality"
+      #  description: "Deaths among people with HIV"
+
+      # Testing metrics
+      testing:
+        id: "testing"
+        label: "HIV Testing Rates"
+        description: "Rate of HIV testing in population"
+
+      # Prevention metrics
+      prep:
+        id: "prep.uptake"
+        label: "PrEP Coverage"
+        description: "Proportion of eligible population on PrEP"
+
+      # Treatment metrics
+      suppression:
+        id: "suppression"
+        label: "Viral Suppression"
+        description: "Proportion of PLWH with suppressed viral load"
+
+      # Diagnosis awareness
+      knowledge:
+        id: "awareness"
+        label: "Knowledge of Status"
+        description: "Proportion of PLWH aware of their status"
+        
+      # Ryan White clients
+      rw_clients:
+        id: "rw.clients"
+        label: "Ryan White Clients"
+        description: "Number of Ryan White clients"
+        
+      # ADAP clients
+      adap_clients:
+        id: "adap.clients"
+        label: "ADAP Clients"
+        description: "Number of ADAP clients"
+        
+      # Non-ADAP clients
+      non_adap_clients:
+        id: "non.adap.clients"
+        label: "Non-ADAP Clients"
+        description: "Number of non-ADAP clients"
+        
+      # OAHS clients
+      oahs_clients:
+        id: "oahs.clients"
+        label: "OAHS Clients"
+        description: "Number of OAHS clients"
+        
+      # ADAP proportion
+      adap_proportion:
+        id: "adap.proportion"
+        label: "ADAP Proportion"
+        description: "Proportion of ADAP clients"
+        
+      # OAHS suppression
+      oahs_suppression:
+        id: "oahs.suppression"
+        label: "OAHS Viral Suppression"
+        description: "Viral suppression rate among OAHS clients"
+        
+      # ADAP suppression
+      adap_suppression:
+        id: "adap.suppression"
+        label: "ADAP Viral Suppression"
+        description: "Viral suppression rate among ADAP clients"
+
+  stratification:
+    type: "choices-select"
+    label: "Separate Projections By:"
+    multiple: true
+    options:
+      age:
+        id: "age"
+        label: "Age Group"
+      race:
+        id: "race"
+        label: "Race/Ethnicity"
+      sex:
+        id: "sex"
+        label: "Biological Sex"
+      risk:
+        id: "risk"
+        label: "Risk Factor"
+
+  display:
+    type: "radio"
+    label: "What to Show for Projections:"
+    options:
+      mean:
+        id: "mean.and.interval"
+        label: "The Mean Estimate and 95% Credible Interval"
+      median:
+        id: "median.and.interval"
+        label: "The Median Estimate and 95% Credible Interval"
+      individual:
+        id: "individual.simulation"
+        label: "Each Individual Simulation"
+
+# Dimension Settings (for faceting/stratification)
+dimensions:
+  age:
+    values: ['13-24 years', '25-34 years', '35-44 years', '45-54 years', '55+ years']
+    names: ['13-24 years', '25-34 years', '35-44 years', '45-54 years', '55+ years']
+    label: 'Age Group'
+    label_plural: 'Age Groups'
+  
+  race:
+    values: ['black', 'hispanic', 'other']
+    names: ['Black', 'Hispanic', 'Other']
+    label: 'Race/Ethnicity'
+    label_plural: 'Races'
+  
+  sex:
+    values: ['male', 'female']
+    names: ['Male', 'Female']
+    label: 'Biological Sex'
+    label_plural: 'Sexes'
+  
+  risk:
+    values: ['msm', 'active_idu', 'prior_idu', 'msm_active_idu', 'msm_prior_idu', 'heterosexual']
+    names: ['MSM', 'Active IDU', 'Prior IDU', 'MSM + Active IDU', 'MSM + Prior IDU', 'Heterosexual']
+    label: 'Risk Factor'
+    label_plural: 'Risk Factors'
+    
+# Table Display Settings    
+table_structure:
+  base_columns:
+    - id: "Year"
+      source: "year"
+      type: "numeric"
+    - id: "Outcome"
+      source: "outcome.display.name"
+      type: "character"
+    - id: "Source"
+      type: "character"
+      values: ["Projected", "Historical"]
+    - id: "Value"
+      type: "character"
+  
+  display_order:
+    - "Year"
+    - "Simulation"  # If present
+    - dimensions    # Dynamic from faceting
+    - "Source" 
+    - "Outcome"
+    - "Value"
+  
+  defaults:
+    sort_by: ["Year", "Simulation"]
+    direction: "ascending"
+
+# Control Labels and Display Settings
+labels:
+  outcomes: "Outcomes"
+  stratification: "Separate Projections By:"
+  display: "What to Show for Projections:"
+
+# Control Types (for UI generation)
+types:
+  outcomes: "choices-select"
+  stratification: "choices-select"
+  display: "radio"
