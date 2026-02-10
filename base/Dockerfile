@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     libssl-dev \
     libxml2-dev \
+    libxml2 \
     libgit2-dev \
     libgdal-dev \
     libproj-dev \
