@@ -10,7 +10,9 @@ output_data/
 .Rhistory
 .RData
 *.rdata
+*.Rdata
 !cached/*.Rdata
+!cached/*.rdata
 
 # renv library (but keep lockfile)
 renv/library/

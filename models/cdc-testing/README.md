@@ -1,90 +1,72 @@
 # JHEEM CDC Testing Container
 
-Docker container for the JHEEM CDC Testing model, used to generate plot data for the JHEEM Portal CDC Testing explorer.
+Docker container for the JHEEM CDC Testing model. Extends the shared [jheem-base](https://github.com/ncsizemore/jheem-base) image.
 
-## Overview
+## Usage
 
-This container packages the JHEEM CDC Testing epidemiological model with its R dependencies, enabling batch generation of plot data from pre-run simulations.
-
-**Model Version:** `cdct` (CDC Testing)
-**Anchor Year:** 2025 (intervention scenarios start 2025)
-**Parent Model:** EHE (Ending the HIV Epidemic)
-
-## Quick Start
+The container is published to GitHub Container Registry:
 
 ```bash
-# Pull from GitHub Container Registry
 docker pull ghcr.io/ncsizemore/jheem-cdc-testing-model:latest
-
-# Run batch plot generation
-docker run --rm \
-  -v /path/to/simulations:/app/simulations:ro \
-  -v /path/to/output:/output \
-  ghcr.io/ncsizemore/jheem-cdc-testing-model:latest \
-  batch \
-  --city AL \
-  --scenarios cessation,brief_interruption,prolonged_interruption \
-  --outcomes incidence,diagnosed.prevalence,cdc.funded.tests \
-  --output-dir /output
 ```
 
-## Scenarios
-
-| Scenario ID | File Pattern | Description |
-|-------------|--------------|-------------|
-| `cessation` | `cdct.end` | Complete cessation of CDC-funded testing |
-| `brief_interruption` | `cdct.bintr` | Brief interruption of CDC testing |
-| `prolonged_interruption` | `cdct.pintr` | Prolonged interruption of CDC testing |
-
-## Outcomes
-
-Standard outcomes:
-- `incidence` - Rate of new HIV infections
-- `new` - New diagnoses
-- `diagnosed.prevalence` - Prevalence (diagnosed)
-- `testing` - HIV testing rates
-- `prep.uptake` - PrEP coverage
-- `suppression` - Viral suppression
-- `awareness` - Knowledge of status
-
-CDC-specific outcomes:
-- `cdc.funded.tests` - Number of CDC-funded HIV tests
-- `cdc.funded.diagnoses` - Diagnoses from CDC-funded testing
-
-## Simulation File Format
-
-Expected file naming convention:
-```
-cdct_final.ehe.state-1000_{STATE}_{scenario}.Rdata
-```
-
-Example:
-```
-simulations/
-└── AL/
-    ├── cdct_final.ehe.state-1000_AL_noint.Rdata      (baseline)
-    ├── cdct_final.ehe.state-1000_AL_cdct.end.Rdata   (cessation)
-    ├── cdct_final.ehe.state-1000_AL_cdct.bintr.Rdata (brief)
-    └── cdct_final.ehe.state-1000_AL_cdct.pintr.Rdata (prolonged)
-```
-
-## Building Locally
+### Lambda Mode (Default)
 
 ```bash
-# Clone the repository
-git clone https://github.com/ncsizemore/jheem-cdc-testing-container.git
-cd jheem-cdc-testing-container
-
-# Build the container
-docker build -t jheem-cdc-testing-model .
-
-# Build with specific jheem_analyses commit
-docker build --build-arg JHEEM_ANALYSES_COMMIT=abc123 -t jheem-cdc-testing-model .
+docker run --rm -p 8080:8080 ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0 lambda
 ```
+
+### Batch Mode (Data Generation)
+
+```bash
+docker run --rm ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0 batch \
+  --state AL \
+  --scenarios cessation \
+  --outcomes incidence \
+  --output-mode data
+```
+
+### Test Workspace
+
+```bash
+docker run --rm ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0 test-workspace
+```
+
+## Architecture
+
+This container uses a thin wrapper pattern:
+
+```
+ghcr.io/ncsizemore/jheem-base:1.0.0    (shared R environment, ~150 lines)
+  └── ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0  (this container, ~55 lines)
+```
+
+### What's in this container
+
+| File | Purpose |
+|------|---------|
+| `create_cdc_testing_workspace.R` | Creates CDCT.SPECIFICATION and loads interventions |
+| `cached/google_mobility_data.Rdata` | Mobility data (not in official cache yet) |
+
+Everything else (R packages, batch_plot_generator.R, entrypoint) comes from jheem-base.
+
+## Building
+
+```bash
+docker build -t jheem-cdc-testing-model .
+```
+
+### Build Arguments
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `BASE_VERSION` | `1.0.0` | jheem-base image version |
+| `JHEEM_ANALYSES_COMMIT` | `fc3fe1d...` | jheem_analyses git commit |
 
 ## Related Repositories
 
-- [jheem-portal](https://github.com/ncsizemore/jheem-portal) - Frontend application
-- [jheem-backend](https://github.com/ncsizemore/jheem-backend) - Workflows and configuration
-- [jheem-simulations](https://github.com/ncsizemore/jheem-simulations) - Simulation data releases
-- [jheem-container-minimal](https://github.com/ncsizemore/jheem-container-minimal) - Ryan White container (base)
+| Repository | Purpose |
+|------------|---------|
+| [jheem-base](https://github.com/ncsizemore/jheem-base) | Shared base image |
+| [jheem-backend](https://github.com/ncsizemore/jheem-backend) | Workflows that run this container |
+| [jheem-portal](https://github.com/ncsizemore/jheem-portal) | Frontend that displays generated data |
