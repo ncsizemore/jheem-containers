@@ -1,35 +1,34 @@
-# create_ryan_white_workspace.R - Clean version with proper directory structure
-# Runs from subdirectory where ../jheem_analyses/ naturally exists
+# create_ryan_white_workspace.R - CROI Ryan White workspace creation
+# Usage: Rscript create_ryan_white_workspace.R <output_file> [jheem_analyses_path]
 
 args <- commandArgs(trailingOnly = TRUE)
 if (length(args) == 0) {
-  stop("Usage: Rscript create_ryan_white_workspace.R <output_workspace_file.RData>", call. = FALSE)
+  stop("Usage: Rscript create_ryan_white_workspace.R <output_file> [jheem_analyses_path]", call. = FALSE)
 }
 output_file <- args[1]
+jheem_analyses_path <- if (length(args) >= 2) args[2] else "../jheem_analyses"
 
-cat("🔧 Starting Ryan White workspace creation (clean directory structure)\n")
-cat("📁 Output file:", output_file, "\n")
-cat("📁 Working directory:", getwd(), "\n")
+cat("Starting Ryan White CROI workspace creation\n")
+cat("Output file:", output_file, "\n")
+cat("jheem_analyses path:", jheem_analyses_path, "\n")
+cat("Working directory:", getwd(), "\n")
 
 start_time <- Sys.time()
 
-# Verify we're in the expected directory structure
-if (!dir.exists("../jheem_analyses")) {
-  cat("❌ Expected directory structure not found\n")
-  cat("📁 Current directory:", getwd(), "\n")
-  cat("🔍 Looking for: ../jheem_analyses/\n")
-  cat("💡 This script should run from a subdirectory with jheem_analyses/ at parent level\n")
+# Verify jheem_analyses directory exists
+if (!dir.exists(jheem_analyses_path)) {
+  cat("ERROR: jheem_analyses not found at:", jheem_analyses_path, "\n")
   quit(status = 1)
 }
 
-cat("✅ Directory structure verified: ../jheem_analyses/ found\n")
+cat("Directory verified:", jheem_analyses_path, "\n")
 
 # 1. Load jheem2 and export internal functions
-cat("📦 Loading jheem2 package...\n")
+cat("Loading jheem2 package...\n")
 library(jheem2)
-cat("✅ jheem2 version:", as.character(packageVersion("jheem2")), "\n")
+cat("jheem2 version:", as.character(packageVersion("jheem2")), "\n")
 
-cat("🔓 Exporting jheem2 internal functions...\n")
+cat("Exporting jheem2 internal functions...\n")
 pkg_env <- asNamespace("jheem2")
 internal_fns <- ls(pkg_env, all.names = TRUE)
 functions_exported_count <- 0
@@ -46,7 +45,7 @@ for (fn_name in internal_fns) {
 cat("✅", functions_exported_count, "internal functions exported to .GlobalEnv\n")
 
 # Export key internal environments needed for simulation operations
-cat("🔓 Exporting jheem2 internal environments...\n")
+cat("Exporting jheem2 internal environments...\n")
 internal_envs <- c("JHEEM.SOLVER.TRACKING")
 for (env_name in internal_envs) {
   if (exists(env_name, pkg_env, inherits = FALSE)) {
@@ -58,53 +57,53 @@ for (env_name in internal_envs) {
   }
 }
 
-use_package_file <- "../jheem_analyses/use_jheem2_package_setting.R"
-ryan_white_spec_file <- "../jheem_analyses/applications/ryan_white/ryan_white_specification.R"
-
-
+# Build file paths using configurable jheem_analyses_path
+ryan_white_spec_file <- file.path(jheem_analyses_path, "applications/ryan_white/ryan_white_specification.R")
+ryan_white_int_file <- file.path(jheem_analyses_path, "applications/ryan_white/ryan_white_interventions.R")
+web_dm_path <- file.path(jheem_analyses_path, "cached/ryan.white.web.data.manager.rdata")
 
 # 3. Source Ryan White model specification (loads RW.DATA.MANAGER)
-cat("🧬 Loading Ryan White model specification...\n")
+cat("Loading Ryan White model specification...\n")
 tryCatch(
   {
-    source("../jheem_analyses/applications/ryan_white/ryan_white_specification.R")
-    cat("✅ Ryan White specification loaded successfully\n")
+    source(ryan_white_spec_file)
+    cat("Ryan White specification loaded successfully\n")
   },
   error = function(e) {
-    cat("❌ ERROR loading specification:", e$message, "\n")
+    cat("ERROR loading specification:", e$message, "\n")
     quit(status = 1)
   }
 )
 
 # 3.5. Load web data manager for container use (in addition to RW.DATA.MANAGER)
-cat("🌐 Loading web data manager for container use...\n")
+cat("Loading web data manager for container use...\n")
 tryCatch(
   {
-    WEB.DATA.MANAGER <- load.data.manager("../jheem_analyses/cached/ryan.white.web.data.manager.rdata", set.as.default = TRUE)
-    cat("✅ Web data manager loaded (RW.DATA.MANAGER kept for compatibility)\n")
+    WEB.DATA.MANAGER <- load.data.manager(web_dm_path, set.as.default = TRUE)
+    cat("Web data manager loaded (RW.DATA.MANAGER kept for compatibility)\n")
   },
   error = function(e) {
-    cat("❌ ERROR loading web data manager:", e$message, "\n")
-    cat("⚠️  Will use RW.DATA.MANAGER as fallback\n")
+    cat("ERROR loading web data manager:", e$message, "\n")
+    cat("Will use RW.DATA.MANAGER as fallback\n")
   }
 )
 
 # 3.6. Load Ryan White interventions (required for rerun.simulations)
-cat("🔧 Loading Ryan White interventions...\n")
+cat("Loading Ryan White interventions...\n")
 RW.ANCHOR.YEAR <- 2026  # CROI 2026 anchor year - needed for intervention suffix
 tryCatch(
   {
-    source("../jheem_analyses/applications/ryan_white/ryan_white_interventions.R")
-    cat("✅ Ryan White interventions loaded successfully\n")
+    source(ryan_white_int_file)
+    cat("Ryan White interventions loaded successfully\n")
   },
   error = function(e) {
-    cat("❌ ERROR loading interventions:", e$message, "\n")
+    cat("ERROR loading interventions:", e$message, "\n")
     quit(status = 1)
   }
 )
 
 # 4. Verify key objects are available
-cat("🔍 Verifying key objects...\n")
+cat("Verifying key objects...\n")
 required_objects <- c("RW.SPECIFICATION", "RW.DATA.MANAGER")
 missing_objects <- c()
 
@@ -118,12 +117,12 @@ for (obj_name in required_objects) {
 }
 
 if (length(missing_objects) > 0) {
-  cat("❌ FATAL: Missing required objects:", paste(missing_objects, collapse = ", "), "\n")
+  cat("FATAL: Missing required objects:", paste(missing_objects, collapse = ", "), "\n")
   quit(status = 1)
 }
 
 # 4.5 Capture VERSION.MANAGER and ONTOLOGY.MAPPING.MANAGER state after registration
-cat("\n📦 Capturing JHEEM2 internal state...\n")
+cat("\nCapturing JHEEM2 internal state...\n")
 
 # Get VERSION.MANAGER
 vm <- asNamespace("jheem2")$VERSION.MANAGER
@@ -137,17 +136,17 @@ if (!("versions" %in% ls(vm, all.names = TRUE) && "rw" %in% vm$versions)) {
   stop("'rw' version not found in VERSION.MANAGER")
 }
 
-cat("  ✅ 'rw' version is registered\n")
+cat("  'rw' version is registered\n")
 
 # Get ONTOLOGY.MAPPING.MANAGER
 ont_mgr <- get("ONTOLOGY.MAPPING.MANAGER", envir = asNamespace("jheem2"))
-cat("  📊 Ontology mappings found:", length(ont_mgr$mappings), "\n")
+cat("  Ontology mappings found:", length(ont_mgr$mappings), "\n")
 if (length(ont_mgr$mappings) > 0) {
-  cat("  🔍 Mapping names:", paste(names(ont_mgr$mappings), collapse = ", "), "\n")
+  cat("  Mapping names:", paste(names(ont_mgr$mappings), collapse = ", "), "\n")
 }
 
 # Capture R6 class generators needed for simulation operations (thin, rerun, etc.)
-cat("  📦 Capturing R6 class generators...\n")
+cat("  Capturing R6 class generators...\n")
 r6_class_names <- c("JHEEM.RUN.METADATA", "SIMULATION.METADATA", "SOLVER.METADATA",
                     "SPECIFICATION.METADATA", "OUTCOME.METADATA", "MODEL.OUTCOME.METADATA")
 r6_classes <- list()
@@ -162,9 +161,9 @@ for (class_name in r6_class_names) {
 
 # Get INTERVENTION.MANAGER (stores registered interventions)
 int_mgr <- get("INTERVENTION.MANAGER", envir = asNamespace("jheem2"))
-cat("  📊 Registered interventions:", length(int_mgr$interventions), "\n")
+cat("  Registered interventions:", length(int_mgr$interventions), "\n")
 if (length(int_mgr$interventions) > 0) {
-  cat("  🔍 Intervention codes:", paste(names(int_mgr$interventions), collapse = ", "), "\n")
+  cat("  Intervention codes:", paste(names(int_mgr$interventions), collapse = ", "), "\n")
 }
 
 # Create the hidden object with both states using consistent approach
@@ -180,11 +179,11 @@ if (length(int_mgr$interventions) > 0) {
 # Save to global environment
 assign(".jheem2_state", .jheem2_state, envir = .GlobalEnv)
 
-cat("  ✅ Internal state captured in .jheem2_state\n")
-cat("  📊 Captured", length(.jheem2_state$version_manager), "VERSION.MANAGER elements\n")
-cat("  📊 Captured", length(.jheem2_state$ontology_mapping_manager), "ONTOLOGY.MAPPING.MANAGER elements\n")
+cat("  Internal state captured in .jheem2_state\n")
+cat("  Captured", length(.jheem2_state$version_manager), "VERSION.MANAGER elements\n")
+cat("  Captured", length(.jheem2_state$ontology_mapping_manager), "ONTOLOGY.MAPPING.MANAGER elements\n")
 if ("mappings" %in% names(.jheem2_state$ontology_mapping_manager)) {
-  cat("  📊 Including", length(.jheem2_state$ontology_mapping_manager$mappings), "ontology mappings\n")
+  cat("  Including", length(.jheem2_state$ontology_mapping_manager$mappings), "ontology mappings\n")
 }
 
 # =============================================================
@@ -192,7 +191,7 @@ if ("mappings" %in% names(.jheem2_state$ontology_mapping_manager)) {
 # =============================================================
 
 # 5. Save workspace to the path provided by the command line argument
-cat("💾 Saving workspace to", output_file, "...\n")
+cat("Saving workspace to", output_file, "...\n")
 file_size_mb <- NA # Initialize in case tryCatch fails before assignment
 
 tryCatch(
@@ -202,11 +201,11 @@ tryCatch(
     # Check file size using the correct path
     file_size <- file.info(output_file)$size
     file_size_mb <- round(file_size / 1024^2, 2)
-    cat("✅ Workspace saved successfully\n")
-    cat("📊 File size:", file_size_mb, "MB\n")
+    cat("Workspace saved successfully\n")
+    cat("File size:", file_size_mb, "MB\n")
   },
   error = function(e) {
-    cat("❌ ERROR saving workspace:", e$message, "\n")
+    cat("ERROR saving workspace:", e$message, "\n")
     quit(status = 1)
   }
 )
@@ -216,9 +215,9 @@ end_time <- Sys.time()
 total_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
 current_objects <- ls(envir = .GlobalEnv)
 
-cat("\n🎯 Ryan White workspace creation complete!\n")
-cat("⏱️  Total time:", round(total_time, 2), "seconds\n")
-cat("📁 Output file:", output_file, "\n") # Use the correct variable
-cat("📊 File size:", file_size_mb, "MB\n") # Use the correct variable
-cat("🔧 Objects included:", length(current_objects), "\n")
-cat("✅ Ready for container deployment\n")
+cat("\nRyan White workspace creation complete!\n")
+cat("Total time:", round(total_time, 2), "seconds\n")
+cat("Output file:", output_file, "\n") # Use the correct variable
+cat("File size:", file_size_mb, "MB\n") # Use the correct variable
+cat("Objects included:", length(current_objects), "\n")
+cat("Ready for container deployment\n")
