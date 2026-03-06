@@ -26,8 +26,9 @@ case "$1" in
     exec Rscript trim_simsets.R "$@"
     ;;
   "custom")
-    echo "Starting Custom mode (same as lambda)"
-    exec R --slave -e "source('lambda_handler.R')"
+    echo "Starting Custom simulation mode"
+    shift  # Remove 'custom' from args
+    exec Rscript common/custom_simulation.R "$@"
     ;;
   "test-batch")
     echo "Testing batch dependencies"
@@ -76,7 +77,7 @@ case "$1" in
     echo "  lambda       - Run Lambda handler for custom simulations"
     echo "  batch        - Run batch plot generator for pre-run simulations"
     echo "  trim         - Trim raw simsets to web-friendly size (if available)"
-    echo "  custom       - Alias for lambda mode"
+    echo "  custom       - Run custom simulation (user params → JSON output)"
     echo "  test-batch   - Test batch plotting dependencies"
     echo "  test-workspace - Test workspace loading (auto-detect)"
     echo "  debug        - Start interactive bash shell"
