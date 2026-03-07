@@ -28,7 +28,7 @@ case "$1" in
   "custom")
     echo "Starting Custom simulation mode"
     shift  # Remove 'custom' from args
-    exec Rscript common/custom_simulation.R "$@"
+    exec Rscript custom_simulation.R "$@"
     ;;
   "test-batch")
     echo "Testing batch dependencies"
