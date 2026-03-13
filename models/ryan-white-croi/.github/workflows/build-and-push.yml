@@ -8,10 +8,16 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
     inputs:
+      base_version:
+        description: 'jheem-base version (e.g., 1.2.0). Leave empty for default.'
+        required: false
+        default: ''
       jheem_analyses_commit:
         description: 'jheem_analyses commit (leave empty for HEAD)'
         required: false
         default: ''
+  repository_dispatch:
+    types: [base-image-updated]
 
 env:
   GHCR_REGISTRY: ghcr.io
@@ -27,6 +33,31 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
+    - name: Determine base version
+      id: base
+      run: |
+        if [ -n "${{ github.event.client_payload.base_version }}" ]; then
+          echo "version=${{ github.event.client_payload.base_version }}" >> $GITHUB_OUTPUT
+          echo "Using base version from dispatch: ${{ github.event.client_payload.base_version }}"
+        elif [ -n "${{ github.event.inputs.base_version }}" ]; then
+          echo "version=${{ github.event.inputs.base_version }}" >> $GITHUB_OUTPUT
+          echo "Using base version from input: ${{ github.event.inputs.base_version }}"
+        else
+          echo "version=1.0.0" >> $GITHUB_OUTPUT
+          echo "Using default base version: 1.0.0"
+        fi
+
+    - name: Determine jheem_analyses commit
+      id: jheem-commit
+      run: |
+        if [ -n "${{ github.event.inputs.jheem_analyses_commit }}" ]; then
+          echo "commit=${{ github.event.inputs.jheem_analyses_commit }}" >> $GITHUB_OUTPUT
+          echo "Using specified commit: ${{ github.event.inputs.jheem_analyses_commit }}"
+        else
+          echo "commit=HEAD" >> $GITHUB_OUTPUT
+          echo "Using HEAD (latest)"
+        fi
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -53,17 +84,6 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
           type=sha,prefix={{branch}}-,enable=${{ github.ref_type == 'branch' }}
 
-    - name: Determine jheem_analyses commit
-      id: jheem-commit
-      run: |
-        if [ -n "${{ github.event.inputs.jheem_analyses_commit }}" ]; then
-          echo "commit=${{ github.event.inputs.jheem_analyses_commit }}" >> $GITHUB_OUTPUT
-          echo "Using specified commit: ${{ github.event.inputs.jheem_analyses_commit }}"
-        else
-          echo "commit=HEAD" >> $GITHUB_OUTPUT
-          echo "Using HEAD (latest)"
-        fi
-
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
@@ -76,6 +96,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
+          BASE_VERSION=${{ steps.base.outputs.version }}
           JHEEM_ANALYSES_COMMIT=${{ steps.jheem-commit.outputs.commit }}
 
     - name: Generate build summary
@@ -83,5 +104,6 @@ jobs:
         echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "**GHCR Image:** ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
         echo "**Tags:** ${{ steps.meta-ghcr.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Base Version:** ${{ steps.base.outputs.version }}" >> $GITHUB_STEP_SUMMARY
         echo "**Platforms:** linux/amd64" >> $GITHUB_STEP_SUMMARY
         echo "**JHEEM Analyses Commit:** ${{ steps.jheem-commit.outputs.commit }}" >> $GITHUB_STEP_SUMMARY
