@@ -7,7 +7,7 @@ Shared R environment for all JHEEM model containers. Model containers extend thi
 Model containers should use this as their base:
 
 ```dockerfile
-ARG BASE_VERSION=1.0.0
+ARG BASE_VERSION=1.2.0
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}
 
 # Add model-specific workspace
@@ -23,11 +23,12 @@ CMD ["batch"]
 |-----------|-------------|
 | R 4.4.2 | Base R installation |
 | renv.lock | Pinned R packages including jheem2, plotly, jsonlite |
-| batch_plot_generator.R | Auto-detects workspace, generates plot data |
-| container_entrypoint.sh | Routes to batch, lambda, trim, or debug modes |
+| batch_plot_generator.R | Auto-detects workspace, generates plot/data output |
+| custom_simulation.R | Custom simulation mode (load workspace, run intervention, save simsets) |
+| container_entrypoint.sh | Routes to batch, custom, trim, or debug modes |
 | trim_simsets.R | Trims raw simsets to web-friendly size |
 | plotting/ | Plot rendering dependencies |
-| simulation/ | Simulation utilities |
+| simulation/ | Simulation utilities (intervention scripts) |
 
 ## Modes
 
@@ -35,11 +36,25 @@ The entrypoint supports several modes:
 
 | Mode | Description |
 |------|-------------|
-| `batch` | Generate plot data from pre-run simulations |
-| `lambda` | Run custom simulations (for serverless) |
+| `batch` | Extract data from pre-run simulations. Supports `--output-mode data` (JSON) or `plot` (Plotly). |
+| `custom` | Run custom simulation with user parameters. Saves simsets in batch-compatible layout for subsequent `batch` extraction. |
 | `trim` | Trim raw simsets to web-ready size |
 | `test-workspace` | Test workspace loading (auto-detects) |
 | `debug` | Interactive bash shell |
+
+## Version-Matching Requirement
+
+**The jheem2 version in the base image must match the version used to generate the simsets that the container will process.** The diffeq engine dynamics changed at commit `76859f2d` (April 2025) — simsets generated before this commit require pre-fix jheem2, and vice versa.
+
+Current versions:
+
+| Tag | jheem2 | Use with |
+|-----|--------|----------|
+| v1.2.0 | 1.6.2 (pre-fix, pinned to `54f669a`) | MSA simsets (`ryan-white-msa-v1.0.0`) |
+| v1.1.1 | latest (post-fix) | CROI simsets (`ryan-white-state-v2.0.0`) |
+| v1.0.0 | latest (post-fix) | CDC Testing simsets |
+
+See the [custom simulations plan](https://github.com/ncsizemore/jheem-portal/blob/main/docs/CUSTOM-SIMULATIONS-PLAN.md) for full version matrix and context.
 
 ## Building
 
@@ -49,15 +64,14 @@ docker build -t jheem-base .
 
 ## Tagging
 
-Use semantic versioning:
-- `v1.0.0` - First stable release
-- `v1.1.0` - Added new feature
-- `v1.0.1` - Bug fix
+Use semantic versioning. The Dockerfile's `ARG BASE_VERSION` default in downstream containers is the source of truth for which base version they use — workflows should not override it unless explicitly specified.
 
 When base image updates, model containers should:
-1. Update their `BASE_VERSION` build arg
+1. Update their Dockerfile `ARG BASE_VERSION` default
 2. Test builds
 3. Tag new model version
+
+**Cascade rebuild is currently disabled** — different models need different jheem2 versions. Rebuild each model container individually.
 
 ## Related Repositories
 
