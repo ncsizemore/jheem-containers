@@ -19,42 +19,30 @@ Docker container for the CROI 2026 Ryan White 30-state analysis. Extends the sha
 ## Usage
 
 ```bash
-docker pull ghcr.io/ncsizemore/jheem-ryan-white-croi:latest
+docker pull ghcr.io/ncsizemore/jheem-ryan-white-croi:1.0.0
 ```
 
 ### Batch Mode (Data Extraction)
 
 ```bash
-docker run --rm ghcr.io/ncsizemore/jheem-ryan-white-croi:2.0.0 batch \
+docker run --rm ghcr.io/ncsizemore/jheem-ryan-white-croi:1.0.0 batch \
   --state AL \
   --scenarios cessation \
   --outcomes incidence \
   --output-mode data
 ```
 
-### Trim Mode (Simset Preparation)
-
-```bash
-docker run --rm \
-  -v /path/to/raw:/data/raw \
-  -v /path/to/trimmed:/data/trimmed \
-  ghcr.io/ncsizemore/jheem-ryan-white-croi:2.0.0 \
-  trim --state AL
-```
-
 ### Test Workspace
 
 ```bash
-docker run --rm ghcr.io/ncsizemore/jheem-ryan-white-croi:2.0.0 test-workspace
+docker run --rm ghcr.io/ncsizemore/jheem-ryan-white-croi:1.0.0 test-workspace
 ```
 
 ## Architecture
 
-This container uses a thin wrapper pattern:
-
 ```
-ghcr.io/ncsizemore/jheem-base:1.0.0    (shared R environment)
-  └── ghcr.io/ncsizemore/jheem-ryan-white-croi:2.0.0  (this container, ~75 lines)
+ghcr.io/ncsizemore/jheem-base:1.0.0           (shared R environment, jheem2 latest/post-fix)
+  └── ghcr.io/ncsizemore/jheem-ryan-white-croi:1.0.0  (this container)
 ```
 
 ### What's in this container
@@ -62,12 +50,15 @@ ghcr.io/ncsizemore/jheem-base:1.0.0    (shared R environment)
 | File | Purpose |
 |------|---------|
 | `create_ryan_white_workspace.R` | Creates RW.SPECIFICATION with CROI anchor year (2026) |
-| `trim_simsets.R` | Trims raw simsets for web-friendly size |
 | `cached/google_mobility_data.Rdata` | Mobility data (not in official cache yet) |
 
-Everything else (R packages, batch_plot_generator.R, entrypoint) comes from jheem-base.
+Everything else (R packages, batch_plot_generator.R, custom_simulation.R, entrypoint) comes from jheem-base.
 
 Note: CROI also installs jheem2 from dev branch (required for compatibility with latest jheem_analyses).
+
+### Version Matching
+
+This container uses jheem-base v1.0.0 with post-fix jheem2. The CROI simsets (`ryan-white-state-v2.0.0`) were generated after the diffeq fix (`76859f2d`), so the versions match. See jheem-base README for details on version-matching requirements.
 
 ## Building
 
@@ -79,7 +70,7 @@ docker build -t jheem-ryan-white-croi .
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `BASE_VERSION` | `1.0.0` | jheem-base image version |
+| `BASE_VERSION` | `1.0.0` | jheem-base image version (source of truth — workflow defers to this) |
 | `JHEEM_ANALYSES_COMMIT` | `HEAD` | jheem_analyses git commit |
 
 ## Related Repositories
