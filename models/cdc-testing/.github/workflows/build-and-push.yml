@@ -30,18 +30,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Determine base version
+    - name: Determine base version override
       id: base
       run: |
+        # Only set an override if explicitly provided via dispatch or manual input.
+        # Otherwise, the Dockerfile's ARG BASE_VERSION default is used.
         if [ -n "${{ github.event.client_payload.base_version }}" ]; then
-          echo "version=${{ github.event.client_payload.base_version }}" >> $GITHUB_OUTPUT
+          echo "override=BASE_VERSION=${{ github.event.client_payload.base_version }}" >> $GITHUB_OUTPUT
           echo "Using base version from dispatch: ${{ github.event.client_payload.base_version }}"
         elif [ -n "${{ github.event.inputs.base_version }}" ]; then
-          echo "version=${{ github.event.inputs.base_version }}" >> $GITHUB_OUTPUT
+          echo "override=BASE_VERSION=${{ github.event.inputs.base_version }}" >> $GITHUB_OUTPUT
           echo "Using base version from input: ${{ github.event.inputs.base_version }}"
         else
-          echo "version=1.0.0" >> $GITHUB_OUTPUT
-          echo "Using default base version: 1.0.0"
+          echo "override=" >> $GITHUB_OUTPUT
+          echo "Using default base version from Dockerfile"
         fi
 
     - name: Set up Docker Buildx
@@ -80,12 +82,12 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         build-args: |
-          BASE_VERSION=${{ steps.base.outputs.version }}
+          ${{ steps.base.outputs.override }}
 
     - name: Generate build summary
       run: |
         echo "## Docker Build Summary" >> $GITHUB_STEP_SUMMARY
         echo "**Image:** ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
         echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
-        echo "**Base Version:** ${{ steps.base.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Base Version Override:** ${{ steps.base.outputs.override || 'Dockerfile default' }}" >> $GITHUB_STEP_SUMMARY
         echo "**Platforms:** linux/amd64" >> $GITHUB_STEP_SUMMARY
