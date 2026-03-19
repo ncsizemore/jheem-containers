@@ -7,16 +7,10 @@ Docker container for the JHEEM CDC Testing model. Extends the shared [jheem-base
 The container is published to GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/ncsizemore/jheem-cdc-testing-model:latest
+docker pull ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0
 ```
 
-### Lambda Mode (Default)
-
-```bash
-docker run --rm -p 8080:8080 ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0 lambda
-```
-
-### Batch Mode (Data Generation)
+### Batch Mode (Data Extraction)
 
 ```bash
 docker run --rm ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0 batch \
@@ -34,11 +28,9 @@ docker run --rm ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0 test-workspace
 
 ## Architecture
 
-This container uses a thin wrapper pattern:
-
 ```
-ghcr.io/ncsizemore/jheem-base:1.0.0    (shared R environment, ~150 lines)
-  └── ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0  (this container, ~55 lines)
+ghcr.io/ncsizemore/jheem-base:1.0.0           (shared R environment, jheem2 latest/post-fix)
+  └── ghcr.io/ncsizemore/jheem-cdc-testing-model:2.0.0  (this container)
 ```
 
 ### What's in this container
@@ -48,7 +40,11 @@ ghcr.io/ncsizemore/jheem-base:1.0.0    (shared R environment, ~150 lines)
 | `create_cdc_testing_workspace.R` | Creates CDCT.SPECIFICATION and loads interventions |
 | `cached/google_mobility_data.Rdata` | Mobility data (not in official cache yet) |
 
-Everything else (R packages, batch_plot_generator.R, entrypoint) comes from jheem-base.
+Everything else (R packages, batch_plot_generator.R, custom_simulation.R, entrypoint) comes from jheem-base.
+
+### Version Matching
+
+This container uses jheem-base v1.0.0 with post-fix jheem2. The CDC Testing simsets (`cdc-testing-v1.0.0`) generation date relative to the diffeq fix (`76859f2d`) has not been verified — empirical testing required before enabling custom simulations. See jheem-base README for details.
 
 ## Building
 
@@ -60,7 +56,7 @@ docker build -t jheem-cdc-testing-model .
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `BASE_VERSION` | `1.0.0` | jheem-base image version |
+| `BASE_VERSION` | `1.0.0` | jheem-base image version (source of truth — workflow defers to this) |
 | `JHEEM_ANALYSES_COMMIT` | `fc3fe1d...` | jheem_analyses git commit |
 
 ## Related Repositories
