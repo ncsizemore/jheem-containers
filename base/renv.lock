@@ -4604,7 +4604,7 @@
     },
     "jheem2": {
       "Package": "jheem2",
-      "Version": "1.6.2",
+      "Version": "1.11.1",
       "Source": "GitHub",
       "Type": "Package",
       "Title": "Code to set up and run simulations using the JHEEM Engine",
@@ -4619,12 +4619,14 @@
         "deSolve",
         "ggplot2",
         "locations",
-        "ggsci"
+        "ggsci",
+        "plotly",
+        "ungroup"
       ],
       "LinkingTo": [
         "Rcpp"
       ],
-      "RoxygenNote": "7.2.3",
+      "RoxygenNote": "7.3.2",
       "Depends": [
         "R (>= 2.10)"
       ],
@@ -4637,8 +4639,8 @@
       "RemoteHost": "api.github.com",
       "RemoteUsername": "tfojo1",
       "RemoteRepo": "jheem2",
-      "RemoteRef": "54f669a139281f25cd87dfd0c25a01aca797777c",
-      "RemoteSha": "54f669a139281f25cd87dfd0c25a01aca797777c"
+      "RemoteRef": "3b74e3cee64a1f76f419fc855ffc2f8e8449ad57",
+      "RemoteSha": "3b74e3cee64a1f76f419fc855ffc2f8e8449ad57"
     },
     "jpeg": {
       "Package": "jpeg",
@@ -6083,6 +6085,35 @@
       "Author": "Gergely Daróczi [aut, cre] (<https://orcid.org/0000-0003-3149-8537>), Roman Tsegelskyi [aut]",
       "Maintainer": "Gergely Daróczi <daroczig@rapporter.net>",
       "Repository": "CRAN"
+    },
+    "pbapply": {
+      "Package": "pbapply",
+      "Version": "1.7-4",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Adding Progress Bar to '*apply' Functions",
+      "Date": "2025-07-19",
+      "Authors@R": "c(person(given = \"Peter\", family = \"Solymos\", comment = c(ORCID = \"0000-0001-7337-1740\"), role = c(\"aut\", \"cre\"), email = \"psolymos@gmail.com\"), person(given = \"Zygmunt\", family = \"Zawadzki\", role = \"aut\", email = \"zygmunt@zstat.pl\"), person(given = \"Henrik\",  family = \"Bengtsson\",  role = \"ctb\", email = \"henrikb@braju.com\"), person(\"R Core Team\", role = c(\"cph\", \"ctb\")))",
+      "Maintainer": "Peter Solymos <psolymos@gmail.com>",
+      "Description": "A lightweight package that adds progress bar to vectorized R functions ('*apply'). The implementation can easily be added to functions where showing the progress is useful (e.g. bootstrap). The type and style of the progress bar (with percentages or remaining time) can be set through options. Supports several parallel processing backends including mirai and future.",
+      "Depends": [
+        "R (>= 3.2.0)"
+      ],
+      "Imports": [
+        "parallel"
+      ],
+      "Suggests": [
+        "shiny",
+        "future",
+        "future.apply"
+      ],
+      "License": "GPL (>= 2)",
+      "URL": "https://github.com/psolymos/pbapply, https://peter.solymos.org/pbapply/",
+      "BugReports": "https://github.com/psolymos/pbapply/issues",
+      "NeedsCompilation": "no",
+      "Author": "Peter Solymos [aut, cre] (ORCID: <https://orcid.org/0000-0001-7337-1740>), Zygmunt Zawadzki [aut], Henrik Bengtsson [ctb], R Core Team [cph, ctb]",
+      "Repository": "https://packagemanager.posit.co/cran/__linux__/bookworm/latest",
+      "Encoding": "UTF-8"
     },
     "pbkrtest": {
       "Package": "pbkrtest",
@@ -9213,9 +9244,49 @@
       "Maintainer": "Davis Vaughan <davis@posit.co>",
       "Repository": "CRAN"
     },
+    "ungroup": {
+      "Package": "ungroup",
+      "Version": "1.4.4",
+      "Source": "Repository",
+      "Type": "Package",
+      "Title": "Penalized Composite Link Model for Efficient Estimation of Smooth Distributions from Coarsely Binned Data",
+      "Authors@R": "c( person(\"Marius D.\", \"Pascariu\", role = c(\"aut\", \"cre\"), email = \"rpascariu@outlook.com\", comment = c(ORCID = \"0000-0002-2568-6489\")), person(\"Silvia\", \"Rizzi\", role = \"aut\", email = \"srizzi@health.sdu.dk\"), person(\"Jonas\", \"Schoeley\", role = \"aut\", comment = c(ORCID = \"0000-0002-3340-8518\")), person(\"Maciej J.\", \"Danko\", role = \"aut\", email = \"Danko@demogr.mpg.de\", comment = c(ORCID = \"0000-0002-7924-9022\")) )",
+      "Description": "Versatile method for ungrouping histograms (binned count data)  assuming that counts are Poisson distributed and that the underlying sequence  on a fine grid to be estimated is smooth. The method is based on the composite  link model and estimation is achieved by maximizing a penalized likelihood.  Smooth detailed sequences of counts and rates are so estimated from the binned  counts. Ungrouping binned data can be desirable for many reasons: Bins can be  too coarse to allow for accurate analysis; comparisons can be hindered when  different grouping approaches are used in different histograms; and the last  interval is often wide and open-ended and, thus, covers a lot of information  in the tail area. Age-at-death distributions grouped in age classes and  abridged life tables are examples of binned data. Because of modest assumptions,  the approach is suitable for many demographic and epidemiological applications.  For a detailed description of the method and applications see  Rizzi et al. (2015) <doi:10.1093/aje/kwv020>.",
+      "License": "MIT + file LICENSE",
+      "LazyData": "TRUE",
+      "Depends": [
+        "R (>= 3.4.0)"
+      ],
+      "Imports": [
+        "pbapply (>= 1.3)",
+        "Rcpp (>= 0.12.0)",
+        "Rdpack (>= 0.8)",
+        "Matrix"
+      ],
+      "LinkingTo": [
+        "Rcpp",
+        "RcppEigen"
+      ],
+      "Suggests": [
+        "MortalityLaws (>= 1.5.0)",
+        "knitr (>= 1.20)",
+        "rmarkdown (>= 1.10)",
+        "testthat (>= 2.0.0)"
+      ],
+      "RdMacros": "Rdpack",
+      "URL": "https://github.com/mpascariu/ungroup",
+      "BugReports": "https://github.com/mpascariu/ungroup/issues",
+      "VignetteBuilder": "knitr",
+      "Encoding": "UTF-8",
+      "RoxygenNote": "7.3.0",
+      "NeedsCompilation": "yes",
+      "Author": "Marius D. Pascariu [aut, cre] (<https://orcid.org/0000-0002-2568-6489>), Silvia Rizzi [aut], Jonas Schoeley [aut] (<https://orcid.org/0000-0002-3340-8518>), Maciej J. Danko [aut] (<https://orcid.org/0000-0002-7924-9022>)",
+      "Maintainer": "Marius D. Pascariu <rpascariu@outlook.com>",
+      "Repository": "https://packagemanager.posit.co/cran/__linux__/bookworm/latest"
+    },
     "units": {
       "Package": "units",
-      "Version": "1.0-0",
+      "Version": "1.0-1",
       "Source": "Repository",
       "Title": "Measurement Units for R Vectors",
       "Authors@R": "c(person(\"Edzer\", \"Pebesma\", role = c(\"aut\", \"cre\"), email = \"edzer.pebesma@uni-muenster.de\", comment = c(ORCID = \"0000-0001-8049-7069\")), person(\"Thomas\", \"Mailund\", role = \"aut\", email = \"mailund@birc.au.dk\"), person(\"Tomasz\", \"Kalinowski\", role = \"aut\"), person(\"James\", \"Hiebert\", role = \"ctb\"), person(\"Iñaki\", \"Ucar\", role = \"aut\", email = \"iucar@fedoraproject.org\", comment = c(ORCID = \"0000-0001-6403-5550\")), person(\"Thomas Lin\", \"Pedersen\", role = \"ctb\") )",
@@ -9226,7 +9297,7 @@
         "Rcpp"
       ],
       "LinkingTo": [
-        "Rcpp (>= 0.12.10)"
+        "Rcpp (>= 1.1.0)"
       ],
       "Suggests": [
         "NISTunits",
