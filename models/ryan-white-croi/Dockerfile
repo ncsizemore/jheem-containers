@@ -2,12 +2,10 @@
 # JHEEM Ryan White CROI Model (30 States, 2026-2031)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.0.0
+ARG BASE_VERSION=1.3.0
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
-# CROI requires jheem2 dev branch (not the renv.lock version)
-RUN R -e "renv::install('tfojo1/jheem2@dev')" && \
-    R -e "cat('jheem2 version:', as.character(packageVersion('jheem2')), '\n')"
+# jheem2 1.11.1 inherited from base v1.3.0 (no override needed)
 
 # --- Build workspace ---
 FROM base AS workspace-builder
