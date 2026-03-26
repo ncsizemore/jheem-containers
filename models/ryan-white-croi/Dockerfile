@@ -2,10 +2,10 @@
 # JHEEM Ryan White CROI Model (30 States, 2026-2031)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.3.0
+ARG BASE_VERSION=1.4.0
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
-# jheem2 1.11.1 inherited from base v1.3.0 (no override needed)
+# jheem2 1.11.1 inherited from base (no override needed)
 
 # --- Build workspace ---
 FROM base AS workspace-builder
