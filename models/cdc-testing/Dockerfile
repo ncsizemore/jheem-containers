@@ -1,14 +1,18 @@
 # =============================================================================
 # JHEEM CDC Testing Model
-# Thin wrapper around jheem-base - only adds workspace creation
+# Thin wrapper around jheem-base - adds workspace creation + simulation script
 # =============================================================================
-ARG BASE_VERSION=1.0.0
+ARG BASE_VERSION=1.4.0
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
+
+# jheem2 1.11.1 inherited from base (no override needed)
 
 # --- Build workspace ---
 FROM base AS workspace-builder
 
-ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
+# Updated from fc3fe1d to include proportion.tested.regardless model element
+ARG JHEEM_ANALYSES_COMMIT=51ac4957
+
 WORKDIR /app
 
 # Clone jheem_analyses at specific commit
@@ -47,6 +51,9 @@ LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-cdc-t
 LABEL org.opencontainers.image.description="JHEEM CDC Testing model container"
 
 COPY --from=workspace-builder /app/cdc_testing_workspace.RData ./
+
+# CDC Testing custom simulation script
+COPY simple_cdc_testing.R simulation/simple_cdc_testing.R
 
 # Verify workspace
 RUN R --slave -e "load('cdc_testing_workspace.RData'); \

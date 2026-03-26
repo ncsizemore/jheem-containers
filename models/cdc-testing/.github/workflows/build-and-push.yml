@@ -17,7 +17,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/jheem-cdc-testing-model
+  IMAGE_NAME: ${{ github.repository_owner }}/jheem-cdc-testing
 
 jobs:
   build:
