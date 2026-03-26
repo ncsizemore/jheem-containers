@@ -44,45 +44,41 @@ for (fn_name in internal_fns) {
 }
 cat(functions_exported_count, "internal functions exported to .GlobalEnv\n")
 
-# 2. Set CDC Testing anchor year BEFORE sourcing interventions
-# This controls the intervention suffix (empty for 2025, ".26" for 2026)
-# Our release uses non-suffixed files, so we use 2025
-CDC.TESTING.ANCHOR.YEAR <- 2025
-cat("CDC Testing anchor year set to:", CDC.TESTING.ANCHOR.YEAR, "\n")
+# 2. Source cdc_testing_main.R — the research code's own initialization sequence.
+# This sources specification, parameters, likelihood, and interventions in the
+# correct order with the right variables set (anchor year, intervention suffix, etc).
+# Sourcing main.R instead of cherry-picking individual files makes us resilient
+# to changes in the research code's initialization dependencies.
+cat("Loading CDC Testing model via cdc_testing_main.R...\n")
+cdc_testing_main_file <- file.path(jheem_analyses_path, "applications/cdc_testing/cdc_testing_main.R")
 
-# Build file paths using configurable jheem_analyses_path
-cdc_testing_spec_file <- file.path(jheem_analyses_path, "applications/cdc_testing/cdc_testing_specification.R")
-cdc_testing_int_file <- file.path(jheem_analyses_path, "applications/cdc_testing/cdc_testing_interventions.R")
-web_dm_path <- file.path(jheem_analyses_path, "cached/ryan.white.web.data.manager.rdata")
+# main.R uses relative paths (e.g., source('applications/cdc_testing/...'))
+# so we need to run from the jheem_analyses directory
+original_wd <- getwd()
+setwd(jheem_analyses_path)
+cat("  Working directory for sourcing:", getwd(), "\n")
 
-# 3. Source CDC Testing model specification
-cat("Loading CDC Testing model specification...\n")
 tryCatch(
   {
-    source(cdc_testing_spec_file)
-    cat("CDC Testing specification loaded successfully\n")
+    source(cdc_testing_main_file)
+    cat("CDC Testing model loaded successfully\n")
+    cat("  Anchor year:", CDC.TESTING.ANCHOR.YEAR, "\n")
+    cat("  Locations:", length(CDC.TESTING.LOCATIONS), "\n")
+    cat("  Intervention codes:", paste(CDC.TESTING.INTERVENTION.CODES, collapse = ", "), "\n")
   },
   error = function(e) {
-    cat("ERROR loading specification:", e$message, "\n")
+    cat("ERROR loading CDC Testing model:", e$message, "\n")
+    setwd(original_wd)
     quit(status = 1)
   }
 )
 
-# 3.5. Load CDC Testing interventions
-cat("Loading CDC Testing interventions...\n")
-tryCatch(
-  {
-    source(cdc_testing_int_file)
-    cat("CDC Testing interventions loaded successfully\n")
-  },
-  error = function(e) {
-    cat("ERROR loading interventions:", e$message, "\n")
-    quit(status = 1)
-  }
-)
+setwd(original_wd)
+cat("  Restored working directory:", getwd(), "\n")
 
-# 3.6. Load web data manager for container use
+# Load web data manager for container use
 # CDC Testing uses the same data manager as Ryan White (EHE-based)
+web_dm_path <- file.path(jheem_analyses_path, "cached/ryan.white.web.data.manager.rdata")
 cat("Loading web data manager for container use...\n")
 tryCatch(
   {
