@@ -668,10 +668,11 @@ process_batch <- function() {
       log_msg(sprintf("Loading scenario simulation: %s/%s", job$city, scenario))
 
       # Load scenario simulation
+      model_id <- Sys.getenv("MODEL_ID", "ryan-white")
       if (scenario == "base") {
-        simset_file <- file.path("simulations/ryan-white/base", paste0(job$city, "_base.Rdata"))
+        simset_file <- file.path("simulations", model_id, "base", paste0(job$city, "_base.Rdata"))
       } else {
-        simset_file <- file.path("simulations/ryan-white/prerun", job$city, paste0(scenario, ".Rdata"))
+        simset_file <- file.path("simulations", model_id, "prerun", job$city, paste0(scenario, ".Rdata"))
       }
 
       if (!file.exists(simset_file)) {

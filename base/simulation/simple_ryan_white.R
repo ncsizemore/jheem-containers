@@ -1,5 +1,9 @@
 # simulation/simple_ryan_white.R
-# Simplified Ryan White intervention creation using direct jheem2 calls
+# Ryan White intervention creation using direct jheem2 calls.
+# Implements the model-agnostic contract expected by custom_simulation.R:
+#   create_model_intervention() - reads env vars, returns intervention
+#   run_custom_simulation(base_simset, intervention) - returns results simset
+#
 # Based on research script patterns from ryan_white_interventions.R lines 250-327
 
 # ============================================================================
@@ -21,30 +25,19 @@ START.YEAR <- 2025.5
 LOSS.LAG <- 0.25
 
 # ============================================================================
-# SIMPLIFIED INTERVENTION CREATION
+# CONTRACT: create_model_intervention / run_custom_simulation
 # ============================================================================
 
-#' Create Ryan White intervention using direct jheem2 calls
-#' @param parameters List with adap_suppression_loss, oahs_suppression_loss, other_suppression_loss
+#' Create Ryan White intervention using direct jheem2 calls.
+#' Reads ADAP_LOSS, OAHS_LOSS, OTHER_LOSS from environment variables.
 #' @return jheem2 intervention object
-create_ryan_white_intervention <- function(parameters) {
-  cat("🔧 Creating Ryan White intervention with direct jheem2 calls...\n")
-  
-  # Extract parameters with defaults
-  adap_loss <- parameters$adap_suppression_loss %||% 30
-  oahs_loss <- parameters$oahs_suppression_loss %||% 25
-  other_loss <- parameters$other_suppression_loss %||% 40
-  
-  cat("  📊 Parameters: ADAP=", adap_loss, "%, OAHS=", oahs_loss, "%, Other=", other_loss, "%\n")
-  
-  cat("  🔍 Determining number of simulations needed for parameter matrix...\n")
-  # We need to create parameters that will match the base simulation set
-  # For now, we'll use NULL parameters (simplest approach matching our direct numeric values)
-  rw_params <- NULL
-  
-  cat("  📊 Using direct numeric values instead of parameter matrix\n")
-  
-  cat("  🎯 Creating 6 intervention effects (expansion/nonexpansion × adap/oahs/other)...\n")
+create_model_intervention <- function() {
+  adap_loss <- as.numeric(Sys.getenv("ADAP_LOSS", "50"))
+  oahs_loss <- as.numeric(Sys.getenv("OAHS_LOSS", "30"))
+  other_loss <- as.numeric(Sys.getenv("OTHER_LOSS", "40"))
+
+  cat(sprintf("  Creating Ryan White intervention: ADAP=%g%%, OAHS=%g%%, Other=%g%%\n",
+              adap_loss, oahs_loss, other_loss))
   
   # Create ADAP effects (direct jheem2 calls matching research script)
   adap.expansion.effect <- create.intervention.effect(
@@ -115,10 +108,6 @@ create_ryan_white_intervention <- function(parameters) {
     allow.values.greater.than.otherwise = FALSE
   )
   
-  cat("  ✅ All 6 intervention effects created\n")
-  
-  # Create complete intervention (matching research script pattern)
-  cat("  🎯 Creating complete intervention with WHOLE.POPULATION...\n")
   intervention <- create.intervention(
     adap.expansion.effect,
     adap.nonexpansion.effect,
@@ -126,93 +115,43 @@ create_ryan_white_intervention <- function(parameters) {
     oahs.nonexpansion.effect,
     rw.support.expansion.effect,
     rw.support.nonexpansion.effect,
-    parameters = rw_params,
     WHOLE.POPULATION,
     code = "rw-custom"
   )
-  
-  cat("✅ Ryan White intervention created successfully with code 'rw-custom'\n")
+
+  cat("  Ryan White intervention created (code: rw-custom)\n")
   return(intervention)
 }
 
-#' Run custom simulation using direct jheem2 calls
+#' Run custom simulation
 #' @param base_simset jheem2 simulation set
 #' @param intervention jheem2 intervention object
 #' @return jheem2 simulation results
 run_custom_simulation <- function(base_simset, intervention) {
-  cat("🚀 Running custom simulation with direct run.intervention() call...\n")
-  
-  # Validate inputs
-  if (is.null(base_simset)) {
-    stop("Base simulation set cannot be null")
-  }
-  if (is.null(intervention)) {
-    stop("Intervention cannot be null")
-  }
-  
-  cat("  📦 Base simset class:", class(base_simset), "\n")
-  cat("  🔧 Intervention code:", intervention$code, "\n")
-  
-  # Copy simset to avoid modifying original (like the old complex approach)
-  cat("  🔧 Copying simulation set to avoid modifying original...\n")
+  cat(sprintf("  Running simulation (simset class: %s, intervention: %s)\n",
+              class(base_simset), intervention$code))
+
   base_simset <- copy.simulation.set(base_simset)
-  
-  # Create progress callback for monitoring (like the complex approach)
-  # Note: jheem2 sometimes reports inconsistent totals, so we track the max total seen
+
+  # jheem2 sometimes reports inconsistent totals, so track the max seen
   progress_state <- list(max_total = 0, last_index = -1)
-  
   progress_callback <- function(index, total, done) {
-    # Update max total if we see a larger one
-    if (total > progress_state$max_total) {
+    if (total > progress_state$max_total)
       progress_state$max_total <<- total
-    }
-    
-    # Only report progress if index has actually increased and is reasonable
     if (index > progress_state$last_index && index <= progress_state$max_total) {
       percentage <- round((index / progress_state$max_total) * 100)
-      cat("  🔄 Simulation progress:", index, "of", progress_state$max_total, paste0("(", percentage, "%)"), "\n")
+      cat(sprintf("  Progress: %d of %d (%d%%)\n", index, progress_state$max_total, percentage))
       progress_state$last_index <<- index
     }
-    
-    if (done) {
-      cat("  ✅ Simulation batch completed!\n")
-    }
+    if (done) cat("  Simulation batch completed\n")
   }
-  
-  # Direct jheem2 call using intervention's run method (matching research script)
-  cat("  🎯 Calling intervention$run() with progress tracking...\n")
-  results <- intervention$run(base_simset, 
-                             start.year = 2025, 
-                             end.year = 2035, 
-                             verbose = TRUE,
-                             listener = progress_callback)
-  
-  cat("✅ Custom simulation completed successfully\n")
-  cat("  📊 Results class:", class(results), "\n")
-  
-  return(results)
-}
 
-#' Validate intervention parameters
-#' @param parameters List of parameters to validate
-validate_intervention_parameters <- function(parameters) {
-  cat("🔍 Validating intervention parameters...\n")
-  
-  # Check required parameters
-  required_params <- c("adap_suppression_loss", "oahs_suppression_loss", "other_suppression_loss")
-  missing_params <- required_params[!required_params %in% names(parameters)]
-  
-  if (length(missing_params) > 0) {
-    stop("Missing required parameters: ", paste(missing_params, collapse = ", "))
-  }
-  
-  # Validate parameter ranges (0-100%)
-  for (param in required_params) {
-    value <- parameters[[param]]
-    if (!is.numeric(value) || value < 0 || value > 100) {
-      stop("Parameter ", param, " must be between 0 and 100, got: ", value)
-    }
-  }
-  
-  cat("✅ All parameters validated successfully\n")
+  results <- intervention$run(base_simset,
+                              start.year = 2025,
+                              end.year = 2035,
+                              verbose = TRUE,
+                              listener = progress_callback)
+
+  cat("  Simulation completed\n")
+  return(results)
 }

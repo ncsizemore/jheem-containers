@@ -17,8 +17,9 @@ load_baseline_direct <- function(city, page_id = "prerun") {
   
   print(sprintf("[BASELINE] No cached baseline found for %s, loading directly from file", cache_key))
   
-  # Construct direct file path
-  baseline_file <- file.path("simulations/ryan-white/base", paste0(city, "_base.Rdata"))
+  # Construct direct file path (MODEL_ID env var for custom sims, defaults to ryan-white)
+  model_id <- Sys.getenv("MODEL_ID", "ryan-white")
+  baseline_file <- file.path("simulations", model_id, "base", paste0(city, "_base.Rdata"))
   
   if (!file.exists(baseline_file)) {
     warning(sprintf("Baseline file not found: %s", baseline_file))
