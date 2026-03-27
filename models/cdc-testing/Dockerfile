@@ -2,7 +2,7 @@
 # JHEEM CDC Testing Model
 # Thin wrapper around jheem-base - adds workspace creation + simulation script
 # =============================================================================
-ARG BASE_VERSION=1.4.0
+ARG BASE_VERSION=1.4.1
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
