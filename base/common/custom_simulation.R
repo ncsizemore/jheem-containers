@@ -105,17 +105,23 @@ for (name in names(.jheem2_state$ontology_mapping_manager)) {
 
 library(distributions)
 
-# Workaround for jheem2 bug: populate_outcomes_array crashes on NULL
-# new_values/old_times (affects aids.diagnoses/aids.deaths in state simsets)
-original_poa <- get("populate_outcomes_array", envir = asNamespace("jheem2"))
-patched_poa <- function(desired_times, char_desired_times, n_per_time,
-                         new_values, new_times, old_values, old_times, prior_sim_index) {
-  if (is.null(new_values) || is.null(old_times)) return(old_values)
-  original_poa(desired_times, char_desired_times, n_per_time,
-               new_values, new_times, old_values, old_times, prior_sim_index)
+# Workaround for jheem2 bug: populate_outcomes_array (C++) crashes on NULL
+# new_values/old_times. Affects RW state simsets (aids.diagnoses/aids.deaths
+# outcomes don't exist in some configurations). CDC Testing doesn't have these
+# outcomes, and the patch corrupts its different outcome dimensions.
+# TODO: Fix in jheem2 proper, then remove this.
+if (MODEL_ID %in% c("ryan-white-msa", "ryan-white-state-ajph", "ryan-white-state-croi")) {
+  original_poa <- get("populate_outcomes_array", envir = asNamespace("jheem2"))
+  patched_poa <- function(desired_times, char_desired_times, n_per_time,
+                           new_values, new_times, old_values, old_times, prior_sim_index) {
+    if (is.null(new_values) || is.null(old_times)) return(old_values)
+    original_poa(desired_times, char_desired_times, n_per_time,
+                 new_values, new_times, old_values, old_times, prior_sim_index)
+  }
+  environment(patched_poa) <- asNamespace("jheem2")
+  assignInNamespace("populate_outcomes_array", patched_poa, ns = "jheem2")
+  cat("  Applied populate_outcomes_array NULL-guard (RW models)\n")
 }
-environment(patched_poa) <- asNamespace("jheem2")
-assignInNamespace("populate_outcomes_array", patched_poa, ns = "jheem2")
 
 t1_elapsed <- (proc.time() - t1)["elapsed"]
 cat(sprintf("  Time: %.1f sec\n\n", t1_elapsed))
