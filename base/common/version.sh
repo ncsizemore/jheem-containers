@@ -8,7 +8,9 @@
 # =============================================================================
 set -euo pipefail
 
-jheem2_ver="$(R --slave -e "cat(tryCatch(as.character(packageVersion('jheem2')), error=function(e) 'unknown'))" 2>/dev/null || echo unknown)"
+# RENV_CONFIG_SYNCHRONIZED_CHECK=FALSE silences renv's "project out-of-sync"
+# startup notice, which would otherwise pollute the captured version string.
+jheem2_ver="$(RENV_CONFIG_SYNCHRONIZED_CHECK=FALSE R --slave -e "cat(tryCatch(as.character(packageVersion('jheem2')), error=function(e) 'unknown'))" 2>/dev/null || echo unknown)"
 ws_ver="${JHEEM2_WORKSPACE_VERSION:-}"
 
 cat <<EOF

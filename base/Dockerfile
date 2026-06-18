@@ -2,15 +2,17 @@
 # JHEEM Base Image
 # Shared R environment for all JHEEM model containers
 # =============================================================================
-# Pinned by digest: r-base:4.4.2 is a floating tag on Debian testing/sid, so the
-# system libs drift (e.g. libnode jumped to Node 24, breaking V8). Pinning the
-# manifest digest freezes the OS environment for reproducible builds.
-FROM r-base:4.4.2@sha256:fe9b29520eeb5292d814b0958783c0ddfcdab37402967a3e67307604354f98d7
+# Built on rocker/r-ver (Ubuntu 24.04 LTS, pinned R + Posit Package Manager
+# binaries) rather than r-base. r-base tracks Debian testing/sid (rolling), so
+# its system libs drift out from under us — e.g. libnode jumped to Node 24,
+# breaking V8 against the old ABI. rocker is purpose-built for reproducible R:
+# a frozen Ubuntu LTS base + RSPM binaries, pinned here by digest.
+FROM rocker/r-ver:4.4.2@sha256:df26749182af64d5263bf64149d51a427b476ed28c4e046997143be3f97fdd7c
 
 LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-base"
 LABEL org.opencontainers.image.description="Shared base image for JHEEM model containers"
 
-# --- System Dependencies ---
+# --- System Dependencies (Ubuntu 24.04 noble) ---
 RUN apt-get update && apt-get install -y \
     build-essential \
     libcurl4-openssl-dev \
@@ -28,7 +30,7 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     libtiff5-dev \
     libtiff6 \
-    libjpeg62-turbo \
+    libjpeg-turbo8 \
     libpng16-16 \
     libfreetype6 \
     libfontconfig1-dev \
@@ -41,46 +43,32 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     curl \
-    awscli \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Library Symlinks for RSPM Compatibility ---
-# These binaries from RSPM expect specific library versions
-RUN ARCH_LIB_DIR=$(dpkg-architecture -q DEB_HOST_MULTIARCH) && \
-    # libgit2
-    LIBGIT2=$(ls /usr/lib/${ARCH_LIB_DIR}/libgit2.so.* 2>/dev/null | grep -E 'libgit2\.so\.[0-9]+\.[0-9]+$' | head -1) && \
-    if [ -n "${LIBGIT2}" ]; then ln -sf "${LIBGIT2}" "/usr/lib/${ARCH_LIB_DIR}/libgit2.so.1.5"; fi && \
-    # libnode
-    LIBNODE=$(ls /usr/lib/${ARCH_LIB_DIR}/libnode.so.* 2>/dev/null | head -1) && \
-    if [ -n "${LIBNODE}" ]; then ln -sf "${LIBNODE}" "/usr/lib/${ARCH_LIB_DIR}/libnode.so.108"; fi && \
-    # libgdal
-    GDAL=$(ls /usr/lib/${ARCH_LIB_DIR}/libgdal.so.* 2>/dev/null | head -1) && \
-    if [ -n "${GDAL}" ]; then ln -sf "${GDAL}" "/usr/lib/${ARCH_LIB_DIR}/libgdal.so.32"; fi
+# AWS CLI v2 (used by batch_plot_generator.R --upload-s3; not in noble repos).
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip && \
+    unzip -q /tmp/awscliv2.zip -d /tmp && /tmp/aws/install && \
+    rm -rf /tmp/awscliv2.zip /tmp/aws
 
 # --- R Configuration ---
-RUN R CMD javareconf && \
-    R -e "install.packages('pak', repos = 'https://r-lib.github.io/p/pak/stable/')"
+RUN R CMD javareconf
 
 WORKDIR /app
 
 # --- R Packages ---
+# Rprofile.site points renv at RSPM's noble binaries. No source-compile block or
+# library-symlink hacks are needed (those were r-base/Debian workarounds): on
+# rocker, RSPM binaries match the system libs natively, so renv::restore()
+# installs the locked versions — including V8/sf — straight from binaries.
 COPY renv.lock Rprofile.site ./
-RUN cp Rprofile.site /etc/R/
+RUN cp Rprofile.site "$(R RHOME)/etc/Rprofile.site"
 
-RUN R -e "pak::pkg_install('renv')" && \
+RUN R -e "install.packages('renv')" && \
     R -e "renv::init(bare = TRUE)" && \
     echo "source('renv/activate.R')" > .Rprofile
 
-# Install packages that need source compilation.
-# V8: force the self-contained static libv8 download (needs curl, installed
-# above) instead of linking the system libnode, whose V8 ABI drifts with Debian.
-RUN R -e "renv::install('units', type = 'source')" && \
-    R -e "renv::install('gert', type = 'source')" && \
-    DOWNLOAD_STATIC_LIBV8=1 R -e "renv::install('V8', type = 'source')" && \
-    R -e "renv::install('sf', type = 'source')"
-
-RUN R -e "renv::snapshot(packages = c('units', 'gert', 'V8', 'sf'), update = TRUE)" && \
-    R -e "renv::restore()"
+RUN R -e "renv::restore()"
 
 # Verify core packages
 RUN R --slave -e "library(jheem2); library(plotly); library(jsonlite); cat('Base packages verified\n')"
