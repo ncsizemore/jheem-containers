@@ -30,6 +30,14 @@ case "$1" in
     shift  # Remove 'custom' from args
     exec Rscript custom_simulation.R "$@"
     ;;
+  "run")
+    echo "Starting Run mode (params -> JSON, one command)"
+    shift  # Remove 'run' from args
+    exec ./run_simulation.sh "$@"
+    ;;
+  "version")
+    exec ./version.sh
+    ;;
   "test-batch")
     echo "Testing batch dependencies"
     exec R --slave -e "
@@ -71,21 +79,24 @@ case "$1" in
     exec /bin/bash
     ;;
   *)
-    echo "Usage: $0 {lambda|batch|trim|custom|test-batch|test-workspace|debug} [args...]"
+    echo "Usage: $0 {lambda|batch|trim|custom|run|version|test-batch|test-workspace|debug} [args...]"
     echo ""
     echo "Modes:"
     echo "  lambda       - Run Lambda handler for custom simulations"
     echo "  batch        - Run batch plot generator for pre-run simulations"
     echo "  trim         - Trim raw simsets to web-friendly size (if available)"
     echo "  custom       - Run custom simulation (user params → JSON output)"
+    echo "  run          - One-command sim: human flags → JSON (wraps custom + batch)"
+    echo "  version      - Print image provenance (model id, jheem2, simset release)"
     echo "  test-batch   - Test batch plotting dependencies"
     echo "  test-workspace - Test workspace loading (auto-detect)"
     echo "  debug        - Start interactive bash shell"
     echo ""
     echo "Examples:"
+    echo "  $0 run --location C.12580 --param adap_loss=50 --param oahs_loss=30 --out results.json"
     echo "  $0 batch --city C.12580 --outcomes incidence --scenarios cessation"
     echo "  $0 trim --state AL --input-dir /data/raw --output-dir /data/trimmed"
-    echo "  $0 test-workspace"
+    echo "  $0 version"
     exit 1
     ;;
 esac

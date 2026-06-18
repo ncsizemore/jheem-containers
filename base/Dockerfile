@@ -85,7 +85,7 @@ COPY simulation/ ./simulation/
 COPY plotting/ ./plotting/
 COPY tests/ ./tests/
 
-RUN chmod +x container_entrypoint.sh
+RUN chmod +x container_entrypoint.sh run_simulation.sh version.sh
 
 # Base image doesn't have a default command - model images will set ENTRYPOINT
 # This allows model images to add their workspace and then:
