@@ -2,7 +2,10 @@
 # JHEEM Base Image
 # Shared R environment for all JHEEM model containers
 # =============================================================================
-FROM r-base:4.4.2
+# Pinned by digest: r-base:4.4.2 is a floating tag on Debian testing/sid, so the
+# system libs drift (e.g. libnode jumped to Node 24, breaking V8). Pinning the
+# manifest digest freezes the OS environment for reproducible builds.
+FROM r-base:4.4.2@sha256:fe9b29520eeb5292d814b0958783c0ddfcdab37402967a3e67307604354f98d7
 
 LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-base"
 LABEL org.opencontainers.image.description="Shared base image for JHEEM model containers"
@@ -37,6 +40,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     git \
+    curl \
     awscli \
     && rm -rf /var/lib/apt/lists/*
 
@@ -67,10 +71,12 @@ RUN R -e "pak::pkg_install('renv')" && \
     R -e "renv::init(bare = TRUE)" && \
     echo "source('renv/activate.R')" > .Rprofile
 
-# Install packages that need source compilation
+# Install packages that need source compilation.
+# V8: force the self-contained static libv8 download (needs curl, installed
+# above) instead of linking the system libnode, whose V8 ABI drifts with Debian.
 RUN R -e "renv::install('units', type = 'source')" && \
     R -e "renv::install('gert', type = 'source')" && \
-    R -e "renv::install('V8', type = 'source')" && \
+    DOWNLOAD_STATIC_LIBV8=1 R -e "renv::install('V8', type = 'source')" && \
     R -e "renv::install('sf', type = 'source')"
 
 RUN R -e "renv::snapshot(packages = c('units', 'gert', 'V8', 'sf'), update = TRUE)" && \
