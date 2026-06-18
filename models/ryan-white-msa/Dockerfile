@@ -8,7 +8,7 @@
 # 1.9.2) which serialized function definitions compatible with 1.6.2's R6 classes.
 # Building from source with newer jheem2 would serialize incompatible functions.
 # =============================================================================
-ARG BASE_VERSION=1.3.0
+ARG BASE_VERSION=1.6.0
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
 # --- Workspace source (prebuilt, jheem2 1.9.2 compatible with 1.6.2 runtime) ---
@@ -33,6 +33,20 @@ RUN R --slave -e "load('ryan_white_workspace.RData'); \
     stopifnot(exists('RW.SPECIFICATION')); \
     stopifnot(exists('RW.DATA.MANAGER')); \
     cat('Workspace verified\n')"
+
+# --- Self-describing identity & provenance ---
+# Defaults for the standalone `run` / `version` modes, and so `docker inspect`
+# reveals exactly what's inside. The web pipeline still passes MODEL_ID /
+# SIMULATION_SCRIPT via `docker run -e ...`, which override these (models.json
+# stays the single source of truth for that path). Tag/DOI come later (Tier 1).
+ARG BASE_VERSION
+ENV MODEL_ID=ryan-white-msa \
+    SIMULATION_SCRIPT=simple_ryan_white.R \
+    DEFAULT_OUTCOMES=incidence \
+    SIMSET_RELEASE=ryan-white-msa-v1.0.0 \
+    JHEEM2_REF=54f669a139281f25cd87dfd0c25a01aca797777c \
+    JHEEM2_WORKSPACE_VERSION=1.9.2 \
+    JHEEM_BASE_VERSION=${BASE_VERSION}
 
 ENTRYPOINT ["./container_entrypoint.sh"]
 CMD ["batch"]
