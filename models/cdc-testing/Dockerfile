@@ -2,7 +2,9 @@
 # JHEEM CDC Testing Model
 # Thin wrapper around jheem-base - adds workspace creation + simulation script
 # =============================================================================
-ARG BASE_VERSION=1.4.1
+# Updated from fc3fe1d to include proportion.tested.regardless model element
+ARG BASE_VERSION=1.6.1
+ARG JHEEM_ANALYSES_COMMIT=51ac4957
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
@@ -10,8 +12,7 @@ FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 # --- Build workspace ---
 FROM base AS workspace-builder
 
-# Updated from fc3fe1d to include proportion.tested.regardless model element
-ARG JHEEM_ANALYSES_COMMIT=51ac4957
+ARG JHEEM_ANALYSES_COMMIT
 
 WORKDIR /app
 
@@ -60,6 +61,21 @@ RUN R --slave -e "load('cdc_testing_workspace.RData'); \
     cat('Objects:', length(ls()), '\n'); \
     stopifnot(exists('CDCT.SPECIFICATION')); \
     cat('Workspace verified\n')"
+
+# --- Self-describing identity & provenance ---
+# jheem2 inherited from base (not pinned per-model); no workspace skew (built and
+# run with the same jheem2). Base simset is the no-intervention scenario (_noint).
+# Data is OneDrive-sourced at build time, not yet release-pinned (see jheem-portal
+# REPRODUCIBILITY-AND-CITATION-PLAN §5d).
+ARG BASE_VERSION
+ARG JHEEM_ANALYSES_COMMIT
+ENV MODEL_ID=cdc-testing \
+    SIMULATION_SCRIPT=simple_cdc_testing.R \
+    DEFAULT_OUTCOMES=incidence \
+    SIMSET_RELEASE=cdc-testing-v1.0.0 \
+    SIMSET_BASE_SUFFIX=_noint \
+    JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \
+    JHEEM_BASE_VERSION=${BASE_VERSION}
 
 EXPOSE 8080
 ENTRYPOINT ["./container_entrypoint.sh"]
