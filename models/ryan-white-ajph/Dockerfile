@@ -2,7 +2,8 @@
 # JHEEM Ryan White AJPH Model (11 States, 2025-2030)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.3.0
+ARG BASE_VERSION=1.6.1
+ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
 # jheem2 inherited from base (no override needed)
@@ -10,7 +11,7 @@ FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 # --- Build workspace ---
 FROM base AS workspace-builder
 
-ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
+ARG JHEEM_ANALYSES_COMMIT
 WORKDIR /app
 
 # Clone jheem_analyses at specific commit
@@ -54,6 +55,21 @@ RUN R --slave -e "load('ryan_white_workspace.RData'); \
     stopifnot(exists('RW.SPECIFICATION')); \
     stopifnot(exists('RW.DATA.MANAGER')); \
     cat('Workspace verified\n')"
+
+# --- Self-describing identity & provenance ---
+# State model: jheem2 inherited from base (not pinned per-model); no workspace
+# skew (built and run with the same jheem2). Base simset is the no-intervention
+# scenario (_noint). Data is OneDrive-sourced at build time, not yet release-
+# pinned (see jheem-portal REPRODUCIBILITY-AND-CITATION-PLAN §5d).
+ARG BASE_VERSION
+ARG JHEEM_ANALYSES_COMMIT
+ENV MODEL_ID=ryan-white-state-ajph \
+    SIMULATION_SCRIPT=simple_ryan_white.R \
+    DEFAULT_OUTCOMES=incidence \
+    SIMSET_RELEASE=ryan-white-ajph-v1.0.0 \
+    SIMSET_BASE_SUFFIX=_noint \
+    JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \
+    JHEEM_BASE_VERSION=${BASE_VERSION}
 
 ENTRYPOINT ["./container_entrypoint.sh"]
 CMD ["batch"]
