@@ -2,7 +2,11 @@
 # JHEEM Ryan White CROI Model (30 States, 2026-2031)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.4.0
+ARG BASE_VERSION=1.6.1
+# Pinned (was HEAD — a reproducibility hole). 250ffc8a is the jheem_analyses HEAD
+# at the deployed image's build (croi v2.2.0, 2026-03-26T18:08Z), traced from the
+# build timestamp; rebuild reproduces the production golden bit-for-bit.
+ARG JHEEM_ANALYSES_COMMIT=250ffc8aafcabe00c1bca20df831bf9637c2dd12
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
@@ -10,8 +14,7 @@ FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 # --- Build workspace ---
 FROM base AS workspace-builder
 
-# CROI uses latest HEAD (pin to specific commit once published)
-ARG JHEEM_ANALYSES_COMMIT=HEAD
+ARG JHEEM_ANALYSES_COMMIT
 WORKDIR /app
 
 # Clone jheem_analyses
@@ -68,6 +71,21 @@ RUN R --slave -e "load('ryan_white_workspace.RData'); \
     stopifnot(exists('RW.SPECIFICATION')); \
     stopifnot(exists('RW.DATA.MANAGER')); \
     cat('Workspace verified\n')"
+
+# --- Self-describing identity & provenance ---
+# jheem2 inherited from base (not pinned per-model); no workspace skew (built and
+# run with the same jheem2). Base simset is the no-intervention scenario (_noint).
+# Data is OneDrive-sourced at build time, not yet release-pinned (see jheem-portal
+# REPRODUCIBILITY-AND-CITATION-PLAN §5d).
+ARG BASE_VERSION
+ARG JHEEM_ANALYSES_COMMIT
+ENV MODEL_ID=ryan-white-state-croi \
+    SIMULATION_SCRIPT=simple_ryan_white.R \
+    DEFAULT_OUTCOMES=incidence \
+    SIMSET_RELEASE=ryan-white-state-v2.0.0 \
+    SIMSET_BASE_SUFFIX=_noint \
+    JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \
+    JHEEM_BASE_VERSION=${BASE_VERSION}
 
 EXPOSE 8080
 ENTRYPOINT ["./container_entrypoint.sh"]
