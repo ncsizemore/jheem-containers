@@ -1,0 +1,90 @@
+page:
+  title: "The Johns Hopkins Epidemiologic and Economic Model (JHEEM)"
+  subtitle: "A Mathematical Model in Service of Ending the HIV Epidemic in the US"
+
+navigation:
+  links:
+    - id: "overview"
+      text: "Overview"
+    - id: "model-structure"
+      text: "Model Structure"
+    - id: "calibration"
+      text: "Calibration"
+    - id: "interventions"
+      text: "Interventions"
+    - id: "publications"
+      text: "Publications"
+    - id: "funding"
+      text: "Funding Sources"
+
+content:
+  sections:
+    overview:
+      title: "Overview"
+      content: "The JHEEM is a dynamic, compartmental model of HIV. We have calibrated the model to recapitulate the HIV Epidemic in 32 cities identified by the Ending the HIV Epidemic Initiative (EtE). In each of these cities, we can experiment with different levels of the EtE pillars - HIV testing, viral suppression among people with HIV (PWH), and pre-exposure prophylaxis (PrEP) among individuals at risk for HIV - to project their effect on future transmission."
+    
+    model_structure:
+      title: "Model Structure"
+      content: "The JHEEM represents the adult population (13 years old and older) as stratified into compartments based on HIV status and demographic characteristics."
+      figure:
+        src: "images/model_unit.png"
+        alt: "Schematic of Model Structure"
+        caption: 
+          - "The JHEEM represents the adult population (13 years old and older) as stratified into seven compartments with respect to HIV."
+          - "The population is further stratified by age (13-24, 25-34, 35-44, 45-54, and ≥55 years old), race/ethnicity (Black, Hispanic, and other), sex/sexual behavior (female, heterosexual male, and MSM), and IV drug use (never use, active use, and prior use), for a total of 945 compartments across 135 strata of age, race, sex, and IV drug use."
+    
+    calibration:
+      title: "Calibration"
+      content: "The JHEEM includes 131 variable parameters. Running the model with one set of parameter values yields a simulation, which comprises simulated numbers of infections past and future."
+      list:
+        type: "ordered"
+        items:
+          - content: "<b>Reported Diagnoses</b> from 2009 to 2017 from the CDC."
+          - content: "<b>Prevalence</b> from 2008 to 2016 from the CDC."
+          - content: "<b>Proportion of PWH who are Diagnosed</b> from 2008 to 2016 from the CDC."
+          - content: "<b>Proportion of Diagnosed PWH who are Virally Suppressed</b> from 2014 to 2017 from the CDC."
+          - content: "<b>Deaths among PWH</b> from 2009 to 2017 from the CDC."
+    
+    interventions:
+      title: "Interventions"
+      content: "The JHEEM can be used to project the effects of interventions that affect:"
+      list:
+        type: "unordered"
+        items:
+          - content: "HIV testing frequency"
+          - content: "PrEP coverage among those at risk for HIV"
+          - content: "Viral suppression among PWH"
+          - content: "Participation in needle-exchange programs"
+          - content: "Use of medications for opioid use disorder (MOUDs)"
+    
+    publications:
+      title: "Publications"
+      list:
+        type: "unordered"
+        items:
+          - content: "Comprehensive description of model structure and calibration (in preparation)"
+          - content: "Applications to specific cities (in preparation)"
+    
+    funding:
+      title: "Funding Sources"
+      content: "This work is supported by the following grants from the National Institutes of Health:"
+      list:
+        type: "unordered"
+        items:
+          - content: "R01 AI146555"
+          - content: "R01 DA047952"
+          - content: "DP2 DA049295"
+
+layout:
+  container:
+    class: "page-container"
+    min_width: "750px"
+    max_width: "850px"
+  header:
+    class: "page-header"
+    padding: "var(--spacing-md) var(--spacing-lg)"
+  content:
+    class: "page-content"
+  section:
+    class: "page-section"
+    margin_bottom: "var(--spacing-xl)" 
