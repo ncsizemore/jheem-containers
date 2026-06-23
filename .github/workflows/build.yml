@@ -1,5 +1,13 @@
 name: build
 
+# Build -> test-by-digest -> promote gate.
+#   build:   build the candidate, push it, capture its immutable DIGEST
+#   test:    pull that exact digest, run smoke + golden/perturbation tests
+#   promote: re-tag the *tested digest* to :latest / semver (NO rebuild between
+#            test and promotion). Promotion happens only on push to main / a
+#            release tag and only if the tests passed; PRs and dispatch validate
+#            without promoting.
+
 on:
   push:
     branches: [main]
@@ -9,12 +17,14 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: 'Image to build: all | base | ryan-white-msa | ryan-white-ajph | ryan-white-croi | cdc-testing'
+        description: 'all | base | ryan-white-msa | ryan-white-ajph | ryan-white-croi | cdc-testing'
         default: all
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  # Decide which images to build: dispatch (explicit), tag push (the tagged
-  # image), or branch push (path-filtered; a base/ change rebuilds all).
   select:
     runs-on: ubuntu-latest
     outputs:
@@ -49,7 +59,7 @@ jobs:
                 else
                   files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null || true)
                 fi
-                if echo "$files" | grep -q '^base/'; then
+                if echo "$files" | grep -qE '^(base/|tests/|\.github/)'; then
                   pick="ALL"
                 else
                   for n in ryan-white-msa ryan-white-ajph ryan-white-croi cdc-testing; do
@@ -75,9 +85,6 @@ jobs:
     needs: select
     if: ${{ needs.select.outputs.any == 'true' }}
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -85,8 +92,84 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
-      - if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          platforms: linux/amd64
+          push: true   # push a throwaway candidate tag so the digest is pullable downstream
+          tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:gate-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: record candidate digest
+        run: |
+          mkdir -p dg
+          printf 'ghcr.io/%s/%s@%s' "${{ github.repository_owner }}" "${{ matrix.image }}" "${{ steps.build.outputs.digest }}" > dg/ref
+          echo "candidate: $(cat dg/ref)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ref-${{ matrix.name }}
+          path: dg/ref
+
+  test:
+    needs: [select, build]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ref-${{ matrix.name }}
+          path: dg
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tests/requirements.txt
+      - name: test candidate digest (smoke + golden/perturbation)
+        env:
+          IMAGE_OWNER: ${{ github.repository_owner }}
+        run: |
+          if [ "${{ matrix.name }}" = "base" ]; then echo "base has no model tests"; exit 0; fi
+          REF=$(cat dg/ref)
+          export "GATE_IMAGE_$(printf '%s' '${{ matrix.name }}' | tr 'a-z-' 'A-Z_')=$REF"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pytest tests -k "${{ matrix.name }}" -m "not slow" -v
+          else
+            pytest tests -k "${{ matrix.name }}" -v
+          fi
+
+  promote:
+    needs: [select, build, test]
+    # Only on a real release event, and only if every test passed (fail-closed).
+    if: >-
+      needs.test.result == 'success' &&
+      github.event_name == 'push' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ref-${{ matrix.name }}
+          path: dg
+      - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -94,20 +177,15 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v5
         with:
-          # Preserve the existing published image names so models.json/production is untouched.
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=
             type=match,pattern=${{ matrix.name }}-v(\d+\.\d+\.\d+),group=1
             type=match,pattern=${{ matrix.name }}-v(\d+\.\d+)\.\d+,group=1
-      - uses: docker/build-push-action@v5
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.context }}/Dockerfile
-          platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: promote the tested digest (no rebuild)
+        run: |
+          REF=$(cat dg/ref)
+          TAGS=$(printf '%s' "${{ steps.meta.outputs.tags }}" | sed 's/^/-t /' | tr '\n' ' ')
+          echo "Re-tagging $REF -> $TAGS"
+          docker buildx imagetools create $TAGS "$REF"
