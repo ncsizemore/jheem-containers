@@ -72,6 +72,7 @@ ARG JHEEM_ANALYSES_COMMIT
 ENV MODEL_ID=cdc-testing \
     SIMULATION_SCRIPT=simple_cdc_testing.R \
     DEFAULT_OUTCOMES=incidence \
+    PARAM_ENV_MAP="testing_reduction=TESTING_REDUCTION proportion_tested_regardless=PROPORTION_TESTED" \
     SIMSET_RELEASE=cdc-testing-v1.0.0 \
     SIMSET_BASE_SUFFIX=_noint \
     JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \

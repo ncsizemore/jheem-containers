@@ -118,9 +118,20 @@ fi
 export LOCATION MODEL_ID SIMULATION_SCRIPT SCENARIO_KEY
 export SCENARIO_LABEL="$SCENARIO_KEY"
 export OUTPUT_DIR=/app           # so simulations/ lands where batch reads it (CWD)
+# Map a --param id to its env var via the model's baked PARAM_ENV_MAP (id=ENVVAR
+# pairs, the canonical mapping from models.json); fall back to UPPERCASE(id).
+# UPPERCASE alone is wrong where id != envVar — e.g. CDC's
+# proportion_tested_regardless -> PROPORTION_TESTED (not _REGARDLESS).
+resolve_env() {
+  local id="$1" pair
+  for pair in ${PARAM_ENV_MAP:-}; do
+    [ "${pair%%=*}" = "$id" ] && { printf '%s' "${pair#*=}"; return; }
+  done
+  printf '%s' "$id" | tr '[:lower:]' '[:upper:]'
+}
 for kv in "${PARAMS[@]}"; do
   [[ "$kv" == *=* && -n "${kv%%=*}" ]] || err "bad --param (expected NAME=VALUE): $kv"
-  export "$(echo "${kv%%=*}" | tr '[:lower:]' '[:upper:]')"="${kv#*=}"
+  export "$(resolve_env "${kv%%=*}")"="${kv#*=}"
 done
 
 cd /app

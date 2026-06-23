@@ -66,6 +66,7 @@ ARG JHEEM_ANALYSES_COMMIT
 ENV MODEL_ID=ryan-white-state-ajph \
     SIMULATION_SCRIPT=simple_ryan_white.R \
     DEFAULT_OUTCOMES=incidence \
+    PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-ajph-v1.0.0 \
     SIMSET_BASE_SUFFIX=_noint \
     JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \
