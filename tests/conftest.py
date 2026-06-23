@@ -52,7 +52,12 @@ def docker_run_json(ref, location, params, run_name, timeout=2700):
     for k, v in params.items():
         cmd += ["--param", f"{k}={v}"]
     cmd += ["--out", f"/out/{run_name}.json"]
-    subprocess.run(cmd, check=True, capture_output=True, text=True, timeout=timeout)
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if proc.returncode != 0:
+        raise AssertionError(
+            f"container `run` failed (exit {proc.returncode}) for {run_name}\n"
+            f"--- stdout (tail) ---\n{proc.stdout[-2500:]}\n"
+            f"--- stderr (tail) ---\n{proc.stderr[-2500:]}")
     return load_json(out_file)
 
 

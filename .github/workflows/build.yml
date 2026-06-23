@@ -139,6 +139,11 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
+      - name: free disk space (room for the ~6GB image + large simsets + intermediate saves)
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+            /usr/local/.ghcup /usr/share/dotnet /usr/local/share/boost /opt/microsoft 2>/dev/null || true
+          df -h / | tail -1
       - name: test candidate digest (smoke + golden/perturbation)
         env:
           IMAGE_OWNER: ${{ github.repository_owner }}
