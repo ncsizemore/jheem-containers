@@ -2,7 +2,7 @@
 # JHEEM Ryan White CROI Model (30 States, 2026-2031)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.6.1
+ARG BASE_VERSION=1.6.2
 # Pinned (was HEAD — a reproducibility hole). 250ffc8a is the jheem_analyses HEAD
 # at the deployed image's build (croi v2.2.0, 2026-03-26T18:08Z), traced from the
 # build timestamp; rebuild reproduces the production golden bit-for-bit.
