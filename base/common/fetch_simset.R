@@ -50,18 +50,30 @@ if (length(matches) == 0) {
                location, suffix, repo, release))
 }
 
+# Large state simsets (~0.8-1.3 GB) truncate on a single download.file with no
+# retry. Resume + retry + verify size against the release-asset metadata.
+download_with_retry <- function(url, dest, expected_size, tries = 5L) {
+  for (i in seq_len(tries)) {
+    if (file.exists(dest) && file.size(dest) == expected_size) return(invisible(TRUE))
+    # -C - resumes a truncated partial across attempts; --retry-all-errors covers
+    # mid-transfer resets; -f fails on HTTP errors; -L follows redirects.
+    status <- system2("curl", c("-fL", "--retry", "5", "--retry-delay", "3",
+                                "--retry-all-errors", "-C", "-", "-o", dest, url))
+    if (file.exists(dest) && file.size(dest) == expected_size) return(invisible(TRUE))
+    cat(sprintf("  attempt %d incomplete (%.0f/%.0f MB, curl=%s); retrying\n", i,
+                (if (file.exists(dest)) file.size(dest) else 0) / 1e6, expected_size / 1e6, status))
+    Sys.sleep(2 * i)
+  }
+  stop(sprintf("download failed after %d attempts (need %d bytes): %s", tries, expected_size, url))
+}
+
 for (a in matches) {
   dest <- file.path(cache_dir, a$name)
   if (file.exists(dest) && file.size(dest) == a$size) {
     cat(sprintf("  cache hit: %s (%.0f MB)\n", a$name, a$size / 1e6))
   } else {
     cat(sprintf("  downloading: %s (%.0f MB)\n", a$name, a$size / 1e6))
-    utils::download.file(a$browser_download_url, dest, mode = "wb", quiet = FALSE)
-    if (file.size(dest) != a$size) {
-      unlink(dest)
-      stop(sprintf("Size mismatch for %s (got %d, expected %d) — download truncated?",
-                   a$name, file.size(dest), a$size))
-    }
+    download_with_retry(a$browser_download_url, dest, a$size)
   }
   link <- file.path(link_dir, a$name)
   if (normalizePath(dest, mustWork = FALSE) != normalizePath(link, mustWork = FALSE)) {
