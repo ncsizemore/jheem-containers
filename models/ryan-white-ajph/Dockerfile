@@ -44,7 +44,7 @@ RUN Rscript create_ryan_white_workspace.R ryan_white_workspace.RData ../jheem_an
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-ryan-white-ajph-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM Ryan White AJPH model (11 states, 2025-2030)"
 
 COPY --from=workspace-builder /app/ryan_white_workspace.RData ./

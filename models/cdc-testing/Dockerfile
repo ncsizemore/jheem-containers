@@ -48,7 +48,7 @@ RUN Rscript create_cdc_testing_workspace.R cdc_testing_workspace.RData ../jheem_
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-cdc-testing-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM CDC Testing model container"
 
 COPY --from=workspace-builder /app/cdc_testing_workspace.RData ./

@@ -22,8 +22,10 @@ published JHEEM analyses and power the custom simulations on [jheem.org](https:/
 ## Status
 
 Consolidated from five separate repos with **history preserved** (`git log`/`blame` trace through the
-move). **Phase A** (relocation) — done. The CI matrix and **Phase B** (config-driven build) are in
-progress. See the migration plan: `jheem-portal/docs/CONTAINER-MONOREPO-MIGRATION-PLAN.md`.
+move). **Phase A** (relocation + matrix CI) — **done**: all five images build and push from the monorepo
+to their existing names, and a monorepo-built image reproduces its production golden bit-for-bit. **Phase
+B** (config-driven build) and the CI **test/promotion gate** are next. See the migration plan:
+`jheem-portal/docs/CONTAINER-MONOREPO-MIGRATION-PLAN.md`.
 
 ## Images & versioning
 

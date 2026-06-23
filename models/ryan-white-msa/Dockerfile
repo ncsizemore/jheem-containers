@@ -17,7 +17,7 @@ FROM ghcr.io/ncsizemore/jheem-ryan-white-model:2.1.0 AS workspace-source
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-ryan-white-msa-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM Ryan White MSA model (31 cities)"
 
 COPY --from=workspace-source /app/ryan_white_workspace.RData ./

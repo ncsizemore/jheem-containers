@@ -51,7 +51,7 @@ RUN Rscript create_ryan_white_workspace.R ryan_white_workspace.RData ../jheem_an
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-ryan-white-croi-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM Ryan White CROI model (30 states, 2026-2031)"
 
 COPY --from=workspace-builder /app/ryan_white_workspace.RData ./
