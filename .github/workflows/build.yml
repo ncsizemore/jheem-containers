@@ -139,11 +139,14 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
-      - name: free disk space (room for the ~6GB image + large simsets + intermediate saves)
+      - name: free disk + add swap (1000-sim state/CDC runs exceed the runner's 16GB RAM)
         run: |
           sudo rm -rf /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
             /usr/local/.ghcup /usr/share/dotnet /usr/local/share/boost /opt/microsoft 2>/dev/null || true
-          df -h / | tail -1
+          sudo fallocate -l 24G /mnt/swapfile && sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile
+          echo "--- disk ---"; df -h / | tail -1
+          echo "--- memory+swap ---"; free -h | head -3
       - name: test candidate digest (smoke + golden/perturbation)
         env:
           IMAGE_OWNER: ${{ github.repository_owner }}
