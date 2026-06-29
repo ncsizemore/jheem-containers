@@ -34,7 +34,7 @@ that boundary explicit in all future language.
 | **Runtime-contract cleanup** | **Open.** CDC default `CMD ["lambda"]`; RW assumptions in common lambda/extraction; `test-batch` references `plotting/batch_dependencies.R` (only `.backup` present); model-specific `trim_simsets.R`. |
 | **Legacy namespaced tag recovery** | **Open** — must precede archiving the five source repos. |
 | **Provenance hardening** | **Partial.** Done: `fetch_simset.R` retry/resume/verify (`base:1.6.2`). Open: `version.sh` print `JHEEM_ANALYSES_REF`; pin Actions to SHAs; checksum AWS CLI; pin MSA workspace by digest; external-data immutability. |
-| **PR change-detection** | **Open (partial).** Path filter broadened and no-ops now show as *skipped* (distinct from a validated pass), but the PR diff still falls back to `HEAD~1` rather than the merge base. |
+| **PR change-detection** | **Fixed (3rd-round follow-up).** `pull_request` now diffs against the **merge base** with the target branch (`merge-base FETCH_HEAD <pr-head>`), fail-safe to ALL if unresolved — so a multi-commit PR is no longer under-selected. Dry-run confirmed: a PR with `models/cdc-testing/` in commit 1 + docs in commit 2 now selects `cdc-testing` (old `HEAD~1` selected nothing). This makes "a green PR means the model-output gate ran" defensible. |
 | **Perturbation coverage** | **Open enhancement.** One configured parameter per model today; should become every parameter (make `perturb` a list). |
 | **Base-version spread** | **Intentional interim.** MSA on `1.6.0`, heavy models on `1.6.2`; full consistency is a later cleanup. |
 

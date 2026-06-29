@@ -38,6 +38,8 @@ jobs:
         env:
           IMAGE: ${{ github.event.inputs.image }}
           BEFORE: ${{ github.event.before }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           ALL='[
             {"name":"base","image":"jheem-base","context":"base"},
@@ -46,28 +48,41 @@ jobs:
             {"name":"ryan-white-croi","image":"jheem-ryan-white-croi","context":"models/ryan-white-croi"},
             {"name":"cdc-testing","image":"jheem-cdc-testing","context":"models/cdc-testing"}
           ]'
-          pick=""
+          pick=""; files=""
           case "$GITHUB_EVENT_NAME" in
             workflow_dispatch)
               if [ "${IMAGE:-all}" = "all" ]; then pick="ALL"; else pick="$IMAGE"; fi ;;
+            pull_request)
+              # Multi-commit PRs: diff against the MERGE BASE with the target
+              # branch, not HEAD~1 (which sees only the last commit and would
+              # under-select). fetch-depth:0 gives history; fetch base to be safe.
+              git fetch -q --no-tags origin "$PR_BASE_REF" 2>/dev/null || true
+              mb=$(git merge-base FETCH_HEAD "$PR_HEAD_SHA" 2>/dev/null || true)
+              if [ -n "$mb" ]; then
+                files=$(git diff --name-only "$mb" "$PR_HEAD_SHA" 2>/dev/null || true)
+              else
+                echo "WARN: no merge base resolved; selecting ALL (fail-safe)"; pick="ALL"
+              fi ;;
             *)
               if [[ "$GITHUB_REF" == refs/tags/* ]]; then
                 tag="${GITHUB_REF#refs/tags/}"; pick="${tag%-v*}"
+              elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+                files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
               else
-                if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-                  files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
-                else
-                  files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null || true)
-                fi
-                if echo "$files" | grep -qE '^(base/|tests/|\.github/)'; then
-                  pick="ALL"
-                else
-                  for n in ryan-white-msa ryan-white-ajph ryan-white-croi cdc-testing; do
-                    echo "$files" | grep -q "^models/$n/" && pick="$pick $n"
-                  done
-                fi
+                files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null || true)
               fi ;;
           esac
+          # Path filter (only when files were diffed; dispatch/tag set pick directly).
+          # base/, tests/, or .github/ changes affect every image -> ALL.
+          if [ -z "$pick" ] && [ -n "$files" ]; then
+            if echo "$files" | grep -qE '^(base/|tests/|\.github/)'; then
+              pick="ALL"
+            else
+              for n in ryan-white-msa ryan-white-ajph ryan-white-croi cdc-testing; do
+                echo "$files" | grep -q "^models/$n/" && pick="$pick $n"
+              done
+            fi
+          fi
           if [ "$pick" = "ALL" ]; then
             matrix="$ALL"
           elif [ -z "$(echo $pick | tr -d ' ')" ]; then
