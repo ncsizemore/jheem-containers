@@ -154,11 +154,12 @@ jobs:
           if [ "${{ matrix.name }}" = "base" ]; then echo "base has no model tests"; exit 0; fi
           REF=$(cat dg/ref)
           export "GATE_IMAGE_$(printf '%s' '${{ matrix.name }}' | tr 'a-z-' 'A-Z_')=$REF"
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pytest tests -k "${{ matrix.name }}" -m "not slow" -v
-          else
-            pytest tests -k "${{ matrix.name }}" -v
-          fi
+          # Run the FULL suite (smoke + slow golden/perturbation) on every event,
+          # including PRs. `select` already scopes to release-impacting changes (a
+          # docs-only PR builds nothing), so the cost is the blast radius of the
+          # change, and a green PR means the model-output gate actually ran -- not
+          # just smoke. Promotion still never happens on a PR (see the promote job).
+          pytest tests -k "${{ matrix.name }}" -v
 
   promote:
     needs: [select, build, test]

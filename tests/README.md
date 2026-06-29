@@ -38,3 +38,20 @@ be promoted.
 `test_config.json` is the interim per-model manifest (image, golden scenario,
 perturbation). Phase B's canonical `models.yml` should generate or validate it rather
 than it being a separate copy.
+
+## When the gate runs (merge / release policy)
+
+| Event | Builds | Tests | Promotes |
+|-------|--------|-------|----------|
+| `pull_request` → main | affected images (`select`) | **full** (smoke + slow) | no |
+| push → `main` | affected images | **full** | `:latest` (fail-closed) |
+| tag `<image>-vX.Y.Z` | that image | **full** | `:X.Y.Z` `:X.Y` (fail-closed) |
+| `workflow_dispatch` | chosen / all | **full** | no |
+| feature branch push | — (workflow doesn't trigger) | — | — |
+
+The rule: **a green PR means the full model-output gate ran** on the affected images, so a
+release-impacting change cannot merge on smoke alone. `select` scopes builds to changed
+paths (a docs-only PR builds and tests nothing), so PR cost equals the blast radius of the
+change. Promotion only ever happens on push-to-`main` / release tags, only on the *tested*
+digest, and only if every test passed. During active development, iterate on a feature
+branch and use `workflow_dispatch` for ad-hoc full runs.
