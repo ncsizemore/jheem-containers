@@ -17,7 +17,7 @@ FROM ghcr.io/ncsizemore/jheem-ryan-white-model:2.1.0 AS workspace-source
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-ryan-white-msa-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM Ryan White MSA model (31 cities)"
 
 COPY --from=workspace-source /app/ryan_white_workspace.RData ./
@@ -43,6 +43,7 @@ ARG BASE_VERSION
 ENV MODEL_ID=ryan-white-msa \
     SIMULATION_SCRIPT=simple_ryan_white.R \
     DEFAULT_OUTCOMES=incidence \
+    PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-msa-v1.0.0 \
     JHEEM2_REF=54f669a139281f25cd87dfd0c25a01aca797777c \
     JHEEM2_WORKSPACE_VERSION=1.9.2 \

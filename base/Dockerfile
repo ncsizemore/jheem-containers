@@ -9,7 +9,7 @@
 # a frozen Ubuntu LTS base + RSPM binaries, pinned here by digest.
 FROM rocker/r-ver:4.4.2@sha256:df26749182af64d5263bf64149d51a427b476ed28c4e046997143be3f97fdd7c
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-base"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="Shared base image for JHEEM model containers"
 
 # --- System Dependencies (Ubuntu 24.04 noble) ---

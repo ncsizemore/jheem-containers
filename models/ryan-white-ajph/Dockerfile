@@ -2,7 +2,7 @@
 # JHEEM Ryan White AJPH Model (11 States, 2025-2030)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.6.1
+ARG BASE_VERSION=1.6.2
 ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
@@ -44,7 +44,7 @@ RUN Rscript create_ryan_white_workspace.R ryan_white_workspace.RData ../jheem_an
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-ryan-white-ajph-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM Ryan White AJPH model (11 states, 2025-2030)"
 
 COPY --from=workspace-builder /app/ryan_white_workspace.RData ./
@@ -66,6 +66,7 @@ ARG JHEEM_ANALYSES_COMMIT
 ENV MODEL_ID=ryan-white-state-ajph \
     SIMULATION_SCRIPT=simple_ryan_white.R \
     DEFAULT_OUTCOMES=incidence \
+    PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-ajph-v1.0.0 \
     SIMSET_BASE_SUFFIX=_noint \
     JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \

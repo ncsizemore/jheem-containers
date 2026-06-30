@@ -2,7 +2,7 @@
 # JHEEM Ryan White CROI Model (30 States, 2026-2031)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.6.1
+ARG BASE_VERSION=1.6.2
 # Pinned (was HEAD — a reproducibility hole). 250ffc8a is the jheem_analyses HEAD
 # at the deployed image's build (croi v2.2.0, 2026-03-26T18:08Z), traced from the
 # build timestamp; rebuild reproduces the production golden bit-for-bit.
@@ -51,7 +51,7 @@ RUN Rscript create_ryan_white_workspace.R ryan_white_workspace.RData ../jheem_an
 # --- Final image ---
 FROM base AS final
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-ryan-white-croi-container"
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers"
 LABEL org.opencontainers.image.description="JHEEM Ryan White CROI model (30 states, 2026-2031)"
 
 COPY --from=workspace-builder /app/ryan_white_workspace.RData ./
@@ -82,6 +82,7 @@ ARG JHEEM_ANALYSES_COMMIT
 ENV MODEL_ID=ryan-white-state-croi \
     SIMULATION_SCRIPT=simple_ryan_white.R \
     DEFAULT_OUTCOMES=incidence \
+    PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-state-v2.0.0 \
     SIMSET_BASE_SUFFIX=_noint \
     JHEEM_ANALYSES_REF=${JHEEM_ANALYSES_COMMIT} \
