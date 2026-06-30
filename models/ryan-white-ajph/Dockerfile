@@ -2,7 +2,7 @@
 # JHEEM Ryan White AJPH Model (11 States, 2025-2030)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.6.2
+ARG BASE_VERSION=1.6.3
 ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
 FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
 
