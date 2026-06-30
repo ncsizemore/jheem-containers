@@ -7,7 +7,7 @@ ARG BASE_VERSION=1.6.3
 # at the deployed image's build (croi v2.2.0, 2026-03-26T18:08Z), traced from the
 # build timestamp; rebuild reproduces the production golden bit-for-bit.
 ARG JHEEM_ANALYSES_COMMIT=250ffc8aafcabe00c1bca20df831bf9637c2dd12
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
 

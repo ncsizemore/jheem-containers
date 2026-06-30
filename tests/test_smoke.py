@@ -14,6 +14,14 @@ def test_version_provenance(name, models_cfg):
     out = docker_version(image_ref(name, models_cfg[name]["image"]))
     for field in ("Model ID:", "jheem2 (runtime):", "Base image:", "Simset release:"):
         assert field in out, f"{name}: `version` missing '{field}'\n{out}"
+    # The reported base version must match the expected one. Catches a stale /
+    # cache-poisoned base: a mutable `FROM …:tag` once let the gha cache serve
+    # 1.6.1 layers for a 1.6.3 build, silently shipping models without the base's
+    # fetch retries. (FROMs are now digest-pinned; this is defense in depth.)
+    expected = models_cfg[name]["base_version"]
+    base_line = next((l for l in out.splitlines() if "Base image:" in l), "")
+    assert expected in base_line, \
+        f"{name}: base version mismatch — expected {expected}, got: '{base_line.strip()}'"
 
 
 @pytest.mark.parametrize("name", MODELS)

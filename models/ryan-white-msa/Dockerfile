@@ -9,7 +9,7 @@
 # Building from source with newer jheem2 would serialize incompatible functions.
 # =============================================================================
 ARG BASE_VERSION=1.6.3
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
 
 # --- Workspace source (prebuilt, jheem2 1.9.2 compatible with 1.6.2 runtime) ---
 FROM ghcr.io/ncsizemore/jheem-ryan-white-model:2.1.0 AS workspace-source

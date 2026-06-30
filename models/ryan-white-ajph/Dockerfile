@@ -4,7 +4,7 @@
 # =============================================================================
 ARG BASE_VERSION=1.6.3
 ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION} AS base
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
 
 # jheem2 inherited from base (no override needed)
 
