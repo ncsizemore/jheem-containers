@@ -1,43 +1,51 @@
-# JHEEM CDC Testing Container
+# JHEEM Ryan White AJPH Container
 
-Model image for the JHEEM CDC Testing analysis. It extends `ghcr.io/ncsizemore/jheem-base:1.6.2`, builds
-the CDC Testing workspace from `jheem_analyses`, and exposes the simulation runtime used by the JHEEM
-backend.
+Model image for the Ryan White AJPH state-level analysis. It extends
+`ghcr.io/ncsizemore/jheem-base:1.6.2`, builds the Ryan White workspace from `jheem_analyses`, and exposes
+the batch/runtime path used by JHEEM.
 
 Published image:
 
 ```bash
-ghcr.io/ncsizemore/jheem-cdc-testing
+ghcr.io/ncsizemore/jheem-ryan-white-ajph
 ```
 
 Use `:latest` for local smoke checks and promoted semver tags for production pins.
 
+## Analysis scope
+
+| Property | Value |
+| --- | --- |
+| Geography | 11 states |
+| Timeframe | 2025-2030 |
+| Simulation release | `ryan-white-ajph-v1.0.0` |
+
 ## Runtime
 
-Primary mode: `lambda`
+Primary mode: `batch`
 
 Useful local checks:
 
 ```bash
-docker run --rm ghcr.io/ncsizemore/jheem-cdc-testing:latest test-workspace
+docker run --rm ghcr.io/ncsizemore/jheem-ryan-white-ajph:latest test-workspace
 ```
 
 ```bash
 docker run --rm --platform linux/amd64 \
   -v jheem-cache:/cache -v "$PWD/out:/out" \
-  ghcr.io/ncsizemore/jheem-cdc-testing:latest run \
-  --location CA \
-  --param testing_reduction=100 \
-  --param proportion_tested_regardless=50 \
-  --out /out/cdc-testing.json
+  ghcr.io/ncsizemore/jheem-ryan-white-ajph:latest run \
+  --location FL \
+  --param adap_loss=50 \
+  --param oahs_loss=30 \
+  --param other_loss=40 \
+  --out /out/ryan-white-ajph.json
 ```
 
 ## What is model-specific here
 
 | File | Purpose |
 | --- | --- |
-| `create_cdc_testing_workspace.R` | Creates the CDC Testing workspace from `jheem_analyses`. |
-| `simple_cdc_testing.R` | Custom-simulation adapter copied into the base image's `simulation/` directory. |
+| `create_ryan_white_workspace.R` | Creates the Ryan White AJPH workspace. |
 | `cached/google_mobility_data.Rdata` | Runtime data copied into the build because it is not yet fully release-pinned upstream. |
 
 Everything else - R packages, entrypoints, batch extraction, custom-simulation orchestration, and
@@ -48,7 +56,7 @@ simset-fetch tooling - comes from `jheem-base`.
 | Argument | Current default | Purpose |
 | --- | --- | --- |
 | `BASE_VERSION` | `1.6.2` | Shared base image version tested for this model. |
-| `JHEEM_ANALYSES_COMMIT` | `51ac4957` | Source commit used to build the workspace. |
+| `JHEEM_ANALYSES_COMMIT` | `fc3fe1d2d5f859b322414da8b11f0182e635993b` | Source commit used to build the workspace. |
 
 The final image exports provenance-oriented environment variables including `MODEL_ID`,
 `SIMULATION_SCRIPT`, `SIMSET_RELEASE`, `JHEEM_ANALYSES_REF`, and `JHEEM_BASE_VERSION`.
