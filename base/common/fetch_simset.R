@@ -28,11 +28,23 @@ dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(link_dir,  recursive = TRUE, showWarnings = FALSE)
 
 api <- sprintf("https://api.github.com/repos/%s/releases/tags/%s", repo, release)
-rel <- tryCatch(
-  fromJSON(api, simplifyVector = FALSE),
-  error = function(e) stop(sprintf("Failed to query release %s @ %s: %s",
-                                   repo, release, conditionMessage(e)))
-)
+# Retry the release query: a transient connection blip to api.github.com would
+# otherwise fail the whole run (e.g. the gate runs `run` twice per model and the
+# second invocation re-queries the API even on a warm cache). Same resilience the
+# download already has below.
+rel <- NULL
+for (attempt in 1:5) {
+  rel <- tryCatch(fromJSON(api, simplifyVector = FALSE),
+                  error = function(e) {
+                    message(sprintf("  release query attempt %d failed: %s", attempt, conditionMessage(e)))
+                    NULL
+                  })
+  if (!is.null(rel)) break
+  Sys.sleep(2 * attempt)
+}
+if (is.null(rel)) {
+  stop(sprintf("Failed to query release %s @ %s after 5 attempts", repo, release))
+}
 assets <- rel$assets
 if (is.null(assets) || length(assets) == 0) {
   stop(sprintf("Release %s @ %s has no assets", repo, release))
