@@ -120,8 +120,10 @@ jobs:
           platforms: linux/amd64
           push: true   # push a throwaway candidate tag so the digest is pullable downstream
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:gate-${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          # scope bumped to -d2 to abandon the poisoned cache namespace that
+          # served stale base layers for mutable-tag FROMs (now digest-pinned).
+          cache-from: type=gha,scope=${{ matrix.name }}-d2
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-d2
       - name: record candidate digest
         run: |
           mkdir -p dg

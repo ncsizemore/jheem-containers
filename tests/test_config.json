@@ -7,7 +7,8 @@
       "params": {"adap_loss": 50, "oahs_loss": 30, "other_loss": 40},
       "perturb": {"param": "oahs_loss", "value": 60},
       "golden": "models/ryan-white-msa/tests/golden/C.12580_a50-o30-r40.json",
-      "spec_object": "RW.SPECIFICATION"
+      "spec_object": "RW.SPECIFICATION",
+      "base_version": "1.6.3"
     },
     "ryan-white-ajph": {
       "image": "jheem-ryan-white-ajph",
@@ -15,7 +16,8 @@
       "params": {"adap_loss": 50, "oahs_loss": 30, "other_loss": 40},
       "perturb": {"param": "oahs_loss", "value": 60},
       "golden": "models/ryan-white-ajph/tests/golden/FL_a50-o30-r40.json",
-      "spec_object": "RW.SPECIFICATION"
+      "spec_object": "RW.SPECIFICATION",
+      "base_version": "1.6.3"
     },
     "ryan-white-croi": {
       "image": "jheem-ryan-white-croi",
@@ -23,7 +25,8 @@
       "params": {"adap_loss": 50, "oahs_loss": 30, "other_loss": 40},
       "perturb": {"param": "oahs_loss", "value": 60},
       "golden": "models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json",
-      "spec_object": "RW.SPECIFICATION"
+      "spec_object": "RW.SPECIFICATION",
+      "base_version": "1.6.3"
     },
     "cdc-testing": {
       "image": "jheem-cdc-testing",
@@ -31,7 +34,8 @@
       "params": {"testing_reduction": 100, "proportion_tested_regardless": 50},
       "perturb": {"param": "proportion_tested_regardless", "value": 30},
       "golden": "models/cdc-testing/tests/golden/CA_t100-p50.json",
-      "spec_object": "CDCT.SPECIFICATION"
+      "spec_object": "CDCT.SPECIFICATION",
+      "base_version": "1.6.3"
     }
   }
 }
