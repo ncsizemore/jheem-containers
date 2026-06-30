@@ -52,12 +52,12 @@ Images publish to GitHub Container Registry under `ghcr.io/ncsizemore`.
 | Context | Image | Current base | Primary mode | Gate coverage |
 | --- | --- | --- | --- | --- |
 | `base/` | `jheem-base` | n/a | Shared runtime | Build/publish; downstream cascade still open |
-| `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.6.0` | Batch | Smoke + golden + perturbation |
+| `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.6.3` | Batch | Smoke + golden + perturbation |
 | `models/ryan-white-ajph/` | `jheem-ryan-white-ajph` | `1.6.3` | Batch | Smoke + golden + perturbation |
 | `models/ryan-white-croi/` | `jheem-ryan-white-croi` | `1.6.3` | Lambda | Smoke + golden + perturbation |
 | `models/cdc-testing/` | `jheem-cdc-testing` | `1.6.3` | Lambda | Smoke + golden + perturbation |
 
-The base-version spread is intentional interim compatibility management, not the final target state.
+All model images now build on a single base version (`jheem-base:1.6.3`).
 
 ## CI and promotion model
 
