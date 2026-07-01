@@ -75,9 +75,9 @@ jobs:
               fi ;;
           esac
           # Path filter (only when files were diffed; dispatch/tag set pick directly).
-          # base/, tests/, or .github/ changes affect every image -> ALL.
+          # base/, tests/, .github/, or the canonical models.yml affect every image -> ALL.
           if [ -z "$pick" ] && [ -n "$files" ]; then
-            if echo "$files" | grep -qE '^(base/|tests/|\.github/)'; then
+            if echo "$files" | grep -qE '^(base/|tests/|\.github/|models\.yml$)'; then
               pick="ALL"
             else
               for n in ryan-white-msa ryan-white-ajph ryan-white-croi cdc-testing; do
