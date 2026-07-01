@@ -39,19 +39,24 @@ Current downstream defaults:
 
 | Model image | Base version | Notes |
 | --- | --- | --- |
-| `jheem-ryan-white-msa` | `1.6.0` | Frozen published MSA analysis; the final image pins `jheem2` to the compatible historical ref. |
-| `jheem-ryan-white-ajph` | `1.6.2` | Current heavy-model base with large-simset fetch retry/resume/verify support. |
-| `jheem-ryan-white-croi` | `1.6.2` | Current heavy-model base with large-simset fetch retry/resume/verify support. |
-| `jheem-cdc-testing` | `1.6.2` | Current heavy-model base with large-simset fetch retry/resume/verify support. |
+| `jheem-ryan-white-msa` | `1.6.3` | Published MSA analysis; prebuilt workspace, `jheem2` pinned to the compatible historical ref. |
+| `jheem-ryan-white-ajph` | `1.6.3` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-ryan-white-croi` | `1.6.3` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-cdc-testing` | `1.6.3` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
 
-The model-image gate validates each model candidate by digest. A base-candidate cascade that proves a new
-base image against all downstream models before promotion is still an open architecture item.
+Downstream models pin this base **by digest** (`…:${BASE_VERSION}@sha256:…`), not the mutable tag: a
+`cache-from: type=gha` build once served stale base layers for a tag, silently shipping models without the
+base's fixes. `tests/test_base_pin.py` enforces the pin against the registry on every PR. The model-image
+gate validates each model candidate by digest; a base-candidate cascade that proves a new base image against
+all downstream models before promotion is still an open architecture item.
 
 ## Usage from a model Dockerfile
 
 ```dockerfile
-ARG BASE_VERSION=1.6.2
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}
+ARG BASE_VERSION=1.6.3
+# Pin by digest, not the mutable tag (a gha-cache build can otherwise serve stale
+# base layers). Update both the version and the digest on a base bump.
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302
 
 # Add model-specific workspace/scripts here.
 ENTRYPOINT ["./container_entrypoint.sh"]
