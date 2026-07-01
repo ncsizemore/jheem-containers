@@ -19,8 +19,8 @@ Implemented:
   perturbation tests.
 - Fail-closed promotion to `latest` and semver tags: CI re-tags the exact digest that passed tests instead
   of rebuilding for release.
-- Retry/resume/verify for large simulation-set downloads (`jheem-base:1.6.2`) and retry for the release
-  API query (`jheem-base:1.6.3`), so transient registry/API blips don't fail a run.
+- Retry/resume/verify for large simulation-set downloads and an **authenticated** release-API query
+  (`jheem-base:1.6.5`, via `GITHUB_TOKEN`), so transient blips and API rate limits don't fail a run.
 
 Still open:
 
@@ -49,15 +49,18 @@ framework.
 
 Images publish to GitHub Container Registry under `ghcr.io/ncsizemore`.
 
-| Context | Image | Current base | Primary mode | Gate coverage |
-| --- | --- | --- | --- | --- |
-| `base/` | `jheem-base` | n/a | Shared runtime | Build/publish; downstream cascade still open |
-| `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.6.3` | Batch | Smoke + golden + perturbation |
-| `models/ryan-white-ajph/` | `jheem-ryan-white-ajph` | `1.6.3` | Batch | Smoke + golden + perturbation |
-| `models/ryan-white-croi/` | `jheem-ryan-white-croi` | `1.6.3` | Lambda | Smoke + golden + perturbation |
-| `models/cdc-testing/` | `jheem-cdc-testing` | `1.6.3` | Lambda | Smoke + golden + perturbation |
+Models are driven via `custom` (backend pipeline) or `run` (standalone); a bare `docker run` prints
+`version`.
 
-All model images now build on a single base version (`jheem-base:1.6.3`).
+| Context | Image | Current base | Gate coverage |
+| --- | --- | --- | --- |
+| `base/` | `jheem-base` | n/a (shared runtime) | Build/publish; downstream cascade still open |
+| `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.6.5` | Smoke + golden + perturbation |
+| `models/ryan-white-ajph/` | `jheem-ryan-white-ajph` | `1.6.5` | Smoke + golden + perturbation |
+| `models/ryan-white-croi/` | `jheem-ryan-white-croi` | `1.6.5` | Smoke + golden + perturbation |
+| `models/cdc-testing/` | `jheem-cdc-testing` | `1.6.5` | Smoke + golden + perturbation |
+
+All model images build on a single base version (`jheem-base:1.6.5`), pinned by digest.
 
 ## CI and promotion model
 

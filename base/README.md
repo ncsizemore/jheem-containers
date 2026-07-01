@@ -73,6 +73,9 @@ docker build -t ghcr.io/ncsizemore/jheem-base:local .
 
 ## Release notes
 
+- **`base:1.6.4` is yanked / superseded by `1.6.5`.** 1.6.4 shipped a broken `fetch_simset.R` (a curl
+  code-capture that misbehaves under R's `system2`); the promotion gate caught it before any model pinned
+  it. The tag remains published (no-retag policy) but nothing should build `FROM` it — use `1.6.5`.
 - Downstream model Dockerfiles own their `ARG BASE_VERSION` defaults.
 - Do not force all models to the same base tag unless the affected model goldens have passed.
 - Promotion currently re-tags tested model-image digests; full base-to-model cascade promotion is still
