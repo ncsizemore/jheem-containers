@@ -28,31 +28,27 @@ dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(link_dir,  recursive = TRUE, showWarnings = FALSE)
 
 api <- sprintf("https://api.github.com/repos/%s/releases/tags/%s", repo, release)
-# Query via curl so we can (a) authenticate when GITHUB_TOKEN is present — the
-# 60/hr unauthenticated api.github.com limit becomes 1000-5000/hr — and (b) read
-# the HTTP status. A 403 is rate-limiting: retrying only burns the budget faster,
-# so fail fast on it; other transient statuses retry.
+# Query via curl so we can authenticate when GITHUB_TOKEN is present — the 60/hr
+# unauthenticated api.github.com limit becomes 1000-5000/hr, which is what keeps
+# heavy CI runs off the 403 rate-limit path. `-f` makes curl exit non-zero on any
+# HTTP error, so we detect failure by exit status (robust) rather than parsing the
+# body; on success the JSON body is stdout.
 gh_release_json <- function(url, tries = 4L) {
   token <- Sys.getenv("GITHUB_TOKEN", "")
   hdrs <- c("-H", "Accept: application/vnd.github+json")
   if (nzchar(token)) hdrs <- c(hdrs, "-H", paste0("Authorization: Bearer ", token))
   for (attempt in seq_len(tries)) {
-    body_file <- tempfile()
-    code <- suppressWarnings(system2(
-      "curl", c("-sSL", hdrs, "-o", body_file, "-w", "%{http_code}", url),
-      stdout = TRUE, stderr = FALSE))
-    body <- if (file.exists(body_file)) paste(readLines(body_file, warn = FALSE), collapse = "\n") else ""
-    unlink(body_file)
-    if (identical(as.character(code), "200")) return(body)
-    if (identical(as.character(code), "403")) {
-      stop(sprintf("GitHub API 403 (rate limit) querying %s%s", url,
-                   if (nzchar(token)) "" else
-                     " — set GITHUB_TOKEN to raise the 60/hr unauthenticated limit"))
-    }
-    message(sprintf("  release query attempt %d: HTTP %s; retrying", attempt, as.character(code)))
+    out <- suppressWarnings(system2("curl", c("-fsSL", hdrs, url),
+                                    stdout = TRUE, stderr = FALSE))
+    if (is.null(attr(out, "status"))) return(paste(out, collapse = "\n"))
+    message(sprintf("  release query attempt %d failed (curl exit %s); retrying",
+                    attempt, attr(out, "status")))
     Sys.sleep(2 * attempt)
   }
-  stop(sprintf("release query failed after %d attempts: %s", tries, url))
+  stop(sprintf("release query failed after %d attempts%s: %s", tries,
+               if (nzchar(token)) "" else
+                 " (set GITHUB_TOKEN to raise the 60/hr unauthenticated api.github.com limit)",
+               url))
 }
 rel <- fromJSON(gh_release_json(api), simplifyVector = FALSE)
 assets <- rel$assets
