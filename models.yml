@@ -1,0 +1,139 @@
+# Container build/test/provenance manifest for jheem-containers.
+#
+# Bounded context (see docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md): this file owns how
+# each model image is BUILT, TESTED, PINNED, and REPRODUCED. Backend
+# jheem-backend/.github/config/models.json remains authoritative for
+# app/runtime/product config (display, locations, output paths, production tag).
+# Shared fields (backend_model_id, simulation_script, simset_release, the param
+# id->envVar mapping) are validated across repos, not trusted.
+#
+# tests/test_models_yml.py validates that the Dockerfiles and tests/test_config.json
+# agree with this file (drift fails CI). tests/test_base_pin.py validates the base
+# digest against the registry. Nothing is generated FROM this file yet — that's a
+# later migration step; today it is the canonical description + validation target.
+
+# Shared base image. All models pin this exact digest; a per-model `base:` block
+# may override it if a model must diverge (none do today).
+base:
+  image: ghcr.io/ncsizemore/jheem-base
+  version: "1.6.5"
+  digest: sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+
+models:
+  ryan-white-msa:
+    backend_model_id: ryan-white-msa
+    image: ghcr.io/ncsizemore/jheem-ryan-white-msa
+    context: models/ryan-white-msa
+    template: prebuilt          # copies a frozen workspace image (jheem2 1.9.2 workspace / 1.6.2 runtime)
+    sources:
+      jheem2_ref: 54f669a139281f25cd87dfd0c25a01aca797777c
+      workspace_version: "1.9.2"
+    runtime:
+      model_id: ryan-white-msa
+      simulation_script: simple_ryan_white.R
+      simset_release: ryan-white-msa-v1.0.0
+      default_cmd: version
+      supported_modes: [version, run, custom, batch, test-workspace]
+    workspace:
+      file: ryan_white_workspace.RData
+      spec_object: RW.SPECIFICATION
+    param_env_map:
+      adap_loss: ADAP_LOSS
+      oahs_loss: OAHS_LOSS
+      other_loss: OTHER_LOSS
+    tests:
+      golden:
+        location: C.12580
+        params: {adap_loss: 50, oahs_loss: 30, other_loss: 40}
+        artifact: models/ryan-white-msa/tests/golden/C.12580_a50-o30-r40.json
+      perturbations:
+        - {param: oahs_loss, value: 60}
+
+  ryan-white-ajph:
+    backend_model_id: ryan-white-state-ajph
+    image: ghcr.io/ncsizemore/jheem-ryan-white-ajph
+    context: models/ryan-white-ajph
+    template: from-source
+    sources:
+      jheem_analyses_ref: fc3fe1d2d5f859b322414da8b11f0182e635993b
+    runtime:
+      model_id: ryan-white-state-ajph
+      simulation_script: simple_ryan_white.R
+      simset_release: ryan-white-ajph-v1.0.0
+      simset_base_suffix: _noint
+      default_cmd: version
+      supported_modes: [version, run, custom, batch, test-workspace]
+    workspace:
+      script: create_ryan_white_workspace.R
+      file: ryan_white_workspace.RData
+      spec_object: RW.SPECIFICATION
+    param_env_map:
+      adap_loss: ADAP_LOSS
+      oahs_loss: OAHS_LOSS
+      other_loss: OTHER_LOSS
+    tests:
+      golden:
+        location: FL
+        params: {adap_loss: 50, oahs_loss: 30, other_loss: 40}
+        artifact: models/ryan-white-ajph/tests/golden/FL_a50-o30-r40.json
+      perturbations:
+        - {param: oahs_loss, value: 60}
+
+  ryan-white-croi:
+    backend_model_id: ryan-white-state-croi
+    image: ghcr.io/ncsizemore/jheem-ryan-white-croi
+    context: models/ryan-white-croi
+    template: from-source
+    sources:
+      jheem_analyses_ref: 250ffc8aafcabe00c1bca20df831bf9637c2dd12
+    runtime:
+      model_id: ryan-white-state-croi
+      simulation_script: simple_ryan_white.R
+      simset_release: ryan-white-state-v2.0.0
+      simset_base_suffix: _noint
+      default_cmd: version
+      supported_modes: [version, run, custom, batch, test-workspace]
+    workspace:
+      script: create_ryan_white_workspace.R
+      file: ryan_white_workspace.RData
+      spec_object: RW.SPECIFICATION
+    param_env_map:
+      adap_loss: ADAP_LOSS
+      oahs_loss: OAHS_LOSS
+      other_loss: OTHER_LOSS
+    tests:
+      golden:
+        location: CO
+        params: {adap_loss: 50, oahs_loss: 30, other_loss: 40}
+        artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json
+      perturbations:
+        - {param: oahs_loss, value: 60}
+
+  cdc-testing:
+    backend_model_id: cdc-testing
+    image: ghcr.io/ncsizemore/jheem-cdc-testing
+    context: models/cdc-testing
+    template: from-source
+    sources:
+      jheem_analyses_ref: 51ac4957
+    runtime:
+      model_id: cdc-testing
+      simulation_script: simple_cdc_testing.R
+      simset_release: cdc-testing-v1.0.0
+      simset_base_suffix: _noint
+      default_cmd: version
+      supported_modes: [version, run, custom, batch, test-workspace]
+    workspace:
+      script: create_cdc_testing_workspace.R
+      file: cdc_testing_workspace.RData
+      spec_object: CDCT.SPECIFICATION
+    param_env_map:
+      testing_reduction: TESTING_REDUCTION
+      proportion_tested_regardless: PROPORTION_TESTED
+    tests:
+      golden:
+        location: CA
+        params: {testing_reduction: 100, proportion_tested_regardless: 50}
+        artifact: models/cdc-testing/tests/golden/CA_t100-p50.json
+      perturbations:
+        - {param: proportion_tested_regardless, value: 30}

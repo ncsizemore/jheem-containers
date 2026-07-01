@@ -39,6 +39,11 @@ be promoted.
 perturbation). Phase B's canonical `models.yml` should generate or validate it rather
 than it being a separate copy.
 
+`models.yml` is scoped to container build/test/provenance metadata. Backend
+`models.json` remains authoritative for application/runtime/product configuration, and
+shared fields should be checked by CI. See
+[`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](../docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
+
 ## When the gate runs (merge / release policy)
 
 | Event | Builds | Tests | Promotes |

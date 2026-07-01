@@ -232,11 +232,16 @@ the validation layer is already in place.
 As of 2026-07-01:
 
 - backend `models.json` remains the application/runtime/product manifest;
-- container `models.yml` does not yet exist;
-- Dockerfiles are digest-pinned to `jheem-base`;
-- `tests/test_base_pin.py` validates base version/digest drift;
-- `tests/test_config.json` is still a hand-maintained interim manifest;
-- cross-repo validation against backend `models.json` is not yet implemented.
+- container **`models.yml` exists** with the container-owned fields (migration step 1);
+- `tests/test_models_yml.py` validates that the Dockerfiles and `tests/test_config.json` agree with
+  `models.yml` (migration step 2 — local drift check; runs on every PR, incl. any `models.yml` change);
+- Dockerfiles are digest-pinned to `jheem-base`; `tests/test_base_pin.py` validates the pinned digest
+  against the registry;
+- `tests/test_config.json` is still hand-maintained but is now validated against `models.yml` (not yet
+  generated from it — step 3);
+- cross-repo validation against backend `models.json` is not yet implemented (step 5).
 
-The next configuration milestone should be introducing `models.yml` with this ownership boundary and adding
-validation before using it to refactor Dockerfiles.
+Next milestones (in order): generate `tests/test_config.json` from `models.yml` (step 3); generate/validate
+`PARAM_ENV_MAP` from backend-owned params (step 4); cross-repo validation vs backend `models.json` (step 5);
+move the Actions build matrix to read `models.yml` (step 6). Do not start Dockerfile templates until the
+validation layer is complete.
