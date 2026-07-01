@@ -2,9 +2,9 @@
 # JHEEM Ryan White AJPH Model (11 States, 2025-2030)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.6.3
+ARG BASE_VERSION=1.6.5
 ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
 
 # jheem2 inherited from base (no override needed)
 
@@ -73,4 +73,4 @@ ENV MODEL_ID=ryan-white-state-ajph \
     JHEEM_BASE_VERSION=${BASE_VERSION}
 
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["batch"]
+CMD ["version"]

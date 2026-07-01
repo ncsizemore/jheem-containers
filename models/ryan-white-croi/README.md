@@ -1,7 +1,7 @@
 # JHEEM Ryan White CROI Container
 
 Model image for the Ryan White CROI 2026 state-level analysis. It extends
-`ghcr.io/ncsizemore/jheem-base:1.6.3`, builds the CROI Ryan White workspace from `jheem_analyses`, and
+`ghcr.io/ncsizemore/jheem-base:1.6.5`, builds the CROI Ryan White workspace from `jheem_analyses`, and
 exposes the simulation runtime used by the JHEEM backend.
 
 Published image:
@@ -23,7 +23,7 @@ Use `:latest` for local smoke checks and promoted semver tags for production pin
 
 ## Runtime
 
-Primary mode: `lambda`
+Invoked via `run` (standalone) or `custom` (the backend pipeline); a bare `docker run` prints `version`.
 
 Useful local checks:
 
@@ -57,7 +57,7 @@ simset-fetch tooling - comes from `jheem-base`.
 
 | Argument | Current default | Purpose |
 | --- | --- | --- |
-| `BASE_VERSION` | `1.6.3` | Shared base image version tested for this model. |
+| `BASE_VERSION` | `1.6.5` | Shared base image version tested for this model. |
 | `JHEEM_ANALYSES_COMMIT` | `250ffc8aafcabe00c1bca20df831bf9637c2dd12` | Source commit traced to the deployed image build and golden output. |
 
 The final image exports provenance-oriented environment variables including `MODEL_ID`,

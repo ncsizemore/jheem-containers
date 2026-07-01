@@ -21,6 +21,7 @@ JHEEM model container — provenance
   jheem2 ref:         ${JHEEM2_REF:-<see renv.lock>}
   jheem2 (workspace): ${ws_ver:-<same as runtime>}
   Base image:         ${JHEEM_BASE_VERSION:-<unset>}
+  jheem_analyses ref: ${JHEEM_ANALYSES_REF:-<n/a (prebuilt workspace)>}
   Simset release:     ${SIMSET_RELEASE:-<unset>}
   Git tag:            ${JHEEM_GIT_TAG:-TBD (pending repo versioning)}
   Zenodo DOI:         ${JHEEM_ZENODO_DOI:-TBD (pending Zenodo archival)}

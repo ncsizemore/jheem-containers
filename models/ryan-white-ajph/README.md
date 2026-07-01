@@ -1,7 +1,7 @@
 # JHEEM Ryan White AJPH Container
 
 Model image for the Ryan White AJPH state-level analysis. It extends
-`ghcr.io/ncsizemore/jheem-base:1.6.3`, builds the Ryan White workspace from `jheem_analyses`, and exposes
+`ghcr.io/ncsizemore/jheem-base:1.6.5`, builds the Ryan White workspace from `jheem_analyses`, and exposes
 the batch/runtime path used by JHEEM.
 
 Published image:
@@ -22,7 +22,7 @@ Use `:latest` for local smoke checks and promoted semver tags for production pin
 
 ## Runtime
 
-Primary mode: `batch`
+Invoked via `run` (standalone) or `custom` (the backend pipeline); a bare `docker run` prints `version`.
 
 Useful local checks:
 
@@ -55,7 +55,7 @@ simset-fetch tooling - comes from `jheem-base`.
 
 | Argument | Current default | Purpose |
 | --- | --- | --- |
-| `BASE_VERSION` | `1.6.3` | Shared base image version tested for this model. |
+| `BASE_VERSION` | `1.6.5` | Shared base image version tested for this model. |
 | `JHEEM_ANALYSES_COMMIT` | `fc3fe1d2d5f859b322414da8b11f0182e635993b` | Source commit used to build the workspace. |
 
 The final image exports provenance-oriented environment variables including `MODEL_ID`,

@@ -8,8 +8,8 @@
 # 1.9.2) which serialized function definitions compatible with 1.6.2's R6 classes.
 # Building from source with newer jheem2 would serialize incompatible functions.
 # =============================================================================
-ARG BASE_VERSION=1.6.3
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
+ARG BASE_VERSION=1.6.5
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
 
 # --- Workspace source (prebuilt, jheem2 1.9.2 compatible with 1.6.2 runtime) ---
 FROM ghcr.io/ncsizemore/jheem-ryan-white-model:2.1.0 AS workspace-source
@@ -50,4 +50,4 @@ ENV MODEL_ID=ryan-white-msa \
     JHEEM_BASE_VERSION=${BASE_VERSION}
 
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["batch"]
+CMD ["version"]

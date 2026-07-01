@@ -2,12 +2,12 @@
 # JHEEM Ryan White CROI Model (30 States, 2026-2031)
 # Thin wrapper around jheem-base - only adds workspace creation
 # =============================================================================
-ARG BASE_VERSION=1.6.3
+ARG BASE_VERSION=1.6.5
 # Pinned (was HEAD — a reproducibility hole). 250ffc8a is the jheem_analyses HEAD
 # at the deployed image's build (croi v2.2.0, 2026-03-26T18:08Z), traced from the
 # build timestamp; rebuild reproduces the production golden bit-for-bit.
 ARG JHEEM_ANALYSES_COMMIT=250ffc8aafcabe00c1bca20df831bf9637c2dd12
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
 
@@ -90,4 +90,4 @@ ENV MODEL_ID=ryan-white-state-croi \
 
 EXPOSE 8080
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["lambda"]
+CMD ["version"]
