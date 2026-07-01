@@ -39,10 +39,10 @@ Current downstream defaults:
 
 | Model image | Base version | Notes |
 | --- | --- | --- |
-| `jheem-ryan-white-msa` | `1.6.3` | Published MSA analysis; prebuilt workspace, `jheem2` pinned to the compatible historical ref. |
-| `jheem-ryan-white-ajph` | `1.6.3` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
-| `jheem-ryan-white-croi` | `1.6.3` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
-| `jheem-cdc-testing` | `1.6.3` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-ryan-white-msa` | `1.6.4` | Published MSA analysis; prebuilt workspace, `jheem2` pinned to the compatible historical ref. |
+| `jheem-ryan-white-ajph` | `1.6.4` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-ryan-white-croi` | `1.6.4` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-cdc-testing` | `1.6.4` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
 
 Downstream models pin this base **by digest** (`…:${BASE_VERSION}@sha256:…`), not the mutable tag: a
 `cache-from: type=gha` build once served stale base layers for a tag, silently shipping models without the
@@ -53,14 +53,14 @@ all downstream models before promotion is still an open architecture item.
 ## Usage from a model Dockerfile
 
 ```dockerfile
-ARG BASE_VERSION=1.6.3
+ARG BASE_VERSION=1.6.4
 # Pin by digest, not the mutable tag (a gha-cache build can otherwise serve stale
 # base layers). Update both the version and the digest on a base bump.
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:b104358d399443031b66cd5abf7e660ae9c465a1b7dbd5dc2a72756581c32ca1
 
 # Add model-specific workspace/scripts here.
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["batch"]
+CMD ["version"]
 ```
 
 ## Local build

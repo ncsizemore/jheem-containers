@@ -1,6 +1,6 @@
 # JHEEM CDC Testing Container
 
-Model image for the JHEEM CDC Testing analysis. It extends `ghcr.io/ncsizemore/jheem-base:1.6.3`, builds
+Model image for the JHEEM CDC Testing analysis. It extends `ghcr.io/ncsizemore/jheem-base:1.6.4`, builds
 the CDC Testing workspace from `jheem_analyses`, and exposes the simulation runtime used by the JHEEM
 backend.
 
@@ -47,7 +47,7 @@ simset-fetch tooling - comes from `jheem-base`.
 
 | Argument | Current default | Purpose |
 | --- | --- | --- |
-| `BASE_VERSION` | `1.6.3` | Shared base image version tested for this model. |
+| `BASE_VERSION` | `1.6.4` | Shared base image version tested for this model. |
 | `JHEEM_ANALYSES_COMMIT` | `51ac4957` | Source commit used to build the workspace. |
 
 The final image exports provenance-oriented environment variables including `MODEL_ID`,

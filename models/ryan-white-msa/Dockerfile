@@ -8,8 +8,8 @@
 # 1.9.2) which serialized function definitions compatible with 1.6.2's R6 classes.
 # Building from source with newer jheem2 would serialize incompatible functions.
 # =============================================================================
-ARG BASE_VERSION=1.6.3
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:ccc331e961a4ab0a301dfed17e0c088bdcde919f2d7913d1f360f192a5c5a302 AS base
+ARG BASE_VERSION=1.6.4
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:b104358d399443031b66cd5abf7e660ae9c465a1b7dbd5dc2a72756581c32ca1 AS base
 
 # --- Workspace source (prebuilt, jheem2 1.9.2 compatible with 1.6.2 runtime) ---
 FROM ghcr.io/ncsizemore/jheem-ryan-white-model:2.1.0 AS workspace-source
