@@ -8,7 +8,7 @@
       "perturb": {"param": "oahs_loss", "value": 60},
       "golden": "models/ryan-white-msa/tests/golden/C.12580_a50-o30-r40.json",
       "spec_object": "RW.SPECIFICATION",
-      "base_version": "1.6.4"
+      "base_version": "1.6.5"
     },
     "ryan-white-ajph": {
       "image": "jheem-ryan-white-ajph",
@@ -17,7 +17,7 @@
       "perturb": {"param": "oahs_loss", "value": 60},
       "golden": "models/ryan-white-ajph/tests/golden/FL_a50-o30-r40.json",
       "spec_object": "RW.SPECIFICATION",
-      "base_version": "1.6.4"
+      "base_version": "1.6.5"
     },
     "ryan-white-croi": {
       "image": "jheem-ryan-white-croi",
@@ -26,7 +26,7 @@
       "perturb": {"param": "oahs_loss", "value": 60},
       "golden": "models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json",
       "spec_object": "RW.SPECIFICATION",
-      "base_version": "1.6.4"
+      "base_version": "1.6.5"
     },
     "cdc-testing": {
       "image": "jheem-cdc-testing",
@@ -35,7 +35,7 @@
       "perturb": {"param": "proportion_tested_regardless", "value": 30},
       "golden": "models/cdc-testing/tests/golden/CA_t100-p50.json",
       "spec_object": "CDCT.SPECIFICATION",
-      "base_version": "1.6.4"
+      "base_version": "1.6.5"
     }
   }
 }

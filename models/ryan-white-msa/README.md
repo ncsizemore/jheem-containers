@@ -1,7 +1,7 @@
 # JHEEM Ryan White MSA Container
 
 Model image for the frozen Ryan White MSA analysis. It extends
-`ghcr.io/ncsizemore/jheem-base:1.6.4`, copies the validated workspace from the legacy model image, and
+`ghcr.io/ncsizemore/jheem-base:1.6.5`, copies the validated workspace from the legacy model image, and
 pins the runtime `jheem2` ref needed to reproduce the published simulation outputs.
 
 Published image:
@@ -56,7 +56,7 @@ artifact by digest against golden output before promotion.
 
 | Argument | Current default | Purpose |
 | --- | --- | --- |
-| `BASE_VERSION` | `1.6.4` | Shared base image version tested for this frozen model. |
+| `BASE_VERSION` | `1.6.5` | Shared base image version tested for this frozen model. |
 
 The final image exports provenance-oriented environment variables including `MODEL_ID`,
 `SIMULATION_SCRIPT`, `SIMSET_RELEASE`, `JHEEM2_REF`, `JHEEM2_WORKSPACE_VERSION`, and `JHEEM_BASE_VERSION`.

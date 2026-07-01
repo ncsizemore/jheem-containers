@@ -3,9 +3,9 @@
 # Thin wrapper around jheem-base - adds workspace creation + simulation script
 # =============================================================================
 # Updated from fc3fe1d to include proportion.tested.regardless model element
-ARG BASE_VERSION=1.6.4
+ARG BASE_VERSION=1.6.5
 ARG JHEEM_ANALYSES_COMMIT=51ac4957
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:b104358d399443031b66cd5abf7e660ae9c465a1b7dbd5dc2a72756581c32ca1 AS base
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
 
