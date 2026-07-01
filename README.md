@@ -27,7 +27,9 @@ Still open:
 - Base-image candidate compatibility cascade. The current gate validates model-image candidates; it does
   not yet prove that a candidate base image is compatible with every downstream model before promotion.
 - Canonical model configuration. `tests/test_config.json` is the current test source of truth; a future
-  `models.yml` should drive build metadata, tests, and documentation from one place.
+  `models.yml` should drive container build/test/provenance metadata from one place, while backend
+  `models.json` remains authoritative for application/runtime/product configuration. See
+  [`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
 - Runtime-contract cleanup. Lambda and batch modes work, but the entrypoint contract should be made
   simpler and more explicit.
 - Provenance hardening. Images expose useful version metadata, but the release metadata should eventually
