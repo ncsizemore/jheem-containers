@@ -22,7 +22,7 @@ Use `:latest` for local smoke checks and promoted semver tags for production pin
 
 ## Runtime
 
-Primary mode: `batch`
+Invoked via `run` (standalone) or `custom` (the backend pipeline); a bare `docker run` prints `version`.
 
 Useful local checks:
 

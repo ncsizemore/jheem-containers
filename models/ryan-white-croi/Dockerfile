@@ -90,4 +90,4 @@ ENV MODEL_ID=ryan-white-state-croi \
 
 EXPOSE 8080
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["lambda"]
+CMD ["version"]

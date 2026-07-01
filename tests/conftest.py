@@ -47,8 +47,12 @@ def docker_run_json(ref, location, params, run_name, timeout=2700):
     if out_file.exists():
         out_file.unlink()
     cmd = ["docker", "run", "--rm", "--platform", "linux/amd64",
-           "-v", "jheem-gate-cache:/cache", "-v", f"{out_dir}:/out",
-           ref, "run", "--location", location]
+           "-v", "jheem-gate-cache:/cache", "-v", f"{out_dir}:/out"]
+    if os.environ.get("GITHUB_TOKEN"):
+        # pass the token through by name (value stays out of the arg list/logs);
+        # fetch_simset.R uses it to authenticate api.github.com and avoid the 60/hr limit
+        cmd += ["-e", "GITHUB_TOKEN"]
+    cmd += [ref, "run", "--location", location]
     for k, v in params.items():
         cmd += ["--param", f"{k}={v}"]
     cmd += ["--out", f"/out/{run_name}.json"]

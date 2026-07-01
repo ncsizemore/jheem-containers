@@ -73,4 +73,4 @@ ENV MODEL_ID=ryan-white-state-ajph \
     JHEEM_BASE_VERSION=${BASE_VERSION}
 
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["batch"]
+CMD ["version"]

@@ -80,4 +80,4 @@ ENV MODEL_ID=cdc-testing \
 
 EXPOSE 8080
 ENTRYPOINT ["./container_entrypoint.sh"]
-CMD ["lambda"]
+CMD ["version"]

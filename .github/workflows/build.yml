@@ -167,6 +167,8 @@ jobs:
       - name: test candidate digest (smoke + golden/perturbation)
         env:
           IMAGE_OWNER: ${{ github.repository_owner }}
+          # authenticates fetch_simset.R's api.github.com query (60/hr -> 1000/hr)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.name }}" = "base" ]; then echo "base has no model tests"; exit 0; fi
           REF=$(cat dg/ref)

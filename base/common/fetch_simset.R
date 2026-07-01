@@ -28,23 +28,33 @@ dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(link_dir,  recursive = TRUE, showWarnings = FALSE)
 
 api <- sprintf("https://api.github.com/repos/%s/releases/tags/%s", repo, release)
-# Retry the release query: a transient connection blip to api.github.com would
-# otherwise fail the whole run (e.g. the gate runs `run` twice per model and the
-# second invocation re-queries the API even on a warm cache). Same resilience the
-# download already has below.
-rel <- NULL
-for (attempt in 1:5) {
-  rel <- tryCatch(fromJSON(api, simplifyVector = FALSE),
-                  error = function(e) {
-                    message(sprintf("  release query attempt %d failed: %s", attempt, conditionMessage(e)))
-                    NULL
-                  })
-  if (!is.null(rel)) break
-  Sys.sleep(2 * attempt)
+# Query via curl so we can (a) authenticate when GITHUB_TOKEN is present — the
+# 60/hr unauthenticated api.github.com limit becomes 1000-5000/hr — and (b) read
+# the HTTP status. A 403 is rate-limiting: retrying only burns the budget faster,
+# so fail fast on it; other transient statuses retry.
+gh_release_json <- function(url, tries = 4L) {
+  token <- Sys.getenv("GITHUB_TOKEN", "")
+  hdrs <- c("-H", "Accept: application/vnd.github+json")
+  if (nzchar(token)) hdrs <- c(hdrs, "-H", paste0("Authorization: Bearer ", token))
+  for (attempt in seq_len(tries)) {
+    body_file <- tempfile()
+    code <- suppressWarnings(system2(
+      "curl", c("-sSL", hdrs, "-o", body_file, "-w", "%{http_code}", url),
+      stdout = TRUE, stderr = FALSE))
+    body <- if (file.exists(body_file)) paste(readLines(body_file, warn = FALSE), collapse = "\n") else ""
+    unlink(body_file)
+    if (identical(as.character(code), "200")) return(body)
+    if (identical(as.character(code), "403")) {
+      stop(sprintf("GitHub API 403 (rate limit) querying %s%s", url,
+                   if (nzchar(token)) "" else
+                     " — set GITHUB_TOKEN to raise the 60/hr unauthenticated limit"))
+    }
+    message(sprintf("  release query attempt %d: HTTP %s; retrying", attempt, as.character(code)))
+    Sys.sleep(2 * attempt)
+  }
+  stop(sprintf("release query failed after %d attempts: %s", tries, url))
 }
-if (is.null(rel)) {
-  stop(sprintf("Failed to query release %s @ %s after 5 attempts", repo, release))
-}
+rel <- fromJSON(gh_release_json(api), simplifyVector = FALSE)
 assets <- rel$assets
 if (is.null(assets) || length(assets) == 0) {
   stop(sprintf("Release %s @ %s has no assets", repo, release))
