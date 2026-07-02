@@ -102,6 +102,27 @@ jobs:
           if [ "$(echo "$matrix" | jq 'length')" -gt 0 ]; then echo "any=true" >> "$GITHUB_OUTPUT"; else echo "any=false" >> "$GITHUB_OUTPUT"; fi
           echo "Selected: $matrix"
 
+  # Repo-state contract checks — structural, fast, no candidate image needed.
+  # Runs UNCONDITIONALLY (not gated on select): the global checks (manifest
+  # coverage, reverse backend coverage) must fire even when the matrix is empty —
+  # e.g. a PR adding models/new-model/ without a models.yml entry selects nothing,
+  # and this job is what catches it. The matrix `test` job runs candidate-image
+  # behavior only (smoke + golden); `-k <model>` there deselects these global
+  # tests, which is why they need their own job.
+  contract:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read    # test_base_pin queries ghcr for the base digest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r tests/requirements.txt
+      - name: structural contract tests (models.yml <-> Dockerfiles <-> registry <-> backend)
+        run: pytest tests/test_models_yml.py tests/test_cross_repo.py tests/test_base_pin.py -q
+
   build:
     needs: select
     if: ${{ needs.select.outputs.any == 'true' }}
@@ -185,18 +206,20 @@ jobs:
           if [ "${{ matrix.name }}" = "base" ]; then echo "base has no model tests"; exit 0; fi
           REF=$(cat dg/ref)
           export "GATE_IMAGE_$(printf '%s' '${{ matrix.name }}' | tr 'a-z-' 'A-Z_')=$REF"
-          # Run the FULL suite (smoke + slow golden/perturbation) on every event,
-          # including PRs. `select` already scopes to release-impacting changes (a
-          # docs-only PR builds nothing), so the cost is the blast radius of the
-          # change, and a green PR means the model-output gate actually ran -- not
-          # just smoke. Promotion still never happens on a PR (see the promote job).
-          pytest tests -k "${{ matrix.name }}" -v
+          # Candidate-image BEHAVIOR only (smoke + slow golden/perturbation), on
+          # every event including PRs -- a green PR means the model-output gate
+          # actually ran, not just smoke. Structural/contract tests live in the
+          # `contract` job (they're repo-state checks; `-k <model>` here would
+          # deselect the global ones). Promotion never happens on a PR.
+          pytest tests/test_smoke.py tests/test_golden.py -k "${{ matrix.name }}" -v
 
   promote:
-    needs: [select, build, test]
-    # Only on a real release event, and only if every test passed (fail-closed).
+    needs: [select, build, test, contract]
+    # Only on a real release event, and only if BOTH the model-behavior matrix and
+    # the repo-state contract checks passed (fail-closed).
     if: >-
       needs.test.result == 'success' &&
+      needs.contract.result == 'success' &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest

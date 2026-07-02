@@ -26,10 +26,12 @@ Still open:
 
 - Base-image candidate compatibility cascade. The current gate validates model-image candidates; it does
   not yet prove that a candidate base image is compatible with every downstream model before promotion.
-- Canonical model configuration. `models.yml` owns container build/test/provenance metadata; CI validates
-  the Dockerfiles against it and the test suite reads it directly. Backend `models.json` remains
-  authoritative for application/runtime/product configuration; cross-repo validation of shared fields is
-  still open. See [`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
+- ~~Canonical model configuration~~ **done**: `models.yml` owns container build/test/provenance metadata;
+  a dedicated CI `contract` job validates the Dockerfiles, registry digests, and backend-shared fields
+  (param `id -> envVar` maps, scripts, image names, simset releases) against it on every PR, the test
+  suite reads it directly, and the build matrix is generated from it. Backend `models.json` remains
+  authoritative for application/runtime/product configuration. See
+  [`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
 - Runtime-contract cleanup. Lambda and batch modes work, but the entrypoint contract should be made
   simpler and more explicit.
 - Provenance hardening. Images expose useful version metadata, but the release metadata should eventually
