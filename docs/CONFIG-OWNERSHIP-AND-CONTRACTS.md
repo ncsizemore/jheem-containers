@@ -241,8 +241,14 @@ As of 2026-07-01:
   against the registry;
 - **step 6 done:** the GitHub Actions build matrix (and the per-model path filter) is generated from
   `models.yml` in the `select` job — no hardcoded model list remains in CI;
-- cross-repo validation against backend `models.json` is not yet implemented (step 5).
+- **steps 4+5 done:** `tests/test_cross_repo.py` validates the shared fields against backend
+  `models.json` on every PR — param `id -> envVar` maps (backend-owned; the CDC-bug class), simulation
+  scripts, image names, simset releases, plus the reverse check that every backend custom-sim model has a
+  container. Fetches the (public) backend manifest from `raw.githubusercontent`; `BACKEND_REF` overrides
+  the ref for coordinated cross-repo changes; `BACKEND_MODELS_PATH` points at a local clone for offline
+  work. A failed fetch fails the suite — never skips.
 
-Next milestones: generate/validate `PARAM_ENV_MAP` from backend-owned params (step 4) and cross-repo
-validation vs backend `models.json` (step 5) — one mechanism, two checks. Do not start Dockerfile
-templates until the validation layer is complete.
+The validation layer (steps 1–6) is complete. Remaining, deliberately later: Dockerfile templates (only
+now that validation exists), and the backend-side reciprocal check (its pinned image tags correspond to
+released container images). Known backend-side staleness: `container.repository` still names the old
+per-model repos — a backend edit to make when production cuts over to monorepo-built releases.
