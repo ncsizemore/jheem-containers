@@ -14,9 +14,11 @@
 # digest against the registry.
 
 # Shared base image. All models pin this exact digest; a per-model `base:` block
-# may override it if a model must diverge (none do today).
+# may override it if a model must diverge (none do today). `context` is the base
+# image's own Docker build context (it is also a buildable entry in the CI matrix).
 base:
   image: ghcr.io/ncsizemore/jheem-base
+  context: base
   version: "1.6.5"
   digest: sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
 
