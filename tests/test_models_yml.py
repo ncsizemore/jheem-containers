@@ -6,8 +6,10 @@ mirrored in a Dockerfile must match. The test suite itself reads models.yml dire
 (conftest.config(); step 3 — the old tests/test_config.json was deleted, not generated),
 so there is no test-config mirror left to validate. Structural + fast (no docker/registry
 — test_base_pin.py checks the pinned digest against the registry; transitively
-models.yml.base.digest == Dockerfile digest == registry). Cross-repo validation vs
-backend models.json is a later step.
+models.yml.base.digest == Dockerfile digest == registry; test_cross_repo.py checks the
+backend-shared fields). All three run in the CI `contract` job on every PR — a dedicated
+job, because the matrix jobs' `-k <model>` would deselect the global (non-parametrized)
+checks here.
 """
 import pathlib
 import re
