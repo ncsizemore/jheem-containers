@@ -233,15 +233,14 @@ As of 2026-07-01:
 
 - backend `models.json` remains the application/runtime/product manifest;
 - container **`models.yml` exists** with the container-owned fields (migration step 1);
-- `tests/test_models_yml.py` validates that the Dockerfiles and `tests/test_config.json` agree with
-  `models.yml` (migration step 2 — local drift check; runs on every PR, incl. any `models.yml` change);
+- `tests/test_models_yml.py` validates that the Dockerfiles agree with `models.yml` (migration step 2 —
+  local drift check; runs on every PR, incl. any `models.yml` change);
+- **step 3 done in its strongest form:** `tests/test_config.json` was **deleted**, not generated — the test
+  suite reads `models.yml` directly (`conftest.config()`), so there is no mirrored test config to drift;
 - Dockerfiles are digest-pinned to `jheem-base`; `tests/test_base_pin.py` validates the pinned digest
   against the registry;
-- `tests/test_config.json` is still hand-maintained but is now validated against `models.yml` (not yet
-  generated from it — step 3);
 - cross-repo validation against backend `models.json` is not yet implemented (step 5).
 
-Next milestones (in order): generate `tests/test_config.json` from `models.yml` (step 3); generate/validate
-`PARAM_ENV_MAP` from backend-owned params (step 4); cross-repo validation vs backend `models.json` (step 5);
-move the Actions build matrix to read `models.yml` (step 6). Do not start Dockerfile templates until the
-validation layer is complete.
+Next milestones (in order): generate/validate `PARAM_ENV_MAP` from backend-owned params (step 4);
+cross-repo validation vs backend `models.json` (step 5); move the Actions build matrix to read `models.yml`
+(step 6). Do not start Dockerfile templates until the validation layer is complete.

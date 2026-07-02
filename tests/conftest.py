@@ -12,6 +12,7 @@ import pathlib
 import subprocess
 
 import pytest
+import yaml
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
@@ -22,7 +23,30 @@ def load_json(p):
 
 
 def config():
-    return load_json(REPO / "tests" / "test_config.json")["models"]
+    """Per-model test config, read directly from the canonical models.yml.
+
+    models.yml is the single owner of this data (step 3 of the config migration:
+    the old hand-maintained tests/test_config.json was deleted rather than
+    generated — no mirrored artifact, no drift surface). The adapter keeps the
+    shape the tests were written against.
+    """
+    manifest = yaml.safe_load((REPO / "models.yml").read_text())
+    shared_base = manifest["base"]
+    out = {}
+    for name, m in manifest["models"].items():
+        base = m.get("base", shared_base)
+        golden = m["tests"]["golden"]
+        perturb = m["tests"]["perturbations"][0]  # gate runs one; full coverage is a tracked follow-up
+        out[name] = {
+            "image": m["image"].rsplit("/", 1)[-1],  # short name; owner comes from IMAGE_OWNER/gate
+            "location": golden["location"],
+            "params": golden["params"],
+            "perturb": {"param": perturb["param"], "value": perturb["value"]},
+            "golden": golden["artifact"],
+            "spec_object": m["workspace"]["spec_object"],
+            "base_version": str(base["version"]),
+        }
+    return out
 
 
 @pytest.fixture(scope="session")

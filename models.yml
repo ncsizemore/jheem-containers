@@ -7,10 +7,11 @@
 # Shared fields (backend_model_id, simulation_script, simset_release, the param
 # id->envVar mapping) are validated across repos, not trusted.
 #
-# tests/test_models_yml.py validates that the Dockerfiles and tests/test_config.json
-# agree with this file (drift fails CI). tests/test_base_pin.py validates the base
-# digest against the registry. Nothing is generated FROM this file yet — that's a
-# later migration step; today it is the canonical description + validation target.
+# tests/test_models_yml.py validates that the Dockerfiles agree with this file
+# (drift fails CI), and the test suite reads it directly (conftest.config()) — the
+# old hand-maintained tests/test_config.json was deleted, not generated, so there
+# is no mirrored test config to drift. tests/test_base_pin.py validates the base
+# digest against the registry.
 
 # Shared base image. All models pin this exact digest; a per-model `base:` block
 # may override it if a model must diverge (none do today).
