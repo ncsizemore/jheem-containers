@@ -9,8 +9,9 @@ These checks close that gap by validating the digest chain directly:
   1. every model's base `FROM` is digest-pinned (not a mutable tag);
   2. the pinned digest equals the digest the registry currently serves for the
      claimed `jheem-base:<ARG BASE_VERSION>` tag — catches ARG/digest drift AND a
-     base tag re-pushed under us;
-  3. `test_config.json`'s base_version agrees with the Dockerfile ARG.
+     base tag re-pushed under us.
+(Manifest-vs-Dockerfile agreement is test_models_yml.py's job; the suite reads
+models.yml directly, so there's no separate test config to cross-check.)
 
 No simulation; just file parsing + one registry query per model. The real cure is
 Phase B (pass the freshly-built base digest into model builds); this is the interim
@@ -65,11 +66,3 @@ def test_base_digest_matches_registry(name):
         f"{name}: pinned base digest != registry digest for jheem-base:{version}\n"
         f"  pinned:   {digest}\n  registry: {registry}\n"
         f"  => ARG/digest drift (ARG bumped, digest not), or the base tag was re-pushed")
-
-
-@pytest.mark.parametrize("name", MODELS)
-def test_config_base_version_matches_dockerfile(name):
-    version, _ = _base_ref(name)
-    cfg = config()[name].get("base_version")
-    assert cfg == version, \
-        f"{name}: test_config base_version '{cfg}' != Dockerfile ARG BASE_VERSION '{version}'"

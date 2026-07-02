@@ -35,9 +35,10 @@ be promoted.
 
 ## Config
 
-`test_config.json` is the interim per-model manifest (image, golden scenario,
-perturbation). Phase B's canonical `models.yml` should generate or validate it rather
-than it being a separate copy.
+The suite reads the canonical [`models.yml`](../models.yml) directly (`conftest.config()`)
+— per-model image, golden scenario, perturbation, spec object, base version. There is no
+separate test config to keep in sync (the old hand-maintained `test_config.json` was
+deleted rather than generated). To change what the gate tests, edit `models.yml`.
 
 `models.yml` is scoped to container build/test/provenance metadata. Backend
 `models.json` remains authoritative for application/runtime/product configuration, and

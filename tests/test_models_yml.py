@@ -1,12 +1,14 @@
-"""Validate Dockerfiles + tests/test_config.json agree with models.yml.
+"""Validate Dockerfiles agree with models.yml.
 
 models.yml is the canonical container manifest (docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
 This is the local drift check (migration step 2): every value it owns and that is
-mirrored elsewhere must match. Structural + fast (no docker/registry — test_base_pin.py
-checks the pinned digest against the registry; transitively models.yml.base.digest ==
-Dockerfile digest == registry). Cross-repo validation vs backend models.json is a later step.
+mirrored in a Dockerfile must match. The test suite itself reads models.yml directly
+(conftest.config(); step 3 — the old tests/test_config.json was deleted, not generated),
+so there is no test-config mirror left to validate. Structural + fast (no docker/registry
+— test_base_pin.py checks the pinned digest against the registry; transitively
+models.yml.base.digest == Dockerfile digest == registry). Cross-repo validation vs
+backend models.json is a later step.
 """
-import json
 import pathlib
 import re
 
@@ -37,9 +39,23 @@ def _base(name):
 
 
 def test_manifest_covers_all_models():
-    cfg = set(json.loads((REPO / "tests" / "test_config.json").read_text())["models"])
     dirs = {p.name for p in (REPO / "models").iterdir() if (p / "Dockerfile").exists()}
-    assert set(MODELS) == cfg == dirs, f"models.yml={set(MODELS)} test_config={cfg} model dirs={dirs}"
+    assert set(MODELS) == dirs, f"models.yml={set(MODELS)} model dirs={dirs}"
+
+
+@pytest.mark.parametrize("name", MODELS)
+def test_golden_artifact_exists(name):
+    art = MANIFEST["models"][name]["tests"]["golden"]["artifact"]
+    assert (REPO / art).exists(), f"{name}: golden artifact missing: {art}"
+
+
+@pytest.mark.parametrize("name", MODELS)
+def test_perturbation_params_are_known(name):
+    m = MANIFEST["models"][name]
+    known = set(m["param_env_map"])
+    assert set(m["tests"]["golden"]["params"]) <= known, f"{name}: golden params not in param_env_map"
+    for p in m["tests"]["perturbations"]:
+        assert p["param"] in known, f"{name}: perturbation '{p['param']}' not in param_env_map"
 
 
 @pytest.mark.parametrize("name", MODELS)
@@ -89,13 +105,3 @@ def test_jheem_analyses_ref_matches(name):
         f"{name}: JHEEM_ANALYSES_COMMIT != models.yml"
 
 
-@pytest.mark.parametrize("name", MODELS)
-def test_test_config_matches(name):
-    cfg = json.loads((REPO / "tests" / "test_config.json").read_text())["models"][name]
-    t = MANIFEST["models"][name]["tests"]
-    assert cfg["location"] == t["golden"]["location"], f"{name}: golden location"
-    assert cfg["params"] == t["golden"]["params"], f"{name}: golden params"
-    assert cfg["golden"] == t["golden"]["artifact"], f"{name}: golden artifact"
-    assert cfg["spec_object"] == MANIFEST["models"][name]["workspace"]["spec_object"], f"{name}: spec_object"
-    perts = [{"param": p["param"], "value": p["value"]} for p in t["perturbations"]]
-    assert {"param": cfg["perturb"]["param"], "value": cfg["perturb"]["value"]} in perts, f"{name}: perturbation"
