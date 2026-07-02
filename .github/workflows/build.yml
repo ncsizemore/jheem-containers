@@ -43,13 +43,17 @@ jobs:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          ALL='[
-            {"name":"base","image":"jheem-base","context":"base"},
-            {"name":"ryan-white-msa","image":"jheem-ryan-white-msa","context":"models/ryan-white-msa"},
-            {"name":"ryan-white-ajph","image":"jheem-ryan-white-ajph","context":"models/ryan-white-ajph"},
-            {"name":"ryan-white-croi","image":"jheem-ryan-white-croi","context":"models/ryan-white-croi"},
-            {"name":"cdc-testing","image":"jheem-cdc-testing","context":"models/cdc-testing"}
-          ]'
+          # Matrix is generated from the canonical models.yml (config migration
+          # step 6) — no hardcoded model list in CI. Image names stay short here;
+          # the owner prefix is applied by the build/promote jobs, so the matrix
+          # is owner-agnostic (survives an org transfer).
+          ALL=$(ruby -ryaml -rjson -e '
+            m = YAML.load_file("models.yml")
+            list = [{"name"=>"base", "image"=>m["base"]["image"].split("/").last, "context"=>m["base"]["context"]}]
+            m["models"].each { |k, v| list << {"name"=>k, "image"=>v["image"].split("/").last, "context"=>v["context"]} }
+            puts JSON.generate(list)')
+          echo "manifest matrix: $ALL"
+          MODEL_NAMES=$(echo "$ALL" | jq -r '.[].name | select(. != "base")')
           pick=""; files=""
           case "$GITHUB_EVENT_NAME" in
             workflow_dispatch)
@@ -80,7 +84,7 @@ jobs:
             if echo "$files" | grep -qE '^(base/|tests/|\.github/|models\.yml$)'; then
               pick="ALL"
             else
-              for n in ryan-white-msa ryan-white-ajph ryan-white-croi cdc-testing; do
+              for n in $MODEL_NAMES; do
                 echo "$files" | grep -q "^models/$n/" && pick="$pick $n"
               done
             fi

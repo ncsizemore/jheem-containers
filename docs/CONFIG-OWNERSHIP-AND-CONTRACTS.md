@@ -239,8 +239,10 @@ As of 2026-07-01:
   suite reads `models.yml` directly (`conftest.config()`), so there is no mirrored test config to drift;
 - Dockerfiles are digest-pinned to `jheem-base`; `tests/test_base_pin.py` validates the pinned digest
   against the registry;
+- **step 6 done:** the GitHub Actions build matrix (and the per-model path filter) is generated from
+  `models.yml` in the `select` job — no hardcoded model list remains in CI;
 - cross-repo validation against backend `models.json` is not yet implemented (step 5).
 
-Next milestones (in order): generate/validate `PARAM_ENV_MAP` from backend-owned params (step 4);
-cross-repo validation vs backend `models.json` (step 5); move the Actions build matrix to read `models.yml`
-(step 6). Do not start Dockerfile templates until the validation layer is complete.
+Next milestones: generate/validate `PARAM_ENV_MAP` from backend-owned params (step 4) and cross-repo
+validation vs backend `models.json` (step 5) — one mechanism, two checks. Do not start Dockerfile
+templates until the validation layer is complete.
