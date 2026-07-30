@@ -47,8 +47,13 @@ def test_manifest_covers_all_models():
 
 @pytest.mark.parametrize("name", MODELS)
 def test_golden_artifact_exists(name):
-    art = MANIFEST["models"][name]["tests"]["golden"]["artifact"]
+    golden = MANIFEST["models"][name]["tests"]["golden"]
+    art = golden["artifact"]
     assert (REPO / art).exists(), f"{name}: golden artifact missing: {art}"
+    if "reference_artifact" in golden:
+        reference = golden["reference_artifact"]
+        assert (REPO / reference).exists(), (
+            f"{name}: historical reference artifact missing: {reference}")
 
 
 @pytest.mark.parametrize("name", MODELS)

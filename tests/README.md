@@ -23,13 +23,16 @@ These get their own job because the matrix jobs' `-k <model>` deselects the glob
 - **`test_smoke.py`** (fast, no simulation) — image `version`/provenance fields, and
   `test-workspace` loading the model's specification object. Cheap enough to gate every build.
 - **`test_golden.py`** (`slow`, runs the simulation) —
-  - **regression:** a fixed scenario reproduces the committed production golden `0.0`;
+  - **regression:** a fixed scenario reproduces the committed reviewed golden `0.0`;
   - **perturbation:** a *non-default* parameter moves the intervention while baseline is
     unchanged — proving each parameter reaches the model. This is what catches the CDC
     env-var-name class of bug (a default-valued golden silently passed it).
 
 `golden_compare.py` is the comparator: multi-slice, **null-vs-value is a mismatch**,
-**duplicate keys fail**, per-role (baseline/intervention) breakdown.
+**duplicate keys fail**, per-role (baseline/intervention) breakdown. It accepts either the
+full production custom-simulation artifact or a focused slim `run` artifact. For an
+intentional contract change, keep the former in place as `reference_artifact` and add a
+new reviewed artifact as the active regression gate.
 
 ## Running
 

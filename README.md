@@ -117,9 +117,11 @@ Full regression and perturbation tests:
 pytest tests/test_golden.py
 ```
 
-The slow tests compare model outputs against checked-in golden artifacts under each model directory.
-They are intended to catch runtime regressions, missing scenario outputs, duplicate keys, null/value
-changes, and role-breakdown drift.
+The slow tests compare model outputs against checked-in, reviewed golden artifacts under each model
+directory. They are intended to catch runtime regressions, missing scenario outputs, duplicate keys,
+null/value changes, and role-breakdown drift. When an intentional model-contract correction changes a
+golden, retain the last production artifact as a `reference_artifact` in `models.yml` and gate against a
+new focused artifact; do not overwrite the historical result in place.
 
 ## Related JHEEM repositories
 

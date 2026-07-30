@@ -132,7 +132,9 @@ models:
       golden:
         location: CO
         params: {adap_loss: 50, oahs_loss: 30, other_loss: 40}
-        artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json
+        artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.timing-2026.json
+        # Last production result retained as evidence of the intentional timing correction.
+        reference_artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json
       perturbations:
         - {param: oahs_loss, value: 60}
 
