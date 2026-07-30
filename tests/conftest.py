@@ -45,6 +45,7 @@ def config():
             "golden": golden["artifact"],
             "spec_object": m["workspace"]["spec_object"],
             "base_version": str(base["version"]),
+            "runtime": m["runtime"],
         }
     return out
 

@@ -23,6 +23,19 @@ def test_version_provenance(name, models_cfg):
     assert expected in base_line, \
         f"{name}: base version mismatch — expected {expected}, got: '{base_line.strip()}'"
 
+    runtime = models_cfg[name]["runtime"]
+    if runtime["simulation_script"] == "simple_ryan_white.R":
+        timing = runtime["timing"]
+        expected_lines = (
+            f"Intervention type:  {runtime['intervention_type']}",
+            f"Intervention start: {timing['intervention_start_time']}",
+            f"Loss lag (years):   {timing['loss_lag_years']}",
+            f"Simulation period:  {timing['simulation_start_year']}-{timing['simulation_end_year']}",
+            f"Reporting period:   {timing['reporting_start_year']}-{timing['reporting_end_year']}",
+        )
+        for expected_line in expected_lines:
+            assert expected_line in out, f"{name}: version output missing '{expected_line}'\n{out}"
+
 
 @pytest.mark.parametrize("name", MODELS)
 def test_workspace_specification(name, models_cfg):

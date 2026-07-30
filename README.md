@@ -17,6 +17,8 @@ Implemented:
 - Build -> test-by-digest -> promote workflow for model images.
 - Full pull-request validation for affected images: smoke tests, golden regression tests, and targeted
   perturbation tests.
+- Base-image candidate compatibility cascade: a base candidate is built first, then every model is built
+  from that exact candidate digest and behavior-tested before the base can be released.
 - Fail-closed promotion to `latest` and semver tags: CI re-tags the exact digest that passed tests instead
   of rebuilding for release.
 - Retry/resume/verify for large simulation-set downloads and an **authenticated** release-API query
@@ -24,8 +26,6 @@ Implemented:
 
 Still open:
 
-- Base-image candidate compatibility cascade. The current gate validates model-image candidates; it does
-  not yet prove that a candidate base image is compatible with every downstream model before promotion.
 - ~~Canonical model configuration~~ **done**: `models.yml` owns container build/test/provenance metadata;
   a dedicated CI `contract` job validates the Dockerfiles, registry digests, and backend-shared fields
   (param `id -> envVar` maps, scripts, image names, simset releases) against it on every PR, the test
@@ -37,8 +37,8 @@ Still open:
 - Provenance hardening. Images expose useful version metadata, but the release metadata should eventually
   include a stronger audited chain from source refs to promoted digests.
 
-In short: this is a credible model-image promotion gate, not yet a complete base-plus-model release
-framework.
+In short: this is a digest-closed base-plus-model release gate. Production deployment remains a separate,
+explicit backend pin change.
 
 ## Repository structure
 
@@ -58,7 +58,7 @@ Models are driven via `custom` (backend pipeline) or `run` (standalone); a bare 
 
 | Context | Image | Current base | Gate coverage |
 | --- | --- | --- | --- |
-| `base/` | `jheem-base` | n/a (shared runtime) | Build/publish; downstream cascade still open |
+| `base/` | `jheem-base` | n/a (shared runtime) | Static contract + every downstream model |
 | `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.6.5` | Smoke + golden + perturbation |
 | `models/ryan-white-ajph/` | `jheem-ryan-white-ajph` | `1.6.5` | Smoke + golden + perturbation |
 | `models/ryan-white-croi/` | `jheem-ryan-white-croi` | `1.6.5` | Smoke + golden + perturbation |
@@ -79,12 +79,29 @@ Promotion behavior:
 
 | Trigger | What runs | Promotion |
 | --- | --- | --- |
-| Pull request | Full smoke + slow tests for affected images | No promotion |
-| Push to `main` | Full test suite | Promote tested digests to `latest` |
+| Pull request changing a model | Full smoke + slow tests for affected models | No promotion |
+| Pull request changing `base/` | Base contract plus all model smoke + slow tests against the candidate base digest | No promotion |
+| Push to `main` changing models | Full affected-model suite | Promote tested model digests to `latest` |
+| Push to `main` changing `base/` | Full base compatibility cascade | No promotion; base releases require an explicit tag |
+| Tag `base-vX.Y.Z` | Full base compatibility cascade | Promote the tested base digest to `X.Y.Z`, `X.Y`, and `latest` |
 | Tag `<image>-vX.Y.Z` | Full test suite for the tagged image | Promote tested digest to `X.Y.Z` and `X.Y` |
 | Manual workflow dispatch | Full test suite | No promotion |
 
 This prevents the common failure mode where CI tests one image but publishes another.
+
+### Releasing a base change
+
+A base release and its downstream model adoption are intentionally two reviewed operations:
+
+1. Merge the base change after its candidate digest passes every downstream model test.
+2. Tag that commit `base-vX.Y.Z`; CI repeats the cascade and publishes the tested base digest.
+3. Update `models.yml` and all model Dockerfile pins to the new base version and digest.
+4. Merge that pin update after the model candidates pass against the published digest.
+5. Tag any model releases that production should adopt.
+6. Update the backend semver pins only after those releases pass.
+
+This avoids an unverifiable circular dependency: a model source pin cannot name the new immutable base
+digest until that base digest exists.
 
 ## Local testing
 
@@ -100,9 +117,11 @@ Full regression and perturbation tests:
 pytest tests/test_golden.py
 ```
 
-The slow tests compare model outputs against checked-in golden artifacts under each model directory.
-They are intended to catch runtime regressions, missing scenario outputs, duplicate keys, null/value
-changes, and role-breakdown drift.
+The slow tests compare model outputs against checked-in, reviewed golden artifacts under each model
+directory. They are intended to catch runtime regressions, missing scenario outputs, duplicate keys,
+null/value changes, and role-breakdown drift. When an intentional model-contract correction changes a
+golden, retain the last production artifact as a `reference_artifact` in `models.yml` and gate against a
+new focused artifact; do not overwrite the historical result in place.
 
 ## Related JHEEM repositories
 
@@ -112,5 +131,5 @@ changes, and role-breakdown drift.
 - [`jheem-simulations`](https://github.com/ncsizemore/jheem-simulations) stores simulation artifacts and
   release data used by the portal.
 
-Legacy per-image repositories should remain available until historical tags and any external references
-have been recovered or intentionally retired.
+Legacy per-image repositories remain available for historical tags and external references, but publishing
+from them is disabled. This monorepo is the only current writer for the GHCR packages.

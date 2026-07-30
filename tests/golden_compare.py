@@ -8,8 +8,9 @@ Addresses the golden-coverage gaps the independent review flagged:
 - reports per-role (baseline vs intervention) so a perturbation test can assert
   "baseline unchanged, intervention moved".
 
-Golden format (production custom-sim artifact): {metadata, data: {scenario:
-{outcome: {statistic: {facet: {sim: [...], obs, metadata}}}}}}.
+Golden format may be either the production custom-sim artifact ({metadata,
+data: {scenario: {outcome: {statistic: {facet: {sim: [...], obs,
+metadata}}}}}}) or a reviewed slim `run` output ({sim, obs, metadata}).
 Candidate format (the slim `run` output): {sim: [...], obs, metadata} for the
 single outcome/facets that `run` produced.
 """
@@ -35,6 +36,8 @@ def _index(rows, outcome, statistic, facet):
 
 
 def _golden_rows(golden, outcome, statistic, facet):
+    if "sim" in golden:
+        return golden["sim"]
     data = golden["data"]
     scenario = next(iter(data))  # custom artifact has a single scenario key
     return data[scenario][outcome][statistic][facet]["sim"]

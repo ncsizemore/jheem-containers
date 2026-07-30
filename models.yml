@@ -34,6 +34,14 @@ models:
     runtime:
       model_id: ryan-white-msa
       simulation_script: simple_ryan_white.R
+      intervention_type: permanent_cessation
+      timing:
+        intervention_start_time: 2025.5
+        loss_lag_years: 0.25
+        simulation_start_year: 2025
+        simulation_end_year: 2035
+        reporting_start_year: 2025
+        reporting_end_year: 2030
       simset_release: ryan-white-msa-v1.0.0
       default_cmd: version
       supported_modes: [version, run, custom, batch, test-workspace]
@@ -62,6 +70,14 @@ models:
     runtime:
       model_id: ryan-white-state-ajph
       simulation_script: simple_ryan_white.R
+      intervention_type: permanent_cessation
+      timing:
+        intervention_start_time: 2025.5
+        loss_lag_years: 0.25
+        simulation_start_year: 2025
+        simulation_end_year: 2035
+        reporting_start_year: 2025
+        reporting_end_year: 2030
       simset_release: ryan-white-ajph-v1.0.0
       simset_base_suffix: _noint
       default_cmd: version
@@ -92,6 +108,14 @@ models:
     runtime:
       model_id: ryan-white-state-croi
       simulation_script: simple_ryan_white.R
+      intervention_type: permanent_cessation
+      timing:
+        intervention_start_time: 2026.5
+        loss_lag_years: 0.25
+        simulation_start_year: 2026
+        simulation_end_year: 2036
+        reporting_start_year: 2026
+        reporting_end_year: 2031
       simset_release: ryan-white-state-v2.0.0
       simset_base_suffix: _noint
       default_cmd: version
@@ -108,7 +132,9 @@ models:
       golden:
         location: CO
         params: {adap_loss: 50, oahs_loss: 30, other_loss: 40}
-        artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json
+        artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.timing-2026.json
+        # Last production result retained as evidence of the intentional timing correction.
+        reference_artifact: models/ryan-white-croi/tests/golden/CO_a50-o30-r40.json
       perturbations:
         - {param: oahs_loss, value: 60}
 

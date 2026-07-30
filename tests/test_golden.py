@@ -1,6 +1,6 @@
 """Model-output regression + perturbation tests — the heart of the promotion gate.
 
-- Regression: a fixed scenario must reproduce the committed production golden 0.0.
+- Regression: a fixed scenario must reproduce the committed reviewed golden 0.0.
 - Perturbation: a NON-DEFAULT parameter must move the intervention while leaving
   baseline unchanged — proving each parameter reaches the model. This is the test
   that catches the CDC env-var-name class of bug (which a default-valued golden
@@ -9,6 +9,8 @@
 These run the full simulation, so they belong on the gate / nightly, not on
 every commit. Marked `slow`.
 """
+import math
+
 import pytest
 
 from conftest import REPO, config, docker_run_json, image_ref, load_json
@@ -17,11 +19,41 @@ from golden_compare import compare_slice, load
 MODELS = list(config().keys())
 
 
+def assert_no_pre_intervention_year_divergence(out, start_time):
+    """Complete calendar years before an intervention year must be unchanged.
+
+    Annual rows represent intervals beginning at the labeled year, so a July
+    intervention may legitimately change the row for that same calendar year.
+    """
+    intervention_year = math.floor(start_time)
+    by_key = {}
+    for row in out["sim"]:
+        if row["year"] >= intervention_year:
+            continue
+        key = (row["year"], row.get("facet.by1"), row.get("stratum", ""))
+        role = "baseline" if row["simset"] == "Baseline" else "intervention"
+        by_key.setdefault(key, {})[role] = (
+            row.get("value"), row.get("value.lower"), row.get("value.upper"))
+
+    compared = 0
+    for key, roles in by_key.items():
+        if {"baseline", "intervention"} <= roles.keys():
+            compared += 1
+            assert roles["baseline"] == roles["intervention"], (
+                f"intervention diverged before configured intervention year "
+                f"{intervention_year}: {key}")
+    assert compared > 0, "candidate output had no comparable pre-effect rows"
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("name", MODELS)
 def test_golden_regression(name, models_cfg):
     m = models_cfg[name]
     out = docker_run_json(image_ref(name, m["image"]), m["location"], m["params"], f"{name}-golden")
+    timing = m["runtime"].get("timing")
+    if timing:
+        assert_no_pre_intervention_year_divergence(
+            out, timing["intervention_start_time"])
     res = compare_slice(load(REPO / m["golden"]), out)
     assert res.n_common > 0, "no comparable points"
     assert not res.missing and not res.extra, f"missing={res.missing[:3]} extra={res.extra[:3]}"

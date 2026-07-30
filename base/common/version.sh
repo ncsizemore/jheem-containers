@@ -27,6 +27,16 @@ JHEEM model container — provenance
   Zenodo DOI:         ${JHEEM_ZENODO_DOI:-TBD (pending Zenodo archival)}
 EOF
 
+if [[ -n "${INTERVENTION_TYPE:-}" ]]; then
+  cat <<EOF
+  Intervention type:  ${INTERVENTION_TYPE}
+  Intervention start: ${INTERVENTION_START_TIME:-<unset>}
+  Loss lag (years):   ${LOSS_LAG_YEARS:-<unset>}
+  Simulation period:  ${SIMULATION_START_YEAR:-<unset>}-${SIMULATION_END_YEAR:-<unset>}
+  Reporting period:   ${REPORTING_START_YEAR:-<unset>}-${REPORTING_END_YEAR:-<unset>}
+EOF
+fi
+
 if [[ -n "$ws_ver" && "$ws_ver" != "$jheem2_ver" ]]; then
   cat <<EOF
 

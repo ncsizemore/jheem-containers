@@ -23,13 +23,16 @@ These get their own job because the matrix jobs' `-k <model>` deselects the glob
 - **`test_smoke.py`** (fast, no simulation) — image `version`/provenance fields, and
   `test-workspace` loading the model's specification object. Cheap enough to gate every build.
 - **`test_golden.py`** (`slow`, runs the simulation) —
-  - **regression:** a fixed scenario reproduces the committed production golden `0.0`;
+  - **regression:** a fixed scenario reproduces the committed reviewed golden `0.0`;
   - **perturbation:** a *non-default* parameter moves the intervention while baseline is
     unchanged — proving each parameter reaches the model. This is what catches the CDC
     env-var-name class of bug (a default-valued golden silently passed it).
 
 `golden_compare.py` is the comparator: multi-slice, **null-vs-value is a mismatch**,
-**duplicate keys fail**, per-role (baseline/intervention) breakdown.
+**duplicate keys fail**, per-role (baseline/intervention) breakdown. It accepts either the
+full production custom-simulation artifact or a focused slim `run` artifact. For an
+intentional contract change, keep the former in place as `reference_artifact` and add a
+new reviewed artifact as the active regression gate.
 
 ## Running
 
@@ -59,13 +62,21 @@ deleted rather than generated). To change what the gate tests, edit `models.yml`
 shared fields should be checked by CI. See
 [`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](../docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
 
+For coordinated pull requests, CI first checks the backend branch matching the
+container pull request's branch name and falls back to backend `master` when no
+matching branch exists. Local coordinated work can set
+`BACKEND_MODELS_PATH=/path/to/jheem-backend/.github/config/models.json`.
+
 ## When the gate runs (merge / release policy)
 
 | Event | Builds | Tests | Promotes |
 |-------|--------|-------|----------|
-| `pull_request` → main | affected images (`select`) | contract + **full** behavior (smoke + slow) | no |
-| push → `main` | affected images | **full** | `:latest` (fail-closed) |
-| tag `<image>-vX.Y.Z` | that image | **full** | `:X.Y.Z` `:X.Y` (fail-closed) |
+| model `pull_request` → main | affected models (`select`) | contract + **full** behavior (smoke + slow) | no |
+| base `pull_request` → main | candidate base + every model built from its digest | base contract + every model's **full** behavior | no |
+| model push → `main` | affected models | **full** | `:latest` (fail-closed) |
+| base push → `main` | candidate base + all downstream models | **full cascade** | no; explicit release tag required |
+| tag `base-vX.Y.Z` | candidate base + all downstream models | **full cascade** | base `:X.Y.Z` `:X.Y` `:latest` |
+| tag `<image>-vX.Y.Z` | that model | **full** | `:X.Y.Z` `:X.Y` (fail-closed) |
 | `workflow_dispatch` | chosen / all | **full** | no |
 | feature branch push | — (workflow doesn't trigger) | — | — |
 

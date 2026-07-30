@@ -179,8 +179,9 @@ docker run --rm \
 ### Ryan White Implementation Limitations
 1. **Single parameter set**: No uncertainty quantification like research script
 2. **Same expansion/nonexpansion**: No differentiation between Medicaid expansion states  
-3. **Fixed timing**: Uses hardcoded START.YEAR (2025.5) and LOSS.LAG (0.25)
-   - **TODO**: Make start year a user parameter for API integration
+3. **Config-driven timing**: The model image/backend contract must supply
+   intervention, lag, simulation, and reporting periods. The script fails
+   closed when any required timing value is absent or invalid.
 4. **Fixed intervention type**: Only supports permanent cessation, not temporary interruptions
 
 ### General Translation Limitations
