@@ -147,7 +147,9 @@ jobs:
           # Coordinated cross-repo PRs use the same branch name. The helper
           # falls back to backend master when that branch does not exist.
           BACKEND_REF: ${{ github.head_ref || 'master' }}
-        run: pytest tests/test_models_yml.py tests/test_cross_repo.py tests/test_base_pin.py -q
+        run: >-
+          pytest tests/test_models_yml.py tests/test_cross_repo.py
+          tests/test_base_pin.py tests/test_workflow_gate.py -q
 
   build-base:
     needs: select
@@ -272,7 +274,11 @@ jobs:
 
   test-models:
     needs: [select, build-models]
-    if: ${{ needs.select.outputs.models_any == 'true' }}
+    if: >-
+      always() &&
+      needs.select.result == 'success' &&
+      needs.build-models.result == 'success' &&
+      needs.select.outputs.models_any == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -325,6 +331,8 @@ jobs:
   promote-models:
     needs: [select, build-models, test-models, contract]
     if: >-
+      always() &&
+      needs.select.result == 'success' &&
       needs.build-models.result == 'success' &&
       needs.test-models.result == 'success' &&
       needs.contract.result == 'success' &&
