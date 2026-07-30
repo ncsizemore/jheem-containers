@@ -59,13 +59,21 @@ deleted rather than generated). To change what the gate tests, edit `models.yml`
 shared fields should be checked by CI. See
 [`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](../docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
 
+For coordinated pull requests, CI first checks the backend branch matching the
+container pull request's branch name and falls back to backend `master` when no
+matching branch exists. Local coordinated work can set
+`BACKEND_MODELS_PATH=/path/to/jheem-backend/.github/config/models.json`.
+
 ## When the gate runs (merge / release policy)
 
 | Event | Builds | Tests | Promotes |
 |-------|--------|-------|----------|
-| `pull_request` → main | affected images (`select`) | contract + **full** behavior (smoke + slow) | no |
-| push → `main` | affected images | **full** | `:latest` (fail-closed) |
-| tag `<image>-vX.Y.Z` | that image | **full** | `:X.Y.Z` `:X.Y` (fail-closed) |
+| model `pull_request` → main | affected models (`select`) | contract + **full** behavior (smoke + slow) | no |
+| base `pull_request` → main | candidate base + every model built from its digest | base contract + every model's **full** behavior | no |
+| model push → `main` | affected models | **full** | `:latest` (fail-closed) |
+| base push → `main` | candidate base + all downstream models | **full cascade** | no; explicit release tag required |
+| tag `base-vX.Y.Z` | candidate base + all downstream models | **full cascade** | base `:X.Y.Z` `:X.Y` `:latest` |
+| tag `<image>-vX.Y.Z` | that model | **full** | `:X.Y.Z` `:X.Y` (fail-closed) |
 | `workflow_dispatch` | chosen / all | **full** | no |
 | feature branch push | — (workflow doesn't trigger) | — | — |
 

@@ -69,8 +69,11 @@ def test_context_exists(name):
 def test_base_matches_dockerfile(name):
     df, base = _dockerfile(name), _base(name)
     assert _arg(df, "BASE_VERSION") == base["version"], f"{name}: ARG BASE_VERSION != models.yml"
-    frm = re.search(r"jheem-base:\$\{BASE_VERSION\}@(sha256:[a-f0-9]{64})", df)
-    assert frm and frm.group(1) == base["digest"], f"{name}: FROM digest != models.yml base.digest"
+    default = _arg(df, "BASE_IMAGE")
+    expected = f"{base['image']}:${{BASE_VERSION}}@{base['digest']}"
+    assert default == expected, f"{name}: ARG BASE_IMAGE != models.yml base pin"
+    assert re.search(r"^FROM \$\{BASE_IMAGE\} AS base$", df, re.M), \
+        f"{name}: FROM must consume overridable BASE_IMAGE"
 
 
 @pytest.mark.parametrize("name", MODELS)
@@ -81,6 +84,19 @@ def test_runtime_env_matches(name):
     assert _env(df, "SIMSET_RELEASE") == rt["simset_release"], f"{name}: SIMSET_RELEASE"
     if "simset_base_suffix" in rt:
         assert _env(df, "SIMSET_BASE_SUFFIX") == rt["simset_base_suffix"], f"{name}: SIMSET_BASE_SUFFIX"
+    timing = rt.get("timing")
+    if timing:
+        expected = {
+            "INTERVENTION_TYPE": rt["intervention_type"],
+            "INTERVENTION_START_TIME": timing["intervention_start_time"],
+            "LOSS_LAG_YEARS": timing["loss_lag_years"],
+            "SIMULATION_START_YEAR": timing["simulation_start_year"],
+            "SIMULATION_END_YEAR": timing["simulation_end_year"],
+            "REPORTING_START_YEAR": timing["reporting_start_year"],
+            "REPORTING_END_YEAR": timing["reporting_end_year"],
+        }
+        for env_name, value in expected.items():
+            assert _env(df, env_name) == str(value), f"{name}: {env_name}"
 
 
 @pytest.mark.parametrize("name", MODELS)
@@ -105,5 +121,3 @@ def test_jheem_analyses_ref_matches(name):
         pytest.skip("prebuilt model — no jheem_analyses_ref")
     assert _arg(_dockerfile(name), "JHEEM_ANALYSES_COMMIT") == src["jheem_analyses_ref"], \
         f"{name}: JHEEM_ANALYSES_COMMIT != models.yml"
-
-

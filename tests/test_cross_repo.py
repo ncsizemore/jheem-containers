@@ -34,17 +34,26 @@ def _fetch_backend():
     local = os.environ.get("BACKEND_MODELS_PATH")
     if local:
         return json.loads(pathlib.Path(local).read_text())
-    ref = os.environ.get("BACKEND_REF", "master")
-    url = f"https://raw.githubusercontent.com/{BACKEND_REPO}/{ref}/{BACKEND_PATH}"
-    last = None
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(url, timeout=30) as r:
-                return json.loads(r.read().decode())
-        except Exception as e:  # noqa: BLE001 — retry any transient fetch error
-            last = e
-            time.sleep(2 * (attempt + 1))
-    raise AssertionError(f"could not fetch backend manifest {url}: {last}")
+    requested_ref = os.environ.get("BACKEND_REF", "master")
+    refs = [requested_ref]
+    if requested_ref != "master":
+        refs.append("master")
+
+    failures = []
+    for ref in refs:
+        url = f"https://raw.githubusercontent.com/{BACKEND_REPO}/{ref}/{BACKEND_PATH}"
+        last = None
+        attempts = 1 if ref != "master" else 4
+        for attempt in range(attempts):
+            try:
+                with urllib.request.urlopen(url, timeout=30) as r:
+                    return json.loads(r.read().decode())
+            except Exception as e:  # noqa: BLE001 — retry any transient fetch error
+                last = e
+                if attempt + 1 < attempts:
+                    time.sleep(2 * (attempt + 1))
+        failures.append(f"{url}: {last}")
+    raise AssertionError("could not fetch backend manifest:\n" + "\n".join(failures))
 
 
 @pytest.fixture(scope="session")
@@ -80,6 +89,33 @@ def test_simulation_script_agrees(name, backend):
     theirs = _backend_model(backend, name)["customSimulation"]["simulationScript"]
     ours = MANIFEST["models"][name]["runtime"]["simulation_script"]
     assert ours == theirs, f"{name}: simulation_script container={ours} backend={theirs}"
+
+
+@pytest.mark.parametrize("name", MODELS)
+def test_custom_simulation_timing_agrees(name, backend):
+    """Backend owns runtime semantics; Ryan White image defaults must mirror them."""
+    runtime = MANIFEST["models"][name]["runtime"]
+    if runtime["simulation_script"] != "simple_ryan_white.R":
+        pytest.skip("not a Ryan White custom simulation")
+
+    custom = _backend_model(backend, name)["customSimulation"]
+    theirs = custom["timing"]
+    ours = runtime["timing"]
+    expected = {
+        "intervention_start_time": theirs["interventionStartTime"],
+        "loss_lag_years": theirs["lossLagYears"],
+        "simulation_start_year": theirs["simulationStartYear"],
+        "simulation_end_year": theirs["simulationEndYear"],
+        "reporting_start_year": theirs["reportingStartYear"],
+        "reporting_end_year": theirs["reportingEndYear"],
+    }
+    assert runtime["intervention_type"] == custom["interventionType"], (
+        f"{name}: intervention type container={runtime['intervention_type']} "
+        f"backend={custom['interventionType']}")
+    assert ours == expected, (
+        f"{name}: timing disagrees with backend models.json "
+        f"(owner: backend customSimulation.timing)\n"
+        f"  container: {ours}\n  backend:   {expected}")
 
 
 @pytest.mark.parametrize("name", MODELS)

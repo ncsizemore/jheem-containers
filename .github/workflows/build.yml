@@ -1,12 +1,12 @@
 name: build
 
-# Build -> test-by-digest -> promote gate.
-#   build:   build the candidate, push it, capture its immutable DIGEST
-#   test:    pull that exact digest, run smoke + golden/perturbation tests
-#   promote: re-tag the *tested digest* to :latest / semver (NO rebuild between
-#            test and promotion). Promotion happens only on push to main / a
-#            release tag and only if the tests passed; PRs and dispatch validate
-#            without promoting.
+# Release topology:
+#   model change: build model -> test candidate digest -> promote that digest
+#   base change:  build base -> build every model FROM that exact base digest
+#                 -> test base + every model -> promote base only on base-vX.Y.Z
+#
+# Base changes intentionally do not auto-promote on a main-branch push. A base
+# release needs an explicit tag after the compatibility cascade has passed.
 
 on:
   push:
@@ -20,9 +20,6 @@ on:
         description: 'all | base | ryan-white-msa | ryan-white-ajph | ryan-white-croi | cdc-testing'
         default: all
 
-# Least-privilege default. Jobs that push/promote images opt into packages: write
-# explicitly; the test job (which pipes the token into the PR-built container)
-# stays read-only so an exfiltrated token can't push.
 permissions:
   contents: read
 
@@ -31,7 +28,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
+      model_matrix: ${{ steps.pick.outputs.model_matrix }}
       any: ${{ steps.pick.outputs.any }}
+      models_any: ${{ steps.pick.outputs.models_any }}
+      base_selected: ${{ steps.pick.outputs.base_selected }}
+      base_cascade: ${{ steps.pick.outputs.base_cascade }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,99 +44,202 @@ jobs:
           PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # Matrix is generated from the canonical models.yml (config migration
-          # step 6) — no hardcoded model list in CI. Image names stay short here;
-          # the owner prefix is applied by the build/promote jobs, so the matrix
-          # is owner-agnostic (survives an org transfer).
           ALL=$(ruby -ryaml -rjson -e '
             m = YAML.load_file("models.yml")
             list = [{"name"=>"base", "image"=>m["base"]["image"].split("/").last, "context"=>m["base"]["context"]}]
             m["models"].each { |k, v| list << {"name"=>k, "image"=>v["image"].split("/").last, "context"=>v["context"]} }
             puts JSON.generate(list)')
+          MODELS=$(echo "$ALL" | jq -c '[.[] | select(.name != "base")]')
           echo "manifest matrix: $ALL"
-          MODEL_NAMES=$(echo "$ALL" | jq -r '.[].name | select(. != "base")')
-          pick=""; files=""
+
+          pick=""
+          files=""
+          cascade=false
           case "$GITHUB_EVENT_NAME" in
             workflow_dispatch)
-              if [ "${IMAGE:-all}" = "all" ]; then pick="ALL"; else pick="$IMAGE"; fi ;;
+              case "${IMAGE:-all}" in
+                all|base) pick="ALL"; cascade=true ;;
+                *) pick="$IMAGE" ;;
+              esac
+              ;;
             pull_request)
-              # Multi-commit PRs: diff against the MERGE BASE with the target
-              # branch, not HEAD~1 (which sees only the last commit and would
-              # under-select). fetch-depth:0 gives history; fetch base to be safe.
               git fetch -q --no-tags origin "$PR_BASE_REF" 2>/dev/null || true
               mb=$(git merge-base FETCH_HEAD "$PR_HEAD_SHA" 2>/dev/null || true)
               if [ -n "$mb" ]; then
                 files=$(git diff --name-only "$mb" "$PR_HEAD_SHA" 2>/dev/null || true)
               else
-                echo "WARN: no merge base resolved; selecting ALL (fail-safe)"; pick="ALL"
-              fi ;;
+                echo "WARN: no merge base resolved; selecting base + all models (fail-safe)"
+                pick="ALL"
+                cascade=true
+              fi
+              ;;
             *)
               if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-                tag="${GITHUB_REF#refs/tags/}"; pick="${tag%-v*}"
+                tag="${GITHUB_REF#refs/tags/}"
+                target="${tag%-v*}"
+                if [ "$target" = "base" ]; then
+                  pick="ALL"
+                  cascade=true
+                else
+                  pick="$target"
+                fi
               elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
                 files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
               else
                 files=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" 2>/dev/null || true)
-              fi ;;
+              fi
+              ;;
           esac
-          # Path filter (only when files were diffed; dispatch/tag set pick directly).
-          # base/, tests/, .github/, or the canonical models.yml affect every image -> ALL.
+
           if [ -z "$pick" ] && [ -n "$files" ]; then
-            if echo "$files" | grep -qE '^(base/|tests/|\.github/|models\.yml$)'; then
+            if echo "$files" | grep -qE '^base/'; then
               pick="ALL"
+              cascade=true
+            elif echo "$files" | grep -qE '^(tests/|\.github/|models\.yml$)'; then
+              pick="MODELS"
             else
-              for n in $MODEL_NAMES; do
-                echo "$files" | grep -q "^models/$n/" && pick="$pick $n"
+              model_names=$(echo "$MODELS" | jq -r '.[].name')
+              for name in $model_names; do
+                echo "$files" | grep -q "^models/$name/" && pick="$pick $name"
               done
             fi
           fi
+
           if [ "$pick" = "ALL" ]; then
             matrix="$ALL"
-          elif [ -z "$(echo $pick | tr -d ' ')" ]; then
+          elif [ "$pick" = "MODELS" ]; then
+            matrix="$MODELS"
+          elif [ -z "$(echo "$pick" | tr -d ' ')" ]; then
             matrix="[]"
           else
             names=$(printf '%s\n' $pick | jq -R . | jq -cs .)
-            matrix=$(echo "$ALL" | jq -c --argjson names "$names" '[.[] | select(.name as $n | $names | index($n))]')
+            matrix=$(echo "$ALL" | jq -c --argjson names "$names" \
+              '[.[] | select(.name as $n | $names | index($n))]')
           fi
-          matrix=$(echo "$matrix" | jq -c .)
-          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
-          if [ "$(echo "$matrix" | jq 'length')" -gt 0 ]; then echo "any=true" >> "$GITHUB_OUTPUT"; else echo "any=false" >> "$GITHUB_OUTPUT"; fi
-          echo "Selected: $matrix"
 
-  # Repo-state contract checks — structural, fast, no candidate image needed.
-  # Runs UNCONDITIONALLY (not gated on select): the global checks (manifest
-  # coverage, reverse backend coverage) must fire even when the matrix is empty —
-  # e.g. a PR adding models/new-model/ without a models.yml entry selects nothing,
-  # and this job is what catches it. The matrix `test` job runs candidate-image
-  # behavior only (smoke + golden); `-k <model>` there deselects these global
-  # tests, which is why they need their own job.
+          matrix=$(echo "$matrix" | jq -c .)
+          model_matrix=$(echo "$matrix" | jq -c '[.[] | select(.name != "base")]')
+          base_selected=$(echo "$matrix" | jq -r 'any(.name == "base")')
+          if [ "$(echo "$matrix" | jq 'length')" -gt 0 ]; then any=true; else any=false; fi
+          if [ "$(echo "$model_matrix" | jq 'length')" -gt 0 ]; then models_any=true; else models_any=false; fi
+
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "model_matrix=$model_matrix" >> "$GITHUB_OUTPUT"
+          echo "any=$any" >> "$GITHUB_OUTPUT"
+          echo "models_any=$models_any" >> "$GITHUB_OUTPUT"
+          echo "base_selected=$base_selected" >> "$GITHUB_OUTPUT"
+          echo "base_cascade=$cascade" >> "$GITHUB_OUTPUT"
+          echo "Selected: $matrix (base cascade: $cascade)"
+
   contract:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read    # test_base_pin queries ghcr for the base digest
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
-      - name: structural contract tests (models.yml <-> Dockerfiles <-> registry <-> backend)
+      - name: structural contract tests
+        env:
+          # Coordinated cross-repo PRs use the same branch name. The helper
+          # falls back to backend master when that branch does not exist.
+          BACKEND_REF: ${{ github.head_ref || 'master' }}
         run: pytest tests/test_models_yml.py tests/test_cross_repo.py tests/test_base_pin.py -q
 
-  build:
+  build-base:
     needs: select
-    if: ${{ needs.select.outputs.any == 'true' }}
+    if: ${{ needs.select.outputs.base_selected == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # push the candidate image
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: base
+          file: base/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/jheem-base:gate-${{ github.sha }}
+          cache-from: type=gha,scope=base-d3
+          cache-to: type=gha,mode=max,scope=base-d3
+      - name: record candidate digest
+        run: |
+          mkdir -p dg
+          printf 'ghcr.io/%s/jheem-base@%s' \
+            "${{ github.repository_owner }}" "${{ steps.build.outputs.digest }}" > dg/ref
+          echo "candidate base: $(cat dg/ref)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ref-base
+          path: dg/ref
+
+  test-base:
+    needs: [select, build-base]
+    if: ${{ needs.select.outputs.base_selected == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ref-base
+          path: dg
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: test base timing contract
+        run: docker run --rm --platform linux/amd64 "$(cat dg/ref)" Rscript tests/test_ryan_white_timing.R
+
+  build-models:
+    needs: [select, build-base]
+    if: >-
+      always() &&
+      needs.select.result == 'success' &&
+      needs.select.outputs.models_any == 'true' &&
+      (needs.build-base.result == 'success' || needs.build-base.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+        include: ${{ fromJSON(needs.select.outputs.model_matrix) }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.select.outputs.base_cascade == 'true' }}
+        with:
+          name: ref-base
+          path: base-dg
+      - id: base
+        env:
+          BASE_CASCADE: ${{ needs.select.outputs.base_cascade }}
+        run: |
+          if [ "$BASE_CASCADE" = "true" ]; then
+            ref=$(cat base-dg/ref)
+          else
+            ref=$(ruby -ryaml -e '
+              b = YAML.load_file("models.yml")["base"]
+              print "#{b["image"]}:#{b["version"]}@#{b["digest"]}"')
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "model base: $ref"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -148,32 +252,35 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.context }}/Dockerfile
           platforms: linux/amd64
-          push: true   # push a throwaway candidate tag so the digest is pullable downstream
+          push: true
           tags: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:gate-${{ github.sha }}
-          # scope bumped to -d2 to abandon the poisoned cache namespace that
-          # served stale base layers for mutable-tag FROMs (now digest-pinned).
-          cache-from: type=gha,scope=${{ matrix.name }}-d2
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-d2
+          build-args: |
+            BASE_IMAGE=${{ steps.base.outputs.ref }}
+          cache-from: type=gha,scope=${{ matrix.name }}-d3
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-d3
       - name: record candidate digest
         run: |
           mkdir -p dg
-          printf 'ghcr.io/%s/%s@%s' "${{ github.repository_owner }}" "${{ matrix.image }}" "${{ steps.build.outputs.digest }}" > dg/ref
-          echo "candidate: $(cat dg/ref)"
+          printf 'ghcr.io/%s/%s@%s' \
+            "${{ github.repository_owner }}" "${{ matrix.image }}" \
+            "${{ steps.build.outputs.digest }}" > dg/ref
+          echo "candidate model: $(cat dg/ref)"
       - uses: actions/upload-artifact@v4
         with:
           name: ref-${{ matrix.name }}
           path: dg/ref
 
-  test:
-    needs: [select, build]
+  test-models:
+    needs: [select, build-models]
+    if: ${{ needs.select.outputs.models_any == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: read    # pull the candidate digest; token is piped into the container, so keep it read-only
+      packages: read
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+        include: ${{ fromJSON(needs.select.outputs.model_matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -189,47 +296,49 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
-      - name: free disk + add swap (1000-sim state/CDC runs exceed the runner's 16GB RAM)
+      - name: free disk + add swap
         run: |
           sudo rm -rf /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
             /usr/local/.ghcup /usr/share/dotnet /usr/local/share/boost /opt/microsoft 2>/dev/null || true
-          sudo fallocate -l 24G /mnt/swapfile && sudo chmod 600 /mnt/swapfile
-          sudo mkswap /mnt/swapfile && sudo swapon /mnt/swapfile
-          echo "--- disk ---"; df -h / | tail -1
-          echo "--- memory+swap ---"; free -h | head -3
-      - name: test candidate digest (smoke + golden/perturbation)
+          sudo fallocate -l 24G /mnt/swapfile
+          sudo chmod 600 /mnt/swapfile
+          sudo mkswap /mnt/swapfile
+          sudo swapon /mnt/swapfile
+          df -h / | tail -1
+          free -h | head -3
+      - name: test candidate digest
         env:
           IMAGE_OWNER: ${{ github.repository_owner }}
-          # authenticates fetch_simset.R's api.github.com query (60/hr -> 1000/hr)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ "${{ matrix.name }}" = "base" ]; then echo "base has no model tests"; exit 0; fi
           REF=$(cat dg/ref)
           export "GATE_IMAGE_$(printf '%s' '${{ matrix.name }}' | tr 'a-z-' 'A-Z_')=$REF"
-          # Candidate-image BEHAVIOR only (smoke + slow golden/perturbation), on
-          # every event including PRs -- a green PR means the model-output gate
-          # actually ran, not just smoke. Structural/contract tests live in the
-          # `contract` job (they're repo-state checks; `-k <model>` here would
-          # deselect the global ones). Promotion never happens on a PR.
           pytest tests/test_smoke.py tests/test_golden.py -k "${{ matrix.name }}" -v
+      - name: retain candidate outputs for reviewed golden changes
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: outputs-${{ matrix.name }}-${{ github.sha }}
+          path: /tmp/gate_out
+          if-no-files-found: ignore
 
-  promote:
-    needs: [select, build, test, contract]
-    # Only on a real release event, and only if BOTH the model-behavior matrix and
-    # the repo-state contract checks passed (fail-closed).
+  promote-models:
+    needs: [select, build-models, test-models, contract]
     if: >-
-      needs.test.result == 'success' &&
+      needs.build-models.result == 'success' &&
+      needs.test-models.result == 'success' &&
       needs.contract.result == 'success' &&
+      needs.select.outputs.base_cascade != 'true' &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # re-tag the tested digest
+      packages: write
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.select.outputs.matrix) }}
+        include: ${{ fromJSON(needs.select.outputs.model_matrix) }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -249,7 +358,46 @@ jobs:
             type=sha,prefix=
             type=match,pattern=${{ matrix.name }}-v(\d+\.\d+\.\d+),group=1
             type=match,pattern=${{ matrix.name }}-v(\d+\.\d+)\.\d+,group=1
-      - name: promote the tested digest (no rebuild)
+      - name: promote tested model digest
+        run: |
+          REF=$(cat dg/ref)
+          TAGS=$(printf '%s' "${{ steps.meta.outputs.tags }}" | sed 's/^/-t /' | tr '\n' ' ')
+          echo "Re-tagging $REF -> $TAGS"
+          docker buildx imagetools create $TAGS "$REF"
+
+  promote-base:
+    needs: [select, build-base, test-base, build-models, test-models, contract]
+    if: >-
+      needs.build-base.result == 'success' &&
+      needs.test-base.result == 'success' &&
+      needs.build-models.result == 'success' &&
+      needs.test-models.result == 'success' &&
+      needs.contract.result == 'success' &&
+      github.event_name == 'push' &&
+      startsWith(github.ref, 'refs/tags/base-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ref-base
+          path: dg
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/jheem-base
+          tags: |
+            type=raw,value=latest
+            type=match,pattern=base-v(\d+\.\d+\.\d+),group=1
+            type=match,pattern=base-v(\d+\.\d+)\.\d+,group=1
+      - name: promote tested base digest
         run: |
           REF=$(cat dg/ref)
           TAGS=$(printf '%s' "${{ steps.meta.outputs.tags }}" | sed 's/^/-t /' | tr '\n' ' ')

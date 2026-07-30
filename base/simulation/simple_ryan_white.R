@@ -20,9 +20,62 @@ get.intervention.from.code.from.code <- function(...) {
 # RYAN WHITE INTERVENTION PARAMETERS
 # ============================================================================
 
-# Constants matching research script
-START.YEAR <- 2025.5
-LOSS.LAG <- 0.25
+# Timing is model-specific. It must be supplied by the model image/backend
+# contract; silently inheriting the MSA/AJPH timeline caused CROI custom
+# simulations to begin a year early.
+read_required_numeric_env <- function(name) {
+  raw_value <- Sys.getenv(name, "")
+  if (raw_value == "") {
+    stop(sprintf("Required environment variable not set: %s", name))
+  }
+
+  value <- suppressWarnings(as.numeric(raw_value))
+  if (length(value) != 1 || !is.finite(value)) {
+    stop(sprintf("Environment variable %s must be a finite number (received '%s')",
+                 name, raw_value))
+  }
+
+  value
+}
+
+read_required_integer_year <- function(name) {
+  value <- read_required_numeric_env(name)
+  if (value != floor(value)) {
+    stop(sprintf("Environment variable %s must be a whole-number year", name))
+  }
+  value
+}
+
+INTERVENTION.TYPE <- Sys.getenv("INTERVENTION_TYPE", "")
+if (INTERVENTION.TYPE != "permanent_cessation") {
+  stop("Ryan White custom simulations require INTERVENTION_TYPE=permanent_cessation")
+}
+
+START.YEAR <- read_required_numeric_env("INTERVENTION_START_TIME")
+LOSS.LAG <- read_required_numeric_env("LOSS_LAG_YEARS")
+SIMULATION.START.YEAR <- read_required_integer_year("SIMULATION_START_YEAR")
+SIMULATION.END.YEAR <- read_required_integer_year("SIMULATION_END_YEAR")
+REPORTING.START.YEAR <- read_required_integer_year("REPORTING_START_YEAR")
+REPORTING.END.YEAR <- read_required_integer_year("REPORTING_END_YEAR")
+
+if (LOSS.LAG < 0) stop("LOSS_LAG_YEARS cannot be negative")
+if (SIMULATION.START.YEAR >= SIMULATION.END.YEAR) {
+  stop("SIMULATION_START_YEAR must be earlier than SIMULATION_END_YEAR")
+}
+if (START.YEAR < SIMULATION.START.YEAR || START.YEAR > SIMULATION.END.YEAR) {
+  stop("INTERVENTION_START_TIME must fall within the simulation period")
+}
+if (REPORTING.START.YEAR < SIMULATION.START.YEAR ||
+    REPORTING.END.YEAR > SIMULATION.END.YEAR ||
+    REPORTING.START.YEAR > REPORTING.END.YEAR) {
+  stop("The reporting period must be ordered and contained within the simulation period")
+}
+
+cat(sprintf(
+  "  Ryan White timing: intervention=%g, loss lag=%g years, simulation=%d-%d, reporting=%d-%d\n",
+  START.YEAR, LOSS.LAG, SIMULATION.START.YEAR, SIMULATION.END.YEAR,
+  REPORTING.START.YEAR, REPORTING.END.YEAR
+))
 
 # ============================================================================
 # CONTRACT: create_model_intervention / run_custom_simulation
@@ -147,8 +200,8 @@ run_custom_simulation <- function(base_simset, intervention) {
   }
 
   results <- intervention$run(base_simset,
-                              start.year = 2025,
-                              end.year = 2035,
+                              start.year = SIMULATION.START.YEAR,
+                              end.year = SIMULATION.END.YEAR,
                               verbose = TRUE,
                               listener = progress_callback)
 

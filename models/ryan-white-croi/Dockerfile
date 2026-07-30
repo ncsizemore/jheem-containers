@@ -7,7 +7,8 @@ ARG BASE_VERSION=1.6.5
 # at the deployed image's build (croi v2.2.0, 2026-03-26T18:08Z), traced from the
 # build timestamp; rebuild reproduces the production golden bit-for-bit.
 ARG JHEEM_ANALYSES_COMMIT=250ffc8aafcabe00c1bca20df831bf9637c2dd12
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
+ARG BASE_IMAGE=ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+FROM ${BASE_IMAGE} AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
 
@@ -81,6 +82,13 @@ ARG BASE_VERSION
 ARG JHEEM_ANALYSES_COMMIT
 ENV MODEL_ID=ryan-white-state-croi \
     SIMULATION_SCRIPT=simple_ryan_white.R \
+    INTERVENTION_TYPE=permanent_cessation \
+    INTERVENTION_START_TIME=2026.5 \
+    LOSS_LAG_YEARS=0.25 \
+    SIMULATION_START_YEAR=2026 \
+    SIMULATION_END_YEAR=2036 \
+    REPORTING_START_YEAR=2026 \
+    REPORTING_END_YEAR=2031 \
     DEFAULT_OUTCOMES=incidence \
     PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-state-v2.0.0 \

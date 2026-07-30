@@ -4,7 +4,8 @@
 # =============================================================================
 ARG BASE_VERSION=1.6.5
 ARG JHEEM_ANALYSES_COMMIT=fc3fe1d2d5f859b322414da8b11f0182e635993b
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
+ARG BASE_IMAGE=ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+FROM ${BASE_IMAGE} AS base
 
 # jheem2 inherited from base (no override needed)
 
@@ -65,6 +66,13 @@ ARG BASE_VERSION
 ARG JHEEM_ANALYSES_COMMIT
 ENV MODEL_ID=ryan-white-state-ajph \
     SIMULATION_SCRIPT=simple_ryan_white.R \
+    INTERVENTION_TYPE=permanent_cessation \
+    INTERVENTION_START_TIME=2025.5 \
+    LOSS_LAG_YEARS=0.25 \
+    SIMULATION_START_YEAR=2025 \
+    SIMULATION_END_YEAR=2035 \
+    REPORTING_START_YEAR=2025 \
+    REPORTING_END_YEAR=2030 \
     DEFAULT_OUTCOMES=incidence \
     PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-ajph-v1.0.0 \

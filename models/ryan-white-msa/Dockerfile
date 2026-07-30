@@ -9,7 +9,8 @@
 # Building from source with newer jheem2 would serialize incompatible functions.
 # =============================================================================
 ARG BASE_VERSION=1.6.5
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
+ARG BASE_IMAGE=ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+FROM ${BASE_IMAGE} AS base
 
 # --- Workspace source (prebuilt, jheem2 1.9.2 compatible with 1.6.2 runtime) ---
 FROM ghcr.io/ncsizemore/jheem-ryan-white-model:2.1.0 AS workspace-source
@@ -42,6 +43,13 @@ RUN R --slave -e "load('ryan_white_workspace.RData'); \
 ARG BASE_VERSION
 ENV MODEL_ID=ryan-white-msa \
     SIMULATION_SCRIPT=simple_ryan_white.R \
+    INTERVENTION_TYPE=permanent_cessation \
+    INTERVENTION_START_TIME=2025.5 \
+    LOSS_LAG_YEARS=0.25 \
+    SIMULATION_START_YEAR=2025 \
+    SIMULATION_END_YEAR=2035 \
+    REPORTING_START_YEAR=2025 \
+    REPORTING_END_YEAR=2030 \
     DEFAULT_OUTCOMES=incidence \
     PARAM_ENV_MAP="adap_loss=ADAP_LOSS oahs_loss=OAHS_LOSS other_loss=OTHER_LOSS" \
     SIMSET_RELEASE=ryan-white-msa-v1.0.0 \

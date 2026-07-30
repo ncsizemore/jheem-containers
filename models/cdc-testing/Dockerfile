@@ -5,7 +5,8 @@
 # Updated from fc3fe1d to include proportion.tested.regardless model element
 ARG BASE_VERSION=1.6.5
 ARG JHEEM_ANALYSES_COMMIT=51ac4957
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8 AS base
+ARG BASE_IMAGE=ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+FROM ${BASE_IMAGE} AS base
 
 # jheem2 1.11.1 inherited from base (no override needed)
 
