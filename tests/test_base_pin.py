@@ -13,9 +13,9 @@ These checks close that gap by validating the digest chain directly:
 (Manifest-vs-Dockerfile agreement is test_models_yml.py's job; the suite reads
 models.yml directly, so there's no separate test config to cross-check.)
 
-No simulation; just file parsing + one registry query per model. The real cure is
-Phase B (pass the freshly-built base digest into model builds); this is the interim
-guard until then.
+No simulation; just file parsing + one registry query per model. CI additionally
+overrides `BASE_IMAGE` with the freshly built candidate digest during a base
+compatibility cascade.
 """
 import re
 import subprocess
@@ -27,16 +27,16 @@ from conftest import REPO, config
 MODELS = list(config().keys())
 
 _ARG = re.compile(r"ARG BASE_VERSION=(\S+)")
-_FROM = re.compile(
-    r"FROM ghcr\.io/ncsizemore/jheem-base:\$\{BASE_VERSION\}(@sha256:[a-f0-9]{64})?")
+_BASE_IMAGE = re.compile(
+    r"ARG BASE_IMAGE=ghcr\.io/ncsizemore/jheem-base:\$\{BASE_VERSION\}@(sha256:[a-f0-9]{64})")
 
 
 def _base_ref(name):
-    """(version, digest_or_None) parsed from the model's base FROM line."""
+    """(version, digest_or_None) parsed from the default BASE_IMAGE pin."""
     text = (REPO / "models" / name / "Dockerfile").read_text()
     arg = _ARG.search(text)
-    frm = _FROM.search(text)
-    digest = frm.group(1)[1:] if (frm and frm.group(1)) else None  # strip leading '@'
+    base_image = _BASE_IMAGE.search(text)
+    digest = base_image.group(1) if base_image else None
     return (arg.group(1) if arg else None), digest
 
 
