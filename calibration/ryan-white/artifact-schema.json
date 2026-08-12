@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jheem.org/schemas/calibration/v1.json",
+  "title": "JHEEM public calibration artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "model",
+    "stage",
+    "location",
+    "ensemble",
+    "simulation_source",
+    "runtime_source",
+    "exporter_source",
+    "registry_source",
+    "manager_sources",
+    "targets"
+  ],
+  "properties": {
+    "schema_version": {"const": "jheem-calibration/v1"},
+    "artifact_id": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "stage": {"enum": ["ehe", "ryan-white"]},
+    "location": {"type": "string", "minLength": 1},
+    "ensemble": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sample_count", "kind", "calibration_code", "quantiles"],
+      "properties": {
+        "sample_count": {"type": "integer", "minimum": 1},
+        "kind": {"type": "string", "minLength": 1},
+        "calibration_code": {"type": "string", "minLength": 1},
+        "quantiles": {
+          "type": "array",
+          "items": {"type": "number", "minimum": 0, "maximum": 1},
+          "minItems": 5,
+          "maxItems": 5
+        }
+      }
+    },
+    "simulation_source": {"$ref": "#/$defs/simulationSource"},
+    "runtime_source": {
+      "allOf": [
+        {"$ref": "#/$defs/fileSource"},
+        {
+          "type": "object",
+          "required": ["image"],
+          "properties": {
+            "image": {
+              "type": "string",
+              "pattern": "^ghcr\\.io/.+@sha256:[0-9a-f]{64}$"
+            }
+          }
+        }
+      ]
+    },
+    "exporter_source": {"$ref": "#/$defs/fileSource"},
+    "registry_source": {
+      "allOf": [
+        {"$ref": "#/$defs/fileSource"},
+        {
+          "type": "object",
+          "required": ["registry_id"],
+          "properties": {"registry_id": {"type": "string", "minLength": 1}}
+        }
+      ]
+    },
+    "manager_sources": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {"$ref": "#/$defs/fileSource"},
+          {
+            "type": "object",
+            "required": ["manager_id", "controlled_release"],
+            "properties": {
+              "manager_id": {"type": "string", "minLength": 1},
+              "controlled_release": {"type": "string", "minLength": 1}
+            }
+          }
+        ]
+      },
+      "minItems": 1
+    },
+    "targets": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/target"},
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "simulationSource": {
+      "allOf": [
+        {"$ref": "#/$defs/fileSource"},
+        {
+          "type": "object",
+          "required": ["release"],
+          "properties": {"release": {"type": "string", "minLength": 1}}
+        }
+      ]
+    },
+    "fileSource": {
+      "type": "object",
+      "required": ["filename", "sha256"],
+      "properties": {
+        "filename": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_id", "label", "classification", "public_panel", "unit",
+        "observation_provenance_confidence", "panels"
+      ],
+      "properties": {
+        "target_id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
+        "classification": {"type": "string", "minLength": 1},
+        "public_panel": {"type": "string", "minLength": 1},
+        "unit": {"type": "string", "minLength": 1},
+        "observation_provenance_confidence": {
+          "enum": ["verified", "reconstructed", "unknown"]
+        },
+        "panels": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/panel"}
+        }
+      }
+    },
+    "panel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["facet", "posterior", "observations"],
+      "properties": {
+        "facet": {"enum": ["total", "age", "race", "sex"]},
+        "posterior": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/posteriorPoint"}
+        },
+        "observations": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/observationPoint"}
+        }
+      }
+    },
+    "stratum": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "posteriorPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["year", "stratum", "q025", "q250", "q500", "q750", "q975"],
+      "properties": {
+        "year": {"type": "integer"},
+        "stratum": {"$ref": "#/$defs/stratum"},
+        "q025": {"type": "number"},
+        "q250": {"type": "number"},
+        "q500": {"type": "number"},
+        "q750": {"type": "number"},
+        "q975": {"type": "number"}
+      }
+    },
+    "observationPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "year", "stratum", "value", "manager_source", "manager_ontology",
+        "public_source_ids"
+      ],
+      "properties": {
+        "year": {"type": "integer"},
+        "stratum": {"$ref": "#/$defs/stratum"},
+        "value": {"type": "number"},
+        "manager_source": {"type": "string", "minLength": 1},
+        "manager_ontology": {"type": "string", "minLength": 1},
+        "public_source_ids": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "minItems": 1
+        }
+      }
+    }
+  }
+}

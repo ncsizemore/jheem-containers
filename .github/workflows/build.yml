@@ -141,6 +141,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: r-lib/actions/setup-r@v2
       - run: pip install -r tests/requirements.txt
       - name: structural contract tests
         env:
@@ -149,7 +150,10 @@ jobs:
           BACKEND_REF: ${{ github.head_ref || 'master' }}
         run: >-
           pytest tests/test_models_yml.py tests/test_cross_repo.py
-          tests/test_base_pin.py tests/test_workflow_gate.py -q
+          tests/test_base_pin.py tests/test_workflow_gate.py
+          tests/test_calibration_registry.py tests/test_calibration_artifact.py -q
+      - name: calibration exporter pure R tests
+        run: Rscript tests/test_calibration_exporter.R
 
   build-base:
     needs: select
