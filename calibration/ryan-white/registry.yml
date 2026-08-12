@@ -1,0 +1,409 @@
+schema_version: jheem-calibration-target-registry/v1
+registry_id: ryan-white-calibration-targets-v1
+scope: initial_public_panel_allowlist
+coverage_status: partial
+coverage_note: >-
+  This registry enumerates intended public calibration panels and the non-visual
+  Ryan White likelihood component needed to interpret them. It is not an
+  exhaustive serialization of every EHE likelihood instruction or weight.
+
+policies:
+  observation_binding: explicit_registry_only
+  simset_metadata_binding: prohibited
+  legacy_adap_mapping: reject_adap_clients_to_non_adap_clients
+  manager_binary_redistribution: controlled_only
+  public_artifacts: minimal_derived_payloads
+  historical_confidence_values: [verified, reconstructed, unknown]
+
+data_managers:
+  ryan-white-web-display-2025-04-08:
+    role: historical_display
+    sha256: 4f1b5063ae6f6e9ffa4b254d4cad71fdf088903295339fb59a17e71819f99989
+    created_at: "2025-04-08 16:21:06 CDT"
+    modified_at: "2025-04-08 16:25:53 CDT"
+    historical_fitting_identity: unknown
+    redistribution: controlled_only
+  ryan-white-full-2026-03-16:
+    role: current_full_candidate
+    sha256: cc227cb9bdf43d9948f97db54d9c2652f034c4b780a8515cb57c99ea6f735188
+    created_at: "2026-03-16 11:42:34 CDT"
+    modified_at: "2026-03-16 11:46:08 CDT"
+    historical_fitting_identity: unknown
+    redistribution: controlled_only
+
+sources:
+  hrsa-rwhap-annual:
+    family: HRSA
+    label: Ryan White HIV/AIDS Program Annual Data Reports
+    url: https://ryanwhite.hrsa.gov/data/reports
+    attribution_required: true
+    public_reuse_status: public_domain_with_citation
+  nastad-adap-monitoring:
+    family: NASTAD
+    label: National RWHAP Part B ADAP Monitoring Project Annual Reports
+    url: https://nastad.org/adap-monitoring-project
+    attribution_required: true
+    public_reuse_status: minimal_derived_values_pending_confirmation
+  cdc-nhss-atlasplus:
+    family: NHSS
+    label: CDC National HIV Surveillance System and AtlasPlus
+    url: https://www.cdc.gov/hiv-data/nhss/index.html
+    attribution_required: true
+    public_reuse_status: public_suppressed_release_only
+  cdc-brfss:
+    family: BRFSS
+    label: CDC Behavioral Risk Factor Surveillance System
+    url: https://www.cdc.gov/brfss/
+    attribution_required: true
+    public_reuse_status: public_suppressed_release_only
+  aidsvu-prep:
+    family: AIDSVu/IQVIA
+    label: AIDSVu public PrEP data
+    url: https://aidsvu.org/data-methods/data-methods-statecounty/
+    attribution_required: true
+    public_reuse_status: public_dataset_with_credit_and_suppression
+
+definition_evidence:
+  ryan-white-msa-likelihood:
+    repository: tfojo1/jheem_analyses
+    revision: 1835cc0239c9a14dd79823167c87fc81cd23a7af
+    path: applications/ryan_white/ryan_white_likelihoods.R
+    confidence: reconstructed
+    note: Packaging-era revision; exact stochastic generator revision is not embedded.
+  ryan-white-ajph-likelihood:
+    repository: tfojo1/jheem_analyses
+    revision: fc3fe1d2d5f859b322414da8b11f0182e635993b
+    path: applications/ryan_white/ryan_white_likelihoods.R
+    confidence: reconstructed
+    note: Runtime-pinned revision; not proof of the historical posterior generator.
+  ryan-white-croi-likelihood:
+    repository: tfojo1/jheem_analyses
+    revision: 250ffc8aafcabe00c1bca20df831bf9637c2dd12
+    path: applications/ryan_white/ryan_white_likelihoods.R
+    confidence: reconstructed
+    note: Runtime-pinned revision; not proof of the historical posterior generator.
+  ehe-likelihood-current-review:
+    repository: tfojo1/jheem_analyses
+    revision: fef88b515295254946cf4e26fd1585b9a4dcebff
+    path: applications/EHE/ehe_likelihoods.R
+    confidence: reconstructed
+    note: Confirms target families; exact historical generator revision and weights remain unknown.
+
+compatibility_evidence:
+  display-2025-to-full-2026:
+    repository: tfojo1/jheem_analyses
+    revision: 13193a9e703a8672c05182afb800401ca961f27c
+    report_path: data_processing/ryan.white.data.manager/validation/reports/ryan-white-manager-compatibility.json
+    applies_to:
+      baseline_manager: ryan-white-web-display-2025-04-08
+      candidate_manager: ryan-white-full-2026-03-16
+    scope: selective_target_compatibility
+    boundary: Does not establish historical fitting-manager or whole-manager identity.
+
+models:
+  ryan-white-msa:
+    backend_model_id: ryan-white-msa
+    geography: msa
+    stages:
+      ehe:
+        label: Epidemic baseline fit
+        simulation_release: ehe-msa-v1.0.0
+        asset_digest_policy: per_location_release_asset
+        calibration_code: final.ehe
+        sample_count: 1000
+        ensemble_kind: full
+        target_set: ehe-public-v1
+        definition_evidence: ehe-likelihood-current-review
+      ryan-white:
+        label: Ryan White service fit
+        simulation_release: ryan-white-msa-v1.0.0
+        asset_digest_policy: per_location_release_asset
+        calibration_code: final.ehe
+        sample_count: 80
+        ensemble_kind: deliberately_thinned_web_delivery
+        target_set: ryan-white-msa-v1
+        definition_evidence: ryan-white-msa-likelihood
+  ryan-white-ajph:
+    backend_model_id: ryan-white-state-ajph
+    geography: state
+    stages:
+      ehe:
+        label: Epidemic baseline fit
+        simulation_release: ehe-state-v1.0.0
+        asset_digest_policy: per_location_release_asset
+        calibration_code: final.ehe.state
+        sample_count: 1000
+        ensemble_kind: full
+        target_set: ehe-public-v1
+        definition_evidence: ehe-likelihood-current-review
+      ryan-white:
+        label: Ryan White service fit
+        simulation_release: ryan-white-ajph-v1.0.0
+        asset_digest_policy: per_location_release_asset
+        calibration_code: final.ehe.state
+        sample_count: 1000
+        ensemble_kind: full
+        target_set: ryan-white-state-v1
+        definition_evidence: ryan-white-ajph-likelihood
+  ryan-white-croi:
+    backend_model_id: ryan-white-state-croi
+    geography: state
+    stages:
+      ehe:
+        label: Epidemic baseline fit
+        simulation_release: ehe-state-v1.0.0
+        asset_digest_policy: per_location_release_asset
+        calibration_code: final.ehe.state
+        sample_count: 1000
+        ensemble_kind: full
+        target_set: ehe-public-v1
+        definition_evidence: ehe-likelihood-current-review
+      ryan-white:
+        label: Ryan White service fit
+        simulation_release: ryan-white-state-v2.0.0
+        asset_digest_policy: per_location_release_asset
+        calibration_code: final.ehe.state
+        sample_count: 1000
+        ensemble_kind: full
+        target_set: ryan-white-state-v1
+        definition_evidence: ryan-white-croi-likelihood
+
+target_sets:
+  ehe-public-v1:
+    stage: ehe
+    exhaustive: false
+    target_ids:
+      - ehe-diagnoses
+      - ehe-diagnosed-prevalence
+      - ehe-awareness
+      - ehe-suppression
+      - ehe-testing
+      - ehe-prep-uptake
+  ryan-white-msa-v1:
+    stage: ryan-white
+    exhaustive: true
+    target_ids:
+      - rw-non-adap-clients
+      - rw-non-adap-sex-risk-distribution
+      - rw-oahs-clients
+      - rw-oahs-suppression
+      - rw-msa-adap-ratio
+      - rw-msa-adap-suppressed-share-diagnosed
+  ryan-white-state-v1:
+    stage: ryan-white
+    exhaustive: true
+    target_ids:
+      - rw-non-adap-clients
+      - rw-non-adap-sex-risk-distribution
+      - rw-oahs-clients
+      - rw-oahs-suppression
+      - rw-state-adap-clients
+      - rw-state-adap-suppression
+
+targets:
+  ehe-diagnoses:
+    stage: ehe
+    classification: active_likelihood_family
+    label: New HIV diagnoses
+    simulation: {outcome: new, unit: people}
+    observation:
+      outcome: diagnoses
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [cdc-nhss-atlasplus]
+      binding: explicit
+      provenance_confidence: reconstructed
+    likelihood: {kind: basic, from_year: 2008}
+    facets: [total, age, race, sex]
+    public_panel: model_fit_check
+  ehe-diagnosed-prevalence:
+    stage: ehe
+    classification: active_likelihood_family
+    label: People living with diagnosed HIV
+    simulation: {outcome: diagnosed.prevalence, unit: people}
+    observation:
+      outcome: diagnosed.prevalence
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [cdc-nhss-atlasplus]
+      binding: explicit
+      provenance_confidence: reconstructed
+    likelihood: {kind: basic, from_year: 2008}
+    facets: [total, age, race, sex]
+    public_panel: model_fit_check
+  ehe-awareness:
+    stage: ehe
+    classification: active_likelihood_family
+    label: Awareness of HIV status
+    simulation: {outcome: awareness, unit: proportion}
+    observation:
+      outcome: awareness
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [cdc-nhss-atlasplus]
+      binding: explicit
+      provenance_confidence: reconstructed
+    likelihood: {kind: nested_proportion, denominator_outcome: total.prevalence, from_year: 2008}
+    facets: [total, age, race, sex]
+    public_panel: model_fit_check
+  ehe-suppression:
+    stage: ehe
+    classification: active_likelihood_family
+    label: Viral suppression among people with diagnosed HIV
+    simulation: {outcome: suppression, unit: proportion}
+    observation:
+      outcome: suppression
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [cdc-nhss-atlasplus]
+      binding: explicit
+      provenance_confidence: reconstructed
+    likelihood: {kind: nested_proportion, denominator_outcome: diagnosed.prevalence, from_year: 2008}
+    facets: [total, age, race, sex]
+    public_panel: model_fit_check
+  ehe-testing:
+    stage: ehe
+    classification: active_likelihood_family
+    label: Proportion tested for HIV
+    simulation: {outcome: testing, unit: proportion}
+    observation:
+      outcome: proportion.tested
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [cdc-brfss]
+      binding: explicit
+      provenance_confidence: reconstructed
+    likelihood: {kind: nested_proportion, denominator_outcome: adult.population, from_year: 2010}
+    facets: [total, age, race, sex]
+    public_panel: model_fit_check
+  ehe-prep-uptake:
+    stage: ehe
+    classification: active_likelihood_family
+    label: PrEP use
+    simulation: {outcome: prep.uptake, unit: people}
+    observation:
+      outcome: prep
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [aidsvu-prep]
+      binding: explicit
+      provenance_confidence: reconstructed
+    likelihood: {kind: basic, from_year: 2007}
+    facets: [total, age, race, sex]
+    public_panel: model_fit_check
+  rw-non-adap-clients:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: People receiving non-ADAP Ryan White services
+    simulation: {outcome: non.adap.clients, unit: people}
+    observation:
+      outcome: non.adap.clients
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [hrsa-rwhap-annual]
+      binding: explicit
+      provenance_confidence: verified
+    likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race], levels_of_stratification: [0, 1]}
+    facets: [total, age, race, sex]
+    public_panel: calibration_target
+  rw-non-adap-sex-risk-distribution:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: Sex and transmission-risk distribution among non-ADAP clients
+    simulation: {outcome: non.adap.clients, unit: within_year_proportion}
+    observation:
+      outcome: non.adap.clients
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [hrsa-rwhap-annual]
+      binding: explicit_custom_transformation
+      provenance_confidence: verified
+    likelihood: {kind: custom, from_year: 2017, dimensions: [sex, risk]}
+    facets: [sex_risk]
+    public_panel: not_exported
+  rw-oahs-clients:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: People receiving outpatient ambulatory health services
+    simulation: {outcome: oahs.clients, unit: people}
+    observation:
+      outcome: oahs.clients
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [hrsa-rwhap-annual]
+      binding: explicit
+      provenance_confidence: verified
+    likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1]}
+    facets: [total, age, race, sex]
+    public_panel: calibration_target
+  rw-oahs-suppression:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: Viral suppression among OAHS clients
+    simulation: {outcome: oahs.suppression, unit: proportion}
+    observation:
+      outcome: oahs.suppression
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [hrsa-rwhap-annual]
+      binding: explicit
+      provenance_confidence: verified
+    likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1, 2]}
+    facets: [total, age, race, sex]
+    public_panel: calibration_target
+  rw-msa-adap-ratio:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: ADAP-to-non-ADAP client ratio
+    simulation: {outcome: adap.proportion, unit: ratio}
+    observation:
+      outcome: adap.proportion
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [hrsa-rwhap-annual, cdc-nhss-atlasplus]
+      binding: explicit_nested_geography
+      provenance_confidence: verified
+    likelihood:
+      kind: nested_proportion
+      denominator_outcome: non.adap.clients
+      from_year: 2017
+      to_year: 2021
+      dimensions: [age, sex, race, risk]
+      levels_of_stratification: [0, 1]
+    facets: [total, age, race, sex]
+    public_panel: related_model_fit_check
+  rw-msa-adap-suppressed-share-diagnosed:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: ADAP-suppressed clients as a share of diagnosed prevalence
+    simulation:
+      outcome: adap.suppressed.proportion.of.diagnosed
+      unit: proportion
+      expression: adap.clients * adap.suppression / diagnosed.prevalence
+    observation:
+      outcome: adap.suppressed.proportion.of.diagnosed
+      manager: ryan-white-full-2026-03-16
+      source_ids: [hrsa-rwhap-annual, nastad-adap-monitoring, cdc-nhss-atlasplus]
+      binding: explicit_derived_candidate
+      provenance_confidence: reconstructed
+    likelihood: {kind: nested_proportion, denominator_outcome: diagnosed.prevalence, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1]}
+    facets: [total, age, race, sex]
+    public_panel: related_model_fit_check
+  rw-state-adap-clients:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: ADAP clients
+    simulation: {outcome: adap.clients, unit: people}
+    observation:
+      outcome: adap.clients
+      manager: ryan-white-full-2026-03-16
+      source_ids: [hrsa-rwhap-annual]
+      binding: explicit_candidate_override
+      provenance_confidence: reconstructed
+      reject_simset_mapping: non.adap.clients
+    likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race], levels_of_stratification: [0, 1]}
+    facets: [total, age, race, sex]
+    public_panel: calibration_target_with_reconstructed_observations
+  rw-state-adap-suppression:
+    stage: ryan-white
+    classification: active_likelihood_target
+    label: Viral suppression among ADAP clients
+    simulation: {outcome: adap.suppression, unit: proportion}
+    observation:
+      outcome: adap.suppression
+      manager: ryan-white-web-display-2025-04-08
+      source_ids: [nastad-adap-monitoring]
+      binding: explicit
+      provenance_confidence: verified
+    likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1, 2]}
+    facets: [total, age, race, sex]
+    public_panel: calibration_target
