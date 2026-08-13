@@ -54,6 +54,8 @@ def test_exporter_fails_closed_on_known_provenance_boundaries():
         "simulation asset name does not match simset filename",
         "simset location does not match registry geography",
         "has no total-level observations",
+        "workspace does not contain required .jheem2_state",
+        "workspace .jheem2_state is incomplete",
     )
     for fragment in required_fragments:
         assert fragment in EXPORTER
@@ -63,6 +65,8 @@ def test_exporter_never_uses_serialized_observation_mapping_metadata():
     assert "corresponding.observed.outcome" not in EXPORTER
     assert "manager_bindings" in EXPORTER
     assert "from.ontology.names = binding$ontology" in EXPORTER
+    assert "initialize_jheem_runtime(args$workspace)" in EXPORTER
+    assert 'get("ONTOLOGY.MAPPING.MANAGER", envir = namespace)' in EXPORTER
 
 
 def test_representative_artifact_validates_against_schema():

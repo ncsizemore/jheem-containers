@@ -21,7 +21,8 @@ non-visual sex-by-risk likelihood component.
 
 `export_calibration.R` produces the public, baseline-only `jheem-calibration/v1` artifact. It must
 run with the exact model workspace and release asset because historical serialized simsets depend
-on the workspace's registered ontology mappings and function environment. The exporter verifies
+on the workspace's registered ontology mappings and function environment. It restores the saved
+JHEEM version/ontology state using the same pattern as the production container path. The exporter verifies
 the simulation asset, manager binaries, registry, sample count, and calibration code; preserves
 separate observed source series; exports 95%/50% posterior bands plus the median; and rejects
 non-finite or dimensionally inconsistent results. The raw simulations and controlled manager

@@ -55,6 +55,37 @@ load_single_object <- function(path, predicate, label) {
   env[[matches[[1]]]]
 }
 
+initialize_jheem_runtime <- function(workspace_path) {
+  suppressPackageStartupMessages(library(jheem2))
+
+  # Historical serialized simulation objects call package-internal helpers by
+  # name. This mirrors the established container execution path and makes the
+  # exact runtime dependency explicit instead of relying on ambient globals.
+  namespace <- asNamespace("jheem2")
+  for (name in ls(namespace, all.names = TRUE)) {
+    value <- get(name, envir = namespace, inherits = FALSE)
+    if (is.function(value)) assign(name, value, envir = globalenv())
+  }
+
+  load(workspace_path, envir = globalenv())
+  if (!exists(".jheem2_state", envir = globalenv(), inherits = FALSE)) {
+    fail("workspace does not contain required .jheem2_state")
+  }
+  state <- get(".jheem2_state", envir = globalenv(), inherits = FALSE)
+  if (is.null(state$version_manager) || is.null(state$ontology_mapping_manager)) {
+    fail("workspace .jheem2_state is incomplete")
+  }
+
+  version_manager <- namespace$VERSION.MANAGER
+  for (name in names(state$version_manager)) {
+    assign(name, state$version_manager[[name]], envir = version_manager)
+  }
+  ontology_manager <- get("ONTOLOGY.MAPPING.MANAGER", envir = namespace)
+  for (name in names(state$ontology_mapping_manager)) {
+    assign(name, state$ontology_mapping_manager[[name]], envir = ontology_manager)
+  }
+}
+
 normalize_location <- function(location) {
   value <- unname(as.character(location))
   if (length(value) != 1L || !nzchar(value)) fail("simset location must be one non-empty value")
@@ -253,9 +284,7 @@ main <- function() {
     fail("simulation asset name does not match simset filename")
   }
 
-  # Loading the exact model workspace first restores the serialized function and
-  # ontology-mapping environment needed by historical JHEEM simulation sets.
-  load(args$workspace, envir = globalenv())
+  initialize_jheem_runtime(args$workspace)
   simset_hash <- sha256_file(args$simset)
   validate_asset_digest(simset_hash, args[["simulation-asset-sha256"]])
   simset <- load_single_object(args$simset, function(x) inherits(x, "jheem.simulation.set"), "jheem.simulation.set")
