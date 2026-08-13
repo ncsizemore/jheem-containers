@@ -69,6 +69,10 @@ def test_exporter_never_uses_serialized_observation_mapping_metadata():
     assert 'get("ONTOLOGY.MAPPING.MANAGER", envir = namespace)' in EXPORTER
 
 
+def test_exporter_removes_r_group_names_before_json_array_serialization():
+    assert "unname(records[order(order_key)])" in EXPORTER
+
+
 def test_representative_artifact_validates_against_schema():
     artifact = {
         "schema_version": "jheem-calibration/v1",

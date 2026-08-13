@@ -7,6 +7,7 @@ posterior <- array(
 )
 records <- posterior_records(posterior)
 stopifnot(length(records) == 2L)
+stopifnot(is.null(names(records)))
 stopifnot(identical(records[[1]]$year, 2020L))
 stopifnot(is.list(records[[1]]$stratum), !is.null(names(records[[1]]$stratum)))
 stopifnot(records[[1]]$q025 <= records[[1]]$q250)

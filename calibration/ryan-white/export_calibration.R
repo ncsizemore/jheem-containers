@@ -149,7 +149,9 @@ posterior_records <- function(x) {
       stats::setNames(as.list(values), QUANTILE_NAMES))
   })
   order_key <- vapply(records, function(x) paste(c(x$year, unlist(x$stratum)), collapse = "\r"), character(1))
-  records[order(order_key)]
+  # split() names each group; remove those implementation-only names so
+  # jsonlite serializes the records as the schema's array rather than an object.
+  unname(records[order(order_key)])
 }
 
 observation_records <- function(x, binding) {
