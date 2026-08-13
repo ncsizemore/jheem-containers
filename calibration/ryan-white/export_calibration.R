@@ -210,17 +210,67 @@ get_simulation_array <- function(simset, target, keep_dimensions) {
   result
 }
 
+resolve_observation_locations <- function(manager, target, location) {
+  location_binding <- target$observation$location_binding %||% "modeled_location"
+  if (identical(location_binding, "modeled_location")) return(location)
+  if (!identical(location_binding, "nested_likelihood_locations")) {
+    fail("unsupported observation location binding: ", location_binding)
+  }
+
+  likelihood <- target$likelihood
+  required <- c("denominator_outcome", "location_types", "maximum_locations_per_type",
+                "minimum_geographic_resolution_type")
+  missing <- required[vapply(required, function(name) is.null(likelihood[[name]]), logical(1))]
+  if (length(missing)) fail("nested observation location binding is incomplete: ", paste(missing, collapse = ", "))
+
+  minimum_type <- likelihood$minimum_geographic_resolution_type
+  modeled_components <- unname(unlist(locations::get.location.code(
+    locations::get.contained.locations(location, minimum_type), minimum_type
+  )))
+  maximum <- as.integer(likelihood$maximum_locations_per_type)
+  select_type <- function(type) {
+    candidates <- unname(unlist(locations::get.location.code(
+      locations::get.overlapping.locations(location, type), type
+    )))
+    if (length(candidates) <= maximum) return(candidates)
+
+    weights <- vapply(candidates, function(candidate) {
+      candidate_components <- unname(unlist(locations::get.location.code(
+        locations::get.contained.locations(candidate, minimum_type), minimum_type
+      )))
+      overlap <- intersect(candidate_components, modeled_components)
+      if (!length(overlap)) return(NA_real_)
+      denominator <- manager$pull(
+        outcome = likelihood$denominator_outcome,
+        keep.dimensions = "year",
+        dimension.values = list(location = overlap),
+        na.rm = TRUE
+      )
+      if (is.null(denominator) || !length(denominator)) return(NA_real_)
+      mean(denominator, na.rm = TRUE)
+    }, numeric(1))
+    candidates <- candidates[is.finite(weights)]
+    weights <- weights[is.finite(weights)]
+    if (!length(candidates)) return(character())
+    candidates[order(weights, decreasing = TRUE)][seq_len(min(maximum, length(candidates)))]
+  }
+  locations <- sort(unique(unlist(lapply(unname(unlist(likelihood$location_types)), select_type))))
+  if (!length(locations)) fail("nested observation location binding resolved no locations for ", location)
+  locations
+}
+
 get_observation_array <- function(manager, simset, target, binding, keep_dimensions, location) {
   ontology_outcome <- target$simulation$ontology_outcome %||% target$simulation$outcome
   target_ontology <- simset$outcome.ontologies[[ontology_outcome]]
   if (is.null(target_ontology)) fail("simset lacks ontology outcome: ", ontology_outcome)
+  observation_locations <- resolve_observation_locations(manager, target, location)
   manager$pull(
     outcome = target$observation$outcome,
     metric = "estimate",
     sources = binding$source,
     from.ontology.names = binding$ontology,
-    keep.dimensions = keep_dimensions,
-    dimension.values = list(location = location),
+    keep.dimensions = unique(c(keep_dimensions, "location")),
+    dimension.values = list(location = observation_locations),
     target.ontology = target_ontology,
     allow.mapping.from.target.ontology = TRUE,
     na.rm = TRUE
@@ -238,6 +288,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
       public_panel = target$public_panel,
       unit = target$simulation$unit,
       observation_provenance_confidence = target$observation$provenance_confidence,
+      observation_location_binding = target$observation$location_binding %||% "modeled_location",
       panels = list()
     ))
   }
@@ -262,6 +313,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
     public_panel = target$public_panel,
     unit = target$simulation$unit,
     observation_provenance_confidence = target$observation$provenance_confidence,
+    observation_location_binding = target$observation$location_binding %||% "modeled_location",
     panels = panels
   )
 }

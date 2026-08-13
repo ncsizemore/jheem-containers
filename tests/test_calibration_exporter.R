@@ -50,5 +50,9 @@ validate_runtime_image(
 )
 validate_geography("C.12060", "msa")
 validate_geography("AL", "state")
+stopifnot(identical(
+  resolve_observation_locations(NULL, list(observation = list()), "C.12060"),
+  "C.12060"
+))
 
 cat("calibration exporter pure tests passed\n")

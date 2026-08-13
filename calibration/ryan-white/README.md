@@ -28,6 +28,11 @@ separate observed source series; exports 95%/50% posterior bands plus the median
 non-finite or dimensionally inconsistent results. The raw simulations and controlled manager
 binaries are never copied into the artifact.
 
+MSA-level nested proportion targets preserve the fitting likelihood's explicit observation
+geography rule: overlapping state and CBSA series are selected, capped at two per geography type,
+with denominator-weighted selection where a modeled MSA overlaps more candidates. The artifact
+records whether each target uses this rule or direct modeled-location observations.
+
 Example (normally run inside the matching model image):
 
 ```sh

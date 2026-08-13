@@ -424,6 +424,7 @@ targets:
       manager: ryan-white-web-display-2025-04-08
       source_ids: [hrsa-rwhap-annual, cdc-nhss-atlasplus]
       binding: explicit_nested_geography
+      location_binding: nested_likelihood_locations
       provenance_confidence: verified
       manager_bindings:
         msa:
@@ -431,6 +432,9 @@ targets:
     likelihood:
       kind: nested_proportion
       denominator_outcome: non.adap.clients
+      location_types: [STATE, CBSA]
+      maximum_locations_per_type: 2
+      minimum_geographic_resolution_type: COUNTY
       from_year: 2017
       to_year: 2021
       dimensions: [age, sex, race, risk]
@@ -455,13 +459,22 @@ targets:
       manager: ryan-white-full-2026-03-16
       source_ids: [hrsa-rwhap-annual, nastad-adap-monitoring, cdc-nhss-atlasplus]
       binding: explicit_derived_candidate
+      location_binding: nested_likelihood_locations
       provenance_confidence: reconstructed
       manager_bindings:
         msa:
           - source: ryan.white.program
             ontology: ryan.white.pdfs
             public_source_ids: [hrsa-rwhap-annual, nastad-adap-monitoring, cdc-nhss-atlasplus]
-    likelihood: {kind: nested_proportion, denominator_outcome: diagnosed.prevalence, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1]}
+    likelihood:
+      kind: nested_proportion
+      denominator_outcome: diagnosed.prevalence
+      location_types: [STATE, CBSA]
+      maximum_locations_per_type: 2
+      minimum_geographic_resolution_type: COUNTY
+      from_year: 2017
+      dimensions: [age, sex, race, risk]
+      levels_of_stratification: [0, 1]
     facets: [total, age, race, sex]
     public_panel: related_model_fit_check
   rw-state-adap-clients:

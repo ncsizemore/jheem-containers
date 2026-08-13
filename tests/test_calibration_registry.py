@@ -140,6 +140,22 @@ def test_derived_simulation_targets_use_structured_allowlisted_operations():
         assert simulation["ontology_outcome"], target_id
 
 
+def test_nested_msa_targets_encode_the_historical_location_selection_rule():
+    for target_id in (
+        "rw-msa-adap-ratio",
+        "rw-msa-adap-suppressed-share-diagnosed",
+    ):
+        target = REGISTRY["targets"][target_id]
+        assert target["observation"]["location_binding"] == (
+            "nested_likelihood_locations"
+        )
+        likelihood = target["likelihood"]
+        assert likelihood["kind"] == "nested_proportion"
+        assert likelihood["location_types"] == ["STATE", "CBSA"]
+        assert likelihood["maximum_locations_per_type"] == 2
+        assert likelihood["minimum_geographic_resolution_type"] == "COUNTY"
+
+
 def test_legacy_adap_client_mapping_cannot_reenter_the_export_contract():
     target = REGISTRY["targets"]["rw-state-adap-clients"]
     assert target["simulation"]["outcome"] == "adap.clients"

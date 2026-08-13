@@ -111,6 +111,7 @@ def test_representative_artifact_validates_against_schema():
             "public_panel": "calibration_target",
             "unit": "people",
             "observation_provenance_confidence": "verified",
+            "observation_location_binding": "modeled_location",
             "panels": [{
                 "facet": "total",
                 "posterior": [{

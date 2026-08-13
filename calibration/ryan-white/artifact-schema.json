@@ -114,7 +114,7 @@
       "additionalProperties": false,
       "required": [
         "target_id", "label", "classification", "public_panel", "unit",
-        "observation_provenance_confidence", "panels"
+        "observation_provenance_confidence", "observation_location_binding", "panels"
       ],
       "properties": {
         "target_id": {"type": "string", "minLength": 1},
@@ -124,6 +124,9 @@
         "unit": {"type": "string", "minLength": 1},
         "observation_provenance_confidence": {
           "enum": ["verified", "reconstructed", "unknown"]
+        },
+        "observation_location_binding": {
+          "enum": ["modeled_location", "nested_likelihood_locations"]
         },
         "panels": {
           "type": "array",
