@@ -114,6 +114,7 @@ def test_representative_artifact_validates_against_schema():
             "classification": "active_likelihood_target",
             "public_panel": "calibration_target",
             "unit": "people",
+            "likelihood_year_window": {"from_year": 2017, "to_year": None},
             "observation_provenance_confidence": "verified",
             "observation_location_binding": "modeled_location",
             "panels": [{

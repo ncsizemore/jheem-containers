@@ -28,6 +28,11 @@ separate observed source series; exports 95%/50% posterior bands plus the median
 non-finite or dimensionally inconsistent results. The raw simulations and controlled manager
 binaries are never copied into the artifact.
 
+Each panel is restricted to the target likelihood's registered `from_year`/`to_year` fitting
+window, which is included in the artifact. This excludes mathematically undefined ratio outcomes
+from pre-epidemic years without weakening the finite-value requirement inside the calibration
+period.
+
 MSA-level nested proportion targets preserve the fitting likelihood's explicit observation
 geography rule: overlapping state and CBSA series are selected, capped at two per geography type,
 with denominator-weighted selection where a modeled MSA overlaps more candidates. The artifact

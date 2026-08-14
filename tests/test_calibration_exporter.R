@@ -5,7 +5,8 @@ posterior <- array(
   dim = c(year = 2, sim = 5),
   dimnames = list(year = c("2020", "2021"), sim = as.character(1:5))
 )
-records <- posterior_records(posterior)
+window <- list(from_year = 2020L, to_year = NULL)
+records <- posterior_records(posterior, window)
 stopifnot(length(records) == 2L)
 stopifnot(is.null(names(records)))
 stopifnot(identical(records[[1]]$year, 2020L))
@@ -22,11 +23,32 @@ observed <- array(
 )
 observations <- observation_records(observed, list(
   source = "example", ontology = "example", public_source_ids = list("public-example")
-))
+), window)
 stopifnot(length(observations) == 3L)
 stopifnot(identical(observations[[1]]$manager_source, "example"))
 stopifnot(is.list(observations[[1]]$public_source_ids))
 stopifnot(all(vapply(observations, function(x) is.finite(x$value), logical(1))))
+
+posterior_with_undefined_prefit_values <- posterior
+posterior_with_undefined_prefit_values[1, ] <- NaN
+fit_records <- posterior_records(
+  posterior_with_undefined_prefit_values,
+  list(from_year = 2021L, to_year = 2021L)
+)
+stopifnot(length(fit_records) == 1L, identical(fit_records[[1]]$year, 2021L))
+stopifnot(inherits(try(
+  posterior_records(posterior_with_undefined_prefit_values, window),
+  silent = TRUE
+), "try-error"))
+
+stopifnot(identical(
+  likelihood_year_window(list(likelihood = list(from_year = 2008))),
+  list(from_year = 2008L, to_year = NULL)
+))
+stopifnot(identical(
+  likelihood_year_window(list(likelihood = list(from_year = 2017, to_year = 2021))),
+  list(from_year = 2017L, to_year = 2021L)
+))
 
 mock <- new.env(parent = emptyenv())
 mock$get <- function(outcomes, ...) {
