@@ -319,12 +319,22 @@ export_target <- function(target_id, target, geography, simset, managers, locati
   manager <- managers[[target$observation$manager]]
   panels <- lapply(unname(unlist(target$facets)), function(facet) {
     keep <- if (facet == "total") "year" else c("year", facet)
-    posterior <- posterior_records(get_simulation_array(simset, target, keep))
-    observations <- unlist(lapply(bindings, function(binding) {
-      observation_records(get_observation_array(
-        manager, simset, target, binding, keep, location, location_binding
-      ), binding)
-    }), recursive = FALSE)
+    posterior <- tryCatch(
+      posterior_records(get_simulation_array(simset, target, keep)),
+      error = function(error) fail(
+        "target ", target_id, " facet ", facet, " posterior: ", conditionMessage(error)
+      )
+    )
+    observations <- tryCatch(
+      unlist(lapply(bindings, function(binding) {
+        observation_records(get_observation_array(
+          manager, simset, target, binding, keep, location, location_binding
+        ), binding)
+      }), recursive = FALSE),
+      error = function(error) fail(
+        "target ", target_id, " facet ", facet, " observations: ", conditionMessage(error)
+      )
+    )
     if (facet == "total" && !length(observations)) {
       fail("target ", target_id, " has no total-level observations for ", location)
     }
