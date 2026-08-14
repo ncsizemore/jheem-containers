@@ -28,10 +28,21 @@ separate observed source series; exports 95%/50% posterior bands plus the median
 non-finite or dimensionally inconsistent results. The raw simulations and controlled manager
 binaries are never copied into the artifact.
 
+Each panel is restricted to the target likelihood's registered `from_year`/`to_year` fitting
+window, which is included in the artifact. This excludes mathematically undefined ratio outcomes
+from pre-epidemic years without weakening the finite-value requirement inside the calibration
+period.
+
 MSA-level nested proportion targets preserve the fitting likelihood's explicit observation
 geography rule: overlapping state and CBSA series are selected, capped at two per geography type,
 with denominator-weighted selection where a modeled MSA overlaps more candidates. The artifact
 records whether each target uses this rule or direct modeled-location observations.
+
+The EHE awareness and suppression families use the likelihood's location-conditional rule: states
+and five explicitly named MSAs use direct observations, while other MSAs use denominator-weighted
+nested observations. EHE testing uses direct state observations and nested MSA observations. These
+EHE nested families retain the likelihood default of at most three locations per geography type.
+Awareness is exported only at the total level because its likelihood has no stratified dimensions.
 
 Example (normally run inside the matching model image):
 

@@ -5,7 +5,8 @@ posterior <- array(
   dim = c(year = 2, sim = 5),
   dimnames = list(year = c("2020", "2021"), sim = as.character(1:5))
 )
-records <- posterior_records(posterior)
+window <- list(from_year = 2020L, to_year = NULL)
+records <- posterior_records(posterior, window)
 stopifnot(length(records) == 2L)
 stopifnot(is.null(names(records)))
 stopifnot(identical(records[[1]]$year, 2020L))
@@ -22,11 +23,38 @@ observed <- array(
 )
 observations <- observation_records(observed, list(
   source = "example", ontology = "example", public_source_ids = list("public-example")
-))
+), window)
 stopifnot(length(observations) == 3L)
 stopifnot(identical(observations[[1]]$manager_source, "example"))
 stopifnot(is.list(observations[[1]]$public_source_ids))
 stopifnot(all(vapply(observations, function(x) is.finite(x$value), logical(1))))
+
+posterior_with_undefined_prefit_values <- posterior
+posterior_with_undefined_prefit_values[1, ] <- NaN
+fit_records <- posterior_records(
+  posterior_with_undefined_prefit_values,
+  list(from_year = 2021L, to_year = 2021L)
+)
+stopifnot(length(fit_records) == 1L, identical(fit_records[[1]]$year, 2021L))
+stopifnot(inherits(try(
+  posterior_records(posterior_with_undefined_prefit_values, window),
+  silent = TRUE
+), "try-error"))
+
+stopifnot(identical(
+  likelihood_year_window(list(likelihood = list(from_year = 2008))),
+  list(from_year = 2008L, to_year = NULL)
+))
+stopifnot(identical(
+  likelihood_year_window(list(likelihood = list(from_year = 2017, to_year = 2021))),
+  list(from_year = 2017L, to_year = 2021L)
+))
+open_window_record <- likelihood_year_window_record(window)
+stopifnot(
+  is.integer(open_window_record$to_year),
+  length(open_window_record$to_year) == 1L,
+  is.na(open_window_record$to_year)
+)
 
 mock <- new.env(parent = emptyenv())
 mock$get <- function(outcomes, ...) {
@@ -52,8 +80,28 @@ validate_runtime_image(
 validate_geography("C.12060", "msa")
 validate_geography("AL", "state")
 stopifnot(identical(
-  resolve_observation_locations(NULL, list(observation = list()), "C.12060"),
+  resolve_observation_locations(NULL, list(observation = list()), "C.12060", "modeled_location"),
   "C.12060"
+))
+
+conditional_binding_target <- list(observation = list(location_binding = list(
+  state = "modeled_location",
+  msa = list(
+    default = "nested_likelihood_locations",
+    modeled_locations = list("C.33100")
+  )
+)))
+stopifnot(identical(
+  resolve_location_binding(conditional_binding_target, "state", "AL"),
+  "modeled_location"
+))
+stopifnot(identical(
+  resolve_location_binding(conditional_binding_target, "msa", "C.33100"),
+  "modeled_location"
+))
+stopifnot(identical(
+  resolve_location_binding(conditional_binding_target, "msa", "C.12060"),
+  "nested_likelihood_locations"
 ))
 
 cat("calibration exporter pure tests passed\n")

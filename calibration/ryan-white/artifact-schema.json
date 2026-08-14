@@ -114,6 +114,7 @@
       "additionalProperties": false,
       "required": [
         "target_id", "label", "classification", "public_panel", "unit",
+        "likelihood_year_window",
         "observation_provenance_confidence", "observation_location_binding", "panels"
       ],
       "properties": {
@@ -122,6 +123,15 @@
         "classification": {"type": "string", "minLength": 1},
         "public_panel": {"type": "string", "minLength": 1},
         "unit": {"type": "string", "minLength": 1},
+        "likelihood_year_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["from_year", "to_year"],
+          "properties": {
+            "from_year": {"type": "integer"},
+            "to_year": {"type": ["integer", "null"]}
+          }
+        },
         "observation_provenance_confidence": {
           "enum": ["verified", "reconstructed", "unknown"]
         },

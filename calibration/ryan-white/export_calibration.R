@@ -132,11 +132,48 @@ stratum_from_row <- function(row, dimensions) {
   stats::setNames(as.list(as.character(row[dimensions])), dimensions)
 }
 
-posterior_records <- function(x) {
+likelihood_year_window <- function(target) {
+  from_year <- suppressWarnings(as.integer(target$likelihood$from_year))
+  if (length(from_year) != 1L || is.na(from_year)) {
+    fail("target likelihood must define one integer from_year")
+  }
+  to_year <- target$likelihood$to_year
+  if (is.null(to_year)) {
+    to_year <- NULL
+  } else {
+    to_year <- suppressWarnings(as.integer(to_year))
+    if (length(to_year) != 1L || is.na(to_year)) {
+      fail("target likelihood to_year must be one integer when present")
+    }
+    if (to_year < from_year) fail("target likelihood to_year precedes from_year")
+  }
+  list(from_year = from_year, to_year = to_year)
+}
+
+restrict_to_likelihood_years <- function(frame, window) {
+  if (!"year" %in% names(frame)) fail("array is missing year")
+  years <- suppressWarnings(as.integer(as.character(frame$year)))
+  if (anyNA(years)) fail("array contains a non-integer year")
+  keep <- years >= window$from_year
+  if (!is.null(window$to_year)) keep <- keep & years <= window$to_year
+  frame[keep, , drop = FALSE]
+}
+
+likelihood_year_window_record <- function(window) {
+  list(
+    from_year = window$from_year,
+    # jsonlite serializes a bare NULL list member as `{}` under auto_unbox.
+    # A typed NA is emitted as JSON null by the artifact writer's na policy.
+    to_year = if (is.null(window$to_year)) NA_integer_ else window$to_year
+  )
+}
+
+posterior_records <- function(x, window) {
   frame <- array_to_frame(x)
   sim_dimension <- intersect(c("sim", "simulation"), names(frame))
   if (length(sim_dimension) != 1L) fail("posterior array must contain exactly one simulation dimension")
-  if (!"year" %in% names(frame)) fail("posterior array is missing year")
+  frame <- restrict_to_likelihood_years(frame, window)
+  if (!nrow(frame)) fail("posterior array has no values in the likelihood year window")
   if (any(!is.finite(frame$value))) fail("posterior array contains non-finite values")
   group_dimensions <- setdiff(names(frame), c(sim_dimension, "value"))
   keys <- interaction(frame[group_dimensions], drop = TRUE, lex.order = TRUE)
@@ -154,10 +191,10 @@ posterior_records <- function(x) {
   unname(records[order(order_key)])
 }
 
-observation_records <- function(x, binding) {
+observation_records <- function(x, binding, window) {
   if (is.null(x)) return(list())
   frame <- array_to_frame(x)
-  if (!"year" %in% names(frame)) fail("observation array is missing year")
+  frame <- restrict_to_likelihood_years(frame, window)
   frame <- frame[is.finite(frame$value), , drop = FALSE]
   if (!nrow(frame)) return(list())
   dimensions <- setdiff(names(frame), c("year", "source", "value"))
@@ -212,8 +249,26 @@ get_simulation_array <- function(simset, target, keep_dimensions) {
   result
 }
 
-resolve_observation_locations <- function(manager, target, location) {
-  location_binding <- target$observation$location_binding %||% "modeled_location"
+resolve_location_binding <- function(target, geography, location) {
+  binding <- target$observation$location_binding %||% "modeled_location"
+  if (is.character(binding) && length(binding) == 1L) return(binding)
+  if (!is.list(binding)) fail("observation location binding must be a string or geography map")
+
+  geography_binding <- binding[[geography]]
+  if (is.null(geography_binding)) fail("observation location binding has no rule for ", geography)
+  if (is.character(geography_binding) && length(geography_binding) == 1L) return(geography_binding)
+  if (!is.list(geography_binding)) fail("observation location binding rule is invalid for ", geography)
+
+  modeled_locations <- unname(unlist(geography_binding$modeled_locations %||% list()))
+  if (location %in% modeled_locations) return("modeled_location")
+  default <- geography_binding$default
+  if (!is.character(default) || length(default) != 1L) {
+    fail("observation location binding rule has no valid default for ", geography)
+  }
+  default
+}
+
+resolve_observation_locations <- function(manager, target, location, location_binding) {
   if (identical(location_binding, "modeled_location")) return(location)
   if (!identical(location_binding, "nested_likelihood_locations")) {
     fail("unsupported observation location binding: ", location_binding)
@@ -261,11 +316,12 @@ resolve_observation_locations <- function(manager, target, location) {
   locations
 }
 
-get_observation_array <- function(manager, simset, target, binding, keep_dimensions, location) {
+get_observation_array <- function(manager, simset, target, binding, keep_dimensions, location,
+                                  location_binding) {
   ontology_outcome <- target$simulation$ontology_outcome %||% target$simulation$outcome
   target_ontology <- simset$outcome.ontologies[[ontology_outcome]]
   if (is.null(target_ontology)) fail("simset lacks ontology outcome: ", ontology_outcome)
-  observation_locations <- resolve_observation_locations(manager, target, location)
+  observation_locations <- resolve_observation_locations(manager, target, location, location_binding)
   manager$pull(
     outcome = target$observation$outcome,
     metric = "estimate",
@@ -282,6 +338,8 @@ get_observation_array <- function(manager, simset, target, binding, keep_dimensi
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 export_target <- function(target_id, target, geography, simset, managers, location) {
+  location_binding <- resolve_location_binding(target, geography, location)
+  window <- likelihood_year_window(target)
   if (identical(target$public_panel, "not_exported")) {
     return(list(
       target_id = target_id,
@@ -289,8 +347,9 @@ export_target <- function(target_id, target, geography, simset, managers, locati
       classification = target$classification,
       public_panel = target$public_panel,
       unit = target$simulation$unit,
+      likelihood_year_window = likelihood_year_window_record(window),
       observation_provenance_confidence = target$observation$provenance_confidence,
-      observation_location_binding = target$observation$location_binding %||% "modeled_location",
+      observation_location_binding = location_binding,
       panels = list()
     ))
   }
@@ -299,10 +358,22 @@ export_target <- function(target_id, target, geography, simset, managers, locati
   manager <- managers[[target$observation$manager]]
   panels <- lapply(unname(unlist(target$facets)), function(facet) {
     keep <- if (facet == "total") "year" else c("year", facet)
-    posterior <- posterior_records(get_simulation_array(simset, target, keep))
-    observations <- unlist(lapply(bindings, function(binding) {
-      observation_records(get_observation_array(manager, simset, target, binding, keep, location), binding)
-    }), recursive = FALSE)
+    posterior <- tryCatch(
+      posterior_records(get_simulation_array(simset, target, keep), window),
+      error = function(error) fail(
+        "target ", target_id, " facet ", facet, " posterior: ", conditionMessage(error)
+      )
+    )
+    observations <- tryCatch(
+      unlist(lapply(bindings, function(binding) {
+        observation_records(get_observation_array(
+          manager, simset, target, binding, keep, location, location_binding
+        ), binding, window)
+      }), recursive = FALSE),
+      error = function(error) fail(
+        "target ", target_id, " facet ", facet, " observations: ", conditionMessage(error)
+      )
+    )
     if (facet == "total" && !length(observations)) {
       fail("target ", target_id, " has no total-level observations for ", location)
     }
@@ -314,8 +385,9 @@ export_target <- function(target_id, target, geography, simset, managers, locati
     classification = target$classification,
     public_panel = target$public_panel,
     unit = target$simulation$unit,
+    likelihood_year_window = likelihood_year_window_record(window),
     observation_provenance_confidence = target$observation$provenance_confidence,
-    observation_location_binding = target$observation$location_binding %||% "modeled_location",
+    observation_location_binding = location_binding,
     panels = panels
   )
 }

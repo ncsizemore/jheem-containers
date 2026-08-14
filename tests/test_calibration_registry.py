@@ -156,6 +156,31 @@ def test_nested_msa_targets_encode_the_historical_location_selection_rule():
         assert likelihood["minimum_geographic_resolution_type"] == "COUNTY"
 
 
+def test_ehe_location_bindings_match_likelihood_geography_rules():
+    awareness = REGISTRY["targets"]["ehe-awareness"]
+    assert awareness["facets"] == ["total"]
+
+    direct_msa_locations = {
+        "C.29820", "C.31080", "C.33100", "C.40140", "C.41740",
+    }
+    for target_id in ("ehe-awareness", "ehe-suppression"):
+        target = REGISTRY["targets"][target_id]
+        binding = target["observation"]["location_binding"]
+        assert binding["state"] == "modeled_location"
+        assert binding["msa"]["default"] == "nested_likelihood_locations"
+        assert set(binding["msa"]["modeled_locations"]) == direct_msa_locations
+        assert target["likelihood"]["maximum_locations_per_type"] == 3
+        assert target["likelihood"]["minimum_geographic_resolution_type"] == "COUNTY"
+
+    testing = REGISTRY["targets"]["ehe-testing"]
+    assert testing["observation"]["location_binding"] == {
+        "state": "modeled_location",
+        "msa": "nested_likelihood_locations",
+    }
+    assert testing["likelihood"]["location_types"] == ["STATE", "CBSA"]
+    assert testing["likelihood"]["maximum_locations_per_type"] == 3
+
+
 def test_legacy_adap_client_mapping_cannot_reenter_the_export_contract():
     target = REGISTRY["targets"]["rw-state-adap-clients"]
     assert target["simulation"]["outcome"] == "adap.clients"
