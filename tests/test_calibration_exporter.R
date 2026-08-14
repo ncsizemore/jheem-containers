@@ -49,6 +49,12 @@ stopifnot(identical(
   likelihood_year_window(list(likelihood = list(from_year = 2017, to_year = 2021))),
   list(from_year = 2017L, to_year = 2021L)
 ))
+window_json <- jsonlite::toJSON(
+  list(likelihood_year_window = likelihood_year_window_record(window)),
+  auto_unbox = TRUE,
+  na = "null"
+)
+stopifnot(grepl('"to_year":null', window_json, fixed = TRUE))
 
 mock <- new.env(parent = emptyenv())
 mock$get <- function(outcomes, ...) {

@@ -159,6 +159,15 @@ restrict_to_likelihood_years <- function(frame, window) {
   frame[keep, , drop = FALSE]
 }
 
+likelihood_year_window_record <- function(window) {
+  list(
+    from_year = window$from_year,
+    # jsonlite serializes a bare NULL list member as `{}` under auto_unbox.
+    # A typed NA is emitted as JSON null by the artifact writer's na policy.
+    to_year = if (is.null(window$to_year)) NA_integer_ else window$to_year
+  )
+}
+
 posterior_records <- function(x, window) {
   frame <- array_to_frame(x)
   sim_dimension <- intersect(c("sim", "simulation"), names(frame))
@@ -338,7 +347,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
       classification = target$classification,
       public_panel = target$public_panel,
       unit = target$simulation$unit,
-      likelihood_year_window = window,
+      likelihood_year_window = likelihood_year_window_record(window),
       observation_provenance_confidence = target$observation$provenance_confidence,
       observation_location_binding = location_binding,
       panels = list()
@@ -376,7 +385,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
     classification = target$classification,
     public_panel = target$public_panel,
     unit = target$simulation$unit,
-    likelihood_year_window = window,
+    likelihood_year_window = likelihood_year_window_record(window),
     observation_provenance_confidence = target$observation$provenance_confidence,
     observation_location_binding = location_binding,
     panels = panels
