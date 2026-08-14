@@ -52,8 +52,28 @@ validate_runtime_image(
 validate_geography("C.12060", "msa")
 validate_geography("AL", "state")
 stopifnot(identical(
-  resolve_observation_locations(NULL, list(observation = list()), "C.12060"),
+  resolve_observation_locations(NULL, list(observation = list()), "C.12060", "modeled_location"),
   "C.12060"
+))
+
+conditional_binding_target <- list(observation = list(location_binding = list(
+  state = "modeled_location",
+  msa = list(
+    default = "nested_likelihood_locations",
+    modeled_locations = list("C.33100")
+  )
+)))
+stopifnot(identical(
+  resolve_location_binding(conditional_binding_target, "state", "AL"),
+  "modeled_location"
+))
+stopifnot(identical(
+  resolve_location_binding(conditional_binding_target, "msa", "C.33100"),
+  "modeled_location"
+))
+stopifnot(identical(
+  resolve_location_binding(conditional_binding_target, "msa", "C.12060"),
+  "nested_likelihood_locations"
 ))
 
 cat("calibration exporter pure tests passed\n")

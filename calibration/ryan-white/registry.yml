@@ -267,6 +267,11 @@ targets:
       manager: ryan-white-web-display-2025-04-08
       source_ids: [cdc-nhss-atlasplus]
       binding: explicit
+      location_binding:
+        state: modeled_location
+        msa:
+          default: nested_likelihood_locations
+          modeled_locations: [C.29820, C.31080, C.33100, C.40140, C.41740]
       provenance_confidence: reconstructed
       manager_bindings:
         msa:
@@ -274,8 +279,14 @@ targets:
           - {source: cdc.aggregated.proportion, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
         state:
           - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
-    likelihood: {kind: nested_proportion, denominator_outcome: total.prevalence, from_year: 2008}
-    facets: [total, age, race, sex]
+    likelihood:
+      kind: nested_proportion
+      denominator_outcome: total.prevalence
+      location_types: [STATE, CBSA, COUNTY]
+      maximum_locations_per_type: 3
+      minimum_geographic_resolution_type: COUNTY
+      from_year: 2008
+    facets: [total]
     public_panel: model_fit_check
   ehe-suppression:
     stage: ehe
@@ -287,6 +298,11 @@ targets:
       manager: ryan-white-web-display-2025-04-08
       source_ids: [cdc-nhss-atlasplus]
       binding: explicit
+      location_binding:
+        state: modeled_location
+        msa:
+          default: nested_likelihood_locations
+          modeled_locations: [C.29820, C.31080, C.33100, C.40140, C.41740]
       provenance_confidence: reconstructed
       manager_bindings:
         msa:
@@ -295,7 +311,13 @@ targets:
           - {source: lhd, ontology: lhd, public_source_ids: [local-health-department-suppression]}
         state:
           - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
-    likelihood: {kind: nested_proportion, denominator_outcome: diagnosed.prevalence, from_year: 2008}
+    likelihood:
+      kind: nested_proportion
+      denominator_outcome: diagnosed.prevalence
+      location_types: [CBSA, STATE, COUNTY]
+      maximum_locations_per_type: 3
+      minimum_geographic_resolution_type: COUNTY
+      from_year: 2008
     facets: [total, age, race, sex]
     public_panel: model_fit_check
   ehe-testing:
@@ -308,13 +330,22 @@ targets:
       manager: ryan-white-web-display-2025-04-08
       source_ids: [cdc-brfss]
       binding: explicit
+      location_binding:
+        state: modeled_location
+        msa: nested_likelihood_locations
       provenance_confidence: reconstructed
       manager_bindings:
         msa:
           - {source: brfss, ontology: brfss, public_source_ids: [cdc-brfss]}
         state:
           - {source: brfss, ontology: brfss, public_source_ids: [cdc-brfss]}
-    likelihood: {kind: nested_proportion, denominator_outcome: adult.population, from_year: 2010}
+    likelihood:
+      kind: nested_proportion
+      denominator_outcome: adult.population
+      location_types: [STATE, CBSA]
+      maximum_locations_per_type: 3
+      minimum_geographic_resolution_type: COUNTY
+      from_year: 2010
     facets: [total, age, race, sex]
     public_panel: model_fit_check
   ehe-prep-uptake:

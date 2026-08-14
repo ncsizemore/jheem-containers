@@ -212,8 +212,26 @@ get_simulation_array <- function(simset, target, keep_dimensions) {
   result
 }
 
-resolve_observation_locations <- function(manager, target, location) {
-  location_binding <- target$observation$location_binding %||% "modeled_location"
+resolve_location_binding <- function(target, geography, location) {
+  binding <- target$observation$location_binding %||% "modeled_location"
+  if (is.character(binding) && length(binding) == 1L) return(binding)
+  if (!is.list(binding)) fail("observation location binding must be a string or geography map")
+
+  geography_binding <- binding[[geography]]
+  if (is.null(geography_binding)) fail("observation location binding has no rule for ", geography)
+  if (is.character(geography_binding) && length(geography_binding) == 1L) return(geography_binding)
+  if (!is.list(geography_binding)) fail("observation location binding rule is invalid for ", geography)
+
+  modeled_locations <- unname(unlist(geography_binding$modeled_locations %||% list()))
+  if (location %in% modeled_locations) return("modeled_location")
+  default <- geography_binding$default
+  if (!is.character(default) || length(default) != 1L) {
+    fail("observation location binding rule has no valid default for ", geography)
+  }
+  default
+}
+
+resolve_observation_locations <- function(manager, target, location, location_binding) {
   if (identical(location_binding, "modeled_location")) return(location)
   if (!identical(location_binding, "nested_likelihood_locations")) {
     fail("unsupported observation location binding: ", location_binding)
@@ -261,11 +279,12 @@ resolve_observation_locations <- function(manager, target, location) {
   locations
 }
 
-get_observation_array <- function(manager, simset, target, binding, keep_dimensions, location) {
+get_observation_array <- function(manager, simset, target, binding, keep_dimensions, location,
+                                  location_binding) {
   ontology_outcome <- target$simulation$ontology_outcome %||% target$simulation$outcome
   target_ontology <- simset$outcome.ontologies[[ontology_outcome]]
   if (is.null(target_ontology)) fail("simset lacks ontology outcome: ", ontology_outcome)
-  observation_locations <- resolve_observation_locations(manager, target, location)
+  observation_locations <- resolve_observation_locations(manager, target, location, location_binding)
   manager$pull(
     outcome = target$observation$outcome,
     metric = "estimate",
@@ -282,6 +301,7 @@ get_observation_array <- function(manager, simset, target, binding, keep_dimensi
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
 export_target <- function(target_id, target, geography, simset, managers, location) {
+  location_binding <- resolve_location_binding(target, geography, location)
   if (identical(target$public_panel, "not_exported")) {
     return(list(
       target_id = target_id,
@@ -290,7 +310,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
       public_panel = target$public_panel,
       unit = target$simulation$unit,
       observation_provenance_confidence = target$observation$provenance_confidence,
-      observation_location_binding = target$observation$location_binding %||% "modeled_location",
+      observation_location_binding = location_binding,
       panels = list()
     ))
   }
@@ -301,7 +321,9 @@ export_target <- function(target_id, target, geography, simset, managers, locati
     keep <- if (facet == "total") "year" else c("year", facet)
     posterior <- posterior_records(get_simulation_array(simset, target, keep))
     observations <- unlist(lapply(bindings, function(binding) {
-      observation_records(get_observation_array(manager, simset, target, binding, keep, location), binding)
+      observation_records(get_observation_array(
+        manager, simset, target, binding, keep, location, location_binding
+      ), binding)
     }), recursive = FALSE)
     if (facet == "total" && !length(observations)) {
       fail("target ", target_id, " has no total-level observations for ", location)
@@ -315,7 +337,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
     public_panel = target$public_panel,
     unit = target$simulation$unit,
     observation_provenance_confidence = target$observation$provenance_confidence,
-    observation_location_binding = target$observation$location_binding %||% "modeled_location",
+    observation_location_binding = location_binding,
     panels = panels
   )
 }

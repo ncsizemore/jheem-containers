@@ -33,6 +33,12 @@ geography rule: overlapping state and CBSA series are selected, capped at two pe
 with denominator-weighted selection where a modeled MSA overlaps more candidates. The artifact
 records whether each target uses this rule or direct modeled-location observations.
 
+The EHE awareness and suppression families use the likelihood's location-conditional rule: states
+and five explicitly named MSAs use direct observations, while other MSAs use denominator-weighted
+nested observations. EHE testing uses direct state observations and nested MSA observations. These
+EHE nested families retain the likelihood default of at most three locations per geography type.
+Awareness is exported only at the total level because its likelihood has no stratified dimensions.
+
 Example (normally run inside the matching model image):
 
 ```sh
