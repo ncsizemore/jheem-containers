@@ -14,10 +14,13 @@ policies:
   manager_binary_redistribution: controlled_only
   public_artifacts: minimal_derived_payloads
   historical_confidence_values: [verified, reconstructed, unknown]
+  manager_binding_semantics: all_explicit_series_mappable_to_model_geography
 
 data_managers:
   ryan-white-web-display-2025-04-08:
     role: historical_display
+    controlled_release: ryan-white-web-display-manager-v2025.04.08
+    asset_filename: ryan-white-web-display-manager_2025-04-08.rdata
     sha256: 4f1b5063ae6f6e9ffa4b254d4cad71fdf088903295339fb59a17e71819f99989
     created_at: "2025-04-08 16:21:06 CDT"
     modified_at: "2025-04-08 16:25:53 CDT"
@@ -25,6 +28,8 @@ data_managers:
     redistribution: controlled_only
   ryan-white-full-2026-03-16:
     role: current_full_candidate
+    controlled_release: ryan-white-full-manager-v2026.03.16
+    asset_filename: ryan-white-full-manager_2026-03-16.rdata
     sha256: cc227cb9bdf43d9948f97db54d9c2652f034c4b780a8515cb57c99ea6f735188
     created_at: "2026-03-16 11:42:34 CDT"
     modified_at: "2026-03-16 11:46:08 CDT"
@@ -62,6 +67,12 @@ sources:
     url: https://aidsvu.org/data-methods/data-methods-statecounty/
     attribution_required: true
     public_reuse_status: public_dataset_with_credit_and_suppression
+  local-health-department-suppression:
+    family: LHD
+    label: Local health department viral suppression reports embedded in the archived manager
+    url: https://jheem.org/ryan-white/explorer
+    attribution_required: true
+    public_reuse_status: minimal_derived_values_pending_source_confirmation
 
 definition_evidence:
   ryan-white-msa-likelihood:
@@ -103,6 +114,7 @@ compatibility_evidence:
 models:
   ryan-white-msa:
     backend_model_id: ryan-white-msa
+    runtime_image_repository: ghcr.io/ncsizemore/jheem-ryan-white-msa
     geography: msa
     stages:
       ehe:
@@ -125,6 +137,7 @@ models:
         definition_evidence: ryan-white-msa-likelihood
   ryan-white-ajph:
     backend_model_id: ryan-white-state-ajph
+    runtime_image_repository: ghcr.io/ncsizemore/jheem-ryan-white-ajph
     geography: state
     stages:
       ehe:
@@ -147,6 +160,7 @@ models:
         definition_evidence: ryan-white-ajph-likelihood
   ryan-white-croi:
     backend_model_id: ryan-white-state-croi
+    runtime_image_repository: ghcr.io/ncsizemore/jheem-ryan-white-croi
     geography: state
     stages:
       ehe:
@@ -212,6 +226,13 @@ targets:
       source_ids: [cdc-nhss-atlasplus]
       binding: explicit
       provenance_confidence: reconstructed
+      manager_bindings:
+        msa:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: cdc.aggregated.county, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: cdc.surveillance.reports, ontology: cdc.msa.reports, public_source_ids: [cdc-nhss-atlasplus]}
+        state:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
     likelihood: {kind: basic, from_year: 2008}
     facets: [total, age, race, sex]
     public_panel: model_fit_check
@@ -226,6 +247,13 @@ targets:
       source_ids: [cdc-nhss-atlasplus]
       binding: explicit
       provenance_confidence: reconstructed
+      manager_bindings:
+        msa:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: cdc.aggregated.county, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: cdc.surveillance.reports, ontology: cdc.msa.reports, public_source_ids: [cdc-nhss-atlasplus]}
+        state:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
     likelihood: {kind: basic, from_year: 2008}
     facets: [total, age, race, sex]
     public_panel: model_fit_check
@@ -240,6 +268,12 @@ targets:
       source_ids: [cdc-nhss-atlasplus]
       binding: explicit
       provenance_confidence: reconstructed
+      manager_bindings:
+        msa:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: cdc.aggregated.proportion, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+        state:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
     likelihood: {kind: nested_proportion, denominator_outcome: total.prevalence, from_year: 2008}
     facets: [total, age, race, sex]
     public_panel: model_fit_check
@@ -254,6 +288,13 @@ targets:
       source_ids: [cdc-nhss-atlasplus]
       binding: explicit
       provenance_confidence: reconstructed
+      manager_bindings:
+        msa:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: cdc.aggregated.proportion, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: lhd, ontology: lhd, public_source_ids: [local-health-department-suppression]}
+        state:
+          - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
     likelihood: {kind: nested_proportion, denominator_outcome: diagnosed.prevalence, from_year: 2008}
     facets: [total, age, race, sex]
     public_panel: model_fit_check
@@ -268,6 +309,11 @@ targets:
       source_ids: [cdc-brfss]
       binding: explicit
       provenance_confidence: reconstructed
+      manager_bindings:
+        msa:
+          - {source: brfss, ontology: brfss, public_source_ids: [cdc-brfss]}
+        state:
+          - {source: brfss, ontology: brfss, public_source_ids: [cdc-brfss]}
     likelihood: {kind: nested_proportion, denominator_outcome: adult.population, from_year: 2010}
     facets: [total, age, race, sex]
     public_panel: model_fit_check
@@ -282,6 +328,13 @@ targets:
       source_ids: [aidsvu-prep]
       binding: explicit
       provenance_confidence: reconstructed
+      manager_bindings:
+        msa:
+          - {source: prep.cdc.aggregated.county, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
+          - {source: prep.aidsvu.aggregated.county, ontology: aidsvu, public_source_ids: [aidsvu-prep]}
+        state:
+          - {source: aidsvu, ontology: aidsvu, public_source_ids: [aidsvu-prep]}
+          - {source: cdc.prep, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
     likelihood: {kind: basic, from_year: 2007}
     facets: [total, age, race, sex]
     public_panel: model_fit_check
@@ -296,6 +349,11 @@ targets:
       source_ids: [hrsa-rwhap-annual]
       binding: explicit
       provenance_confidence: verified
+      manager_bindings:
+        msa:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
+        state:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
     likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race], levels_of_stratification: [0, 1]}
     facets: [total, age, race, sex]
     public_panel: calibration_target
@@ -310,6 +368,11 @@ targets:
       source_ids: [hrsa-rwhap-annual]
       binding: explicit_custom_transformation
       provenance_confidence: verified
+      manager_bindings:
+        msa:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
+        state:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
     likelihood: {kind: custom, from_year: 2017, dimensions: [sex, risk]}
     facets: [sex_risk]
     public_panel: not_exported
@@ -324,6 +387,11 @@ targets:
       source_ids: [hrsa-rwhap-annual]
       binding: explicit
       provenance_confidence: verified
+      manager_bindings:
+        msa:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
+        state:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
     likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1]}
     facets: [total, age, race, sex]
     public_panel: calibration_target
@@ -338,6 +406,11 @@ targets:
       source_ids: [hrsa-rwhap-annual]
       binding: explicit
       provenance_confidence: verified
+      manager_bindings:
+        msa:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
+        state:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
     likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1, 2]}
     facets: [total, age, race, sex]
     public_panel: calibration_target
@@ -351,10 +424,17 @@ targets:
       manager: ryan-white-web-display-2025-04-08
       source_ids: [hrsa-rwhap-annual, cdc-nhss-atlasplus]
       binding: explicit_nested_geography
+      location_binding: nested_likelihood_locations
       provenance_confidence: verified
+      manager_bindings:
+        msa:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual, cdc-nhss-atlasplus]}
     likelihood:
       kind: nested_proportion
       denominator_outcome: non.adap.clients
+      location_types: [STATE, CBSA]
+      maximum_locations_per_type: 2
+      minimum_geographic_resolution_type: COUNTY
       from_year: 2017
       to_year: 2021
       dimensions: [age, sex, race, risk]
@@ -369,13 +449,32 @@ targets:
       outcome: adap.suppressed.proportion.of.diagnosed
       unit: proportion
       expression: adap.clients * adap.suppression / diagnosed.prevalence
+      ontology_outcome: diagnosed.prevalence
+      derivation:
+        operation: multiply_divide
+        numerator_outcomes: [adap.clients, adap.suppression]
+        denominator_outcomes: [diagnosed.prevalence]
     observation:
       outcome: adap.suppressed.proportion.of.diagnosed
       manager: ryan-white-full-2026-03-16
       source_ids: [hrsa-rwhap-annual, nastad-adap-monitoring, cdc-nhss-atlasplus]
       binding: explicit_derived_candidate
+      location_binding: nested_likelihood_locations
       provenance_confidence: reconstructed
-    likelihood: {kind: nested_proportion, denominator_outcome: diagnosed.prevalence, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1]}
+      manager_bindings:
+        msa:
+          - source: ryan.white.program
+            ontology: ryan.white.pdfs
+            public_source_ids: [hrsa-rwhap-annual, nastad-adap-monitoring, cdc-nhss-atlasplus]
+    likelihood:
+      kind: nested_proportion
+      denominator_outcome: diagnosed.prevalence
+      location_types: [STATE, CBSA]
+      maximum_locations_per_type: 2
+      minimum_geographic_resolution_type: COUNTY
+      from_year: 2017
+      dimensions: [age, sex, race, risk]
+      levels_of_stratification: [0, 1]
     facets: [total, age, race, sex]
     public_panel: related_model_fit_check
   rw-state-adap-clients:
@@ -390,6 +489,9 @@ targets:
       binding: explicit_candidate_override
       provenance_confidence: reconstructed
       reject_simset_mapping: non.adap.clients
+      manager_bindings:
+        state:
+          - {source: ryan.white.program, ontology: ryan.white.pdfs, public_source_ids: [hrsa-rwhap-annual]}
     likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race], levels_of_stratification: [0, 1]}
     facets: [total, age, race, sex]
     public_panel: calibration_target_with_reconstructed_observations
@@ -404,6 +506,9 @@ targets:
       source_ids: [nastad-adap-monitoring]
       binding: explicit
       provenance_confidence: verified
+      manager_bindings:
+        state:
+          - {source: nastad.adap, ontology: ryan.white.pdfs, public_source_ids: [nastad-adap-monitoring]}
     likelihood: {kind: basic, from_year: 2017, dimensions: [age, sex, race, risk], levels_of_stratification: [0, 1, 2]}
     facets: [total, age, race, sex]
     public_panel: calibration_target

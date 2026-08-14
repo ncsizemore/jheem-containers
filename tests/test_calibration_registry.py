@@ -22,6 +22,9 @@ def test_registry_identity_and_scope_are_explicit():
     assert REGISTRY["policies"]["legacy_adap_mapping"] == (
         "reject_adap_clients_to_non_adap_clients"
     )
+    assert REGISTRY["policies"]["manager_binding_semantics"] == (
+        "all_explicit_series_mappable_to_model_geography"
+    )
 
 
 def test_registry_covers_exactly_the_deployed_ryan_white_models():
@@ -29,6 +32,7 @@ def test_registry_covers_exactly_the_deployed_ryan_white_models():
     assert set(REGISTRY["models"]) == expected
     for model_id, model in REGISTRY["models"].items():
         assert model["backend_model_id"] == MODELS[model_id]["backend_model_id"]
+        assert model["runtime_image_repository"] == MODELS[model_id]["image"]
 
 
 def test_service_fit_releases_match_container_runtime_manifest():
@@ -70,6 +74,8 @@ def test_deployed_ensemble_sizes_are_not_conflated():
 def test_manager_records_are_hash_pinned_and_controlled():
     for manager_id, manager in REGISTRY["data_managers"].items():
         assert HEX_64.fullmatch(manager["sha256"]), manager_id
+        assert manager["controlled_release"].startswith("ryan-white-"), manager_id
+        assert manager["asset_filename"].endswith(".rdata"), manager_id
         assert manager["redistribution"] == "controlled_only"
         assert manager["historical_fitting_identity"] in {"verified", "reconstructed", "unknown"}
 
@@ -103,6 +109,51 @@ def test_observation_bindings_are_explicit_and_resolvable():
         assert observation["provenance_confidence"] in {
             "verified", "reconstructed", "unknown"
         }
+
+
+def test_exported_targets_have_explicit_manager_source_and_ontology_bindings():
+    sources = REGISTRY["sources"]
+    for model_id, model in REGISTRY["models"].items():
+        geography = model["geography"]
+        for stage in model["stages"].values():
+            target_ids = REGISTRY["target_sets"][stage["target_set"]]["target_ids"]
+            for target_id in target_ids:
+                target = REGISTRY["targets"][target_id]
+                bindings = target["observation"]["manager_bindings"].get(geography)
+                assert bindings, (model_id, stage["target_set"], target_id)
+                for binding in bindings:
+                    assert binding["source"], target_id
+                    assert binding["ontology"], target_id
+                    assert binding["public_source_ids"], target_id
+                    assert set(binding["public_source_ids"]) <= set(sources), target_id
+
+
+def test_derived_simulation_targets_use_structured_allowlisted_operations():
+    for target_id, target in REGISTRY["targets"].items():
+        simulation = target["simulation"]
+        if "expression" not in simulation:
+            continue
+        derivation = simulation["derivation"]
+        assert derivation["operation"] == "multiply_divide", target_id
+        assert derivation["numerator_outcomes"], target_id
+        assert derivation["denominator_outcomes"], target_id
+        assert simulation["ontology_outcome"], target_id
+
+
+def test_nested_msa_targets_encode_the_historical_location_selection_rule():
+    for target_id in (
+        "rw-msa-adap-ratio",
+        "rw-msa-adap-suppressed-share-diagnosed",
+    ):
+        target = REGISTRY["targets"][target_id]
+        assert target["observation"]["location_binding"] == (
+            "nested_likelihood_locations"
+        )
+        likelihood = target["likelihood"]
+        assert likelihood["kind"] == "nested_proportion"
+        assert likelihood["location_types"] == ["STATE", "CBSA"]
+        assert likelihood["maximum_locations_per_type"] == 2
+        assert likelihood["minimum_geographic_resolution_type"] == "COUNTY"
 
 
 def test_legacy_adap_client_mapping_cannot_reenter_the_export_contract():
