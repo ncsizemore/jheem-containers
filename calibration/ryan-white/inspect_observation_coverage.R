@@ -102,10 +102,14 @@ coverage_record <- function(model_id, stage_id, geography, location, target_id, 
   )
   if (inherits(observations, "error")) {
     message <- conditionMessage(observations)
-    missing_selection_outcome <- grepl(
+    missing_registered_outcome <- grepl(
       "Cannot pull '.+' data from the data manager: '.+' is not a registered outcome\\.$",
       message
     )
+    selection_outcome <- target$likelihood$denominator_outcome
+    missing_selection_outcome <- missing_registered_outcome &&
+      !is.null(selection_outcome) &&
+      grepl(paste0("'", selection_outcome, "' is not a registered outcome."), message, fixed = TRUE)
     return(c(base, list(
       status = if (missing_selection_outcome) "unavailable" else "error",
       observation_count = 0L,
