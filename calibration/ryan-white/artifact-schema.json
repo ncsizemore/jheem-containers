@@ -15,6 +15,7 @@
     "runtime_source",
     "exporter_source",
     "registry_source",
+    "coverage_source",
     "manager_sources",
     "targets"
   ],
@@ -67,6 +68,7 @@
         }
       ]
     },
+    "coverage_source": {"$ref": "#/$defs/fileSource"},
     "manager_sources": {
       "type": "array",
       "items": {
@@ -115,7 +117,8 @@
       "required": [
         "target_id", "label", "classification", "public_panel", "unit",
         "likelihood_year_window",
-        "observation_provenance_confidence", "observation_location_binding", "panels"
+        "observation_provenance_confidence", "observation_location_binding",
+        "availability", "panels"
       ],
       "properties": {
         "target_id": {"type": "string", "minLength": 1},
@@ -138,11 +141,54 @@
         "observation_location_binding": {
           "enum": ["modeled_location", "nested_likelihood_locations"]
         },
+        "availability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "reason"],
+          "properties": {
+            "status": {"enum": ["available", "unavailable", "not_exported"]},
+            "reason": {
+              "type": ["string", "null"],
+              "enum": [
+                null,
+                "no_finite_observations_in_likelihood_window",
+                "selection_outcome_not_in_archived_manager"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {"properties": {"status": {"const": "available"}}},
+              "then": {"properties": {"reason": {"type": "null"}}}
+            },
+            {
+              "if": {"properties": {"status": {"const": "unavailable"}}},
+              "then": {"properties": {"reason": {"type": "string"}}}
+            },
+            {
+              "if": {"properties": {"status": {"const": "not_exported"}}},
+              "then": {"properties": {"reason": {"type": "null"}}}
+            }
+          ]
+        },
         "panels": {
           "type": "array",
           "items": {"$ref": "#/$defs/panel"}
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "availability": {
+                "properties": {"status": {"const": "available"}}
+              }
+            }
+          },
+          "then": {"properties": {"panels": {"minItems": 1}}},
+          "else": {"properties": {"panels": {"maxItems": 0}}}
+        }
+      ]
     },
     "panel": {
       "type": "object",

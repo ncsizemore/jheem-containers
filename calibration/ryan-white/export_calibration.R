@@ -30,7 +30,7 @@ parse_cli <- function(args) {
     i <- i + 2L
   }
   required <- c("registry", "model", "stage", "simset", "simulation-asset-name",
-                "simulation-asset-sha256", "workspace", "runtime-image", "output")
+                "simulation-asset-sha256", "workspace", "runtime-image", "coverage", "output")
   missing <- required[!vapply(required, function(x) !is.null(result[[x]]), logical(1))]
   if (length(missing)) fail("missing required arguments: --", paste(missing, collapse = ", --"))
   result
@@ -337,21 +337,76 @@ get_observation_array <- function(manager, simset, target, binding, keep_dimensi
 
 `%||%` <- function(x, y) if (is.null(x)) y else x
 
-export_target <- function(target_id, target, geography, simset, managers, location) {
+load_coverage_lock <- function(path, registry_path, model_id, stage_id, location, target_ids) {
+  coverage <- jsonlite::read_json(path, simplifyVector = FALSE)
+  if (!identical(coverage$schema_version, "jheem-calibration-observation-coverage/v1")) {
+    fail("unsupported observation coverage schema")
+  }
+  if (!identical(coverage$registry_sha256, sha256_file(registry_path))) {
+    fail("observation coverage registry SHA-256 mismatch")
+  }
+  if (!identical(coverage$model, model_id)) fail("observation coverage model mismatch")
+  records <- Filter(function(record) {
+    identical(record$model, model_id) && identical(record$stage, stage_id) &&
+      identical(record$location, location)
+  }, coverage$records)
+  ids <- vapply(records, function(record) record$target_id, character(1))
+  if (!identical(ids, target_ids) || anyDuplicated(ids)) {
+    fail("observation coverage target set mismatch for ", model_id, "/", stage_id, "/", location)
+  }
+  allowed_statuses <- c("available", "unavailable", "not_exported")
+  if (any(!vapply(records, function(record) record$status %in% allowed_statuses, logical(1)))) {
+    fail("observation coverage contains an unsupported or unresolved status")
+  }
+  allowed_unavailable_reasons <- c(
+    "no_finite_observations_in_likelihood_window",
+    "selection_outcome_not_in_archived_manager"
+  )
+  valid_records <- vapply(records, function(record) {
+    count <- suppressWarnings(as.integer(record$observation_count))
+    if (length(count) != 1L || is.na(count) || count < 0L) return(FALSE)
+    if (identical(record$status, "available")) return(count > 0L && is.null(record$reason))
+    if (identical(record$status, "unavailable")) {
+      return(count == 0L && record$reason %in% allowed_unavailable_reasons)
+    }
+    count == 0L && is.null(record$reason)
+  }, logical(1))
+  if (any(!valid_records)) fail("observation coverage contains an invalid status record")
+  stats::setNames(records, ids)
+}
+
+target_metadata <- function(target_id, target, location_binding, window, availability, panels = list()) {
+  list(
+    target_id = target_id,
+    label = target$label,
+    classification = target$classification,
+    public_panel = target$public_panel,
+    unit = target$simulation$unit,
+    likelihood_year_window = likelihood_year_window_record(window),
+    observation_provenance_confidence = target$observation$provenance_confidence,
+    observation_location_binding = location_binding,
+    availability = availability,
+    panels = panels
+  )
+}
+
+export_target <- function(target_id, target, geography, simset, managers, location, coverage_record) {
   location_binding <- resolve_location_binding(target, geography, location)
   window <- likelihood_year_window(target)
-  if (identical(target$public_panel, "not_exported")) {
-    return(list(
-      target_id = target_id,
-      label = target$label,
-      classification = target$classification,
-      public_panel = target$public_panel,
-      unit = target$simulation$unit,
-      likelihood_year_window = likelihood_year_window_record(window),
-      observation_provenance_confidence = target$observation$provenance_confidence,
-      observation_location_binding = location_binding,
-      panels = list()
-    ))
+  policy_excluded <- identical(target$public_panel, "not_exported")
+  if (!identical(identical(coverage_record$status, "not_exported"), policy_excluded)) {
+    fail("observation coverage status conflicts with target export policy for ", target_id)
+  }
+  if (!identical(coverage_record$public_panel, target$public_panel) ||
+      !identical(coverage_record$observation_location_binding, location_binding)) {
+    fail("observation coverage metadata conflicts with registry for ", target_id)
+  }
+  availability <- list(
+    status = coverage_record$status,
+    reason = if (identical(coverage_record$status, "available")) NA_character_ else coverage_record$reason %||% NA_character_
+  )
+  if (!identical(coverage_record$status, "available")) {
+    return(target_metadata(target_id, target, location_binding, window, availability))
   }
   bindings <- target$observation$manager_bindings[[geography]]
   if (is.null(bindings) || !length(bindings)) fail("target ", target_id, " has no manager bindings for ", geography)
@@ -379,17 +434,7 @@ export_target <- function(target_id, target, geography, simset, managers, locati
     }
     list(facet = facet, posterior = posterior, observations = observations)
   })
-  list(
-    target_id = target_id,
-    label = target$label,
-    classification = target$classification,
-    public_panel = target$public_panel,
-    unit = target$simulation$unit,
-    likelihood_year_window = likelihood_year_window_record(window),
-    observation_provenance_confidence = target$observation$provenance_confidence,
-    observation_location_binding = location_binding,
-    panels = panels
-  )
+  target_metadata(target_id, target, location_binding, window, availability, panels)
 }
 
 main <- function() {
@@ -421,6 +466,9 @@ main <- function() {
 
   target_set <- registry$target_sets[[stage$target_set]]
   target_ids <- unname(unlist(target_set$target_ids))
+  coverage_records <- load_coverage_lock(
+    args$coverage, args$registry, args$model, args$stage, location, target_ids
+  )
   required_manager_ids <- unique(vapply(target_ids, function(id) registry$targets[[id]]$observation$manager, character(1)))
   if (!setequal(required_manager_ids, names(manager_paths))) {
     fail("--manager IDs must exactly match required managers: ", paste(sort(required_manager_ids), collapse = ", "))
@@ -443,7 +491,7 @@ main <- function() {
   }
 
   targets <- lapply(target_ids, function(id) export_target(
-    id, registry$targets[[id]], model$geography, simset, managers, location
+    id, registry$targets[[id]], model$geography, simset, managers, location, coverage_records[[id]]
   ))
   artifact <- list(
     schema_version = "jheem-calibration/v1",
@@ -475,6 +523,10 @@ main <- function() {
       registry_id = registry$registry_id,
       filename = basename(args$registry),
       sha256 = sha256_file(args$registry)
+    ),
+    coverage_source = list(
+      filename = basename(args$coverage),
+      sha256 = sha256_file(args$coverage)
     ),
     manager_sources = manager_sources,
     targets = targets

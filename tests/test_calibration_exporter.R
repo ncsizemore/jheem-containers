@@ -104,4 +104,31 @@ stopifnot(identical(
   "nested_likelihood_locations"
 ))
 
+registry_path <- tempfile(fileext = ".yml")
+writeLines("registry_id: test", registry_path)
+coverage_path <- tempfile(fileext = ".json")
+jsonlite::write_json(list(
+  schema_version = "jheem-calibration-observation-coverage/v1",
+  registry_sha256 = sha256_file(registry_path),
+  model = "model",
+  records = list(
+    list(
+      model = "model", stage = "ehe", location = "AL", target_id = "available",
+      status = "available", observation_count = 1L
+    ),
+    list(
+      model = "model", stage = "ehe", location = "AL", target_id = "missing",
+      status = "unavailable", observation_count = 0L,
+      reason = "no_finite_observations_in_likelihood_window"
+    )
+  )
+), coverage_path, auto_unbox = TRUE)
+coverage_records <- load_coverage_lock(
+  coverage_path, registry_path, "model", "ehe", "AL", c("available", "missing")
+)
+stopifnot(identical(names(coverage_records), c("available", "missing")))
+stopifnot(identical(coverage_records$missing$status, "unavailable"))
+
+unlink(c(registry_path, coverage_path))
+
 cat("calibration exporter pure tests passed\n")

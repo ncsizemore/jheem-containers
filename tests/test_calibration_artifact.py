@@ -11,6 +11,25 @@ CALIBRATION = REPO / "calibration" / "ryan-white"
 SCHEMA = json.loads((CALIBRATION / "artifact-schema.json").read_text())
 EXPORTER = (CALIBRATION / "export_calibration.R").read_text()
 SHA = "a" * 64
+EXPECTED_UNAVAILABLE = {
+    "ryan-white-ajph": set(),
+    "ryan-white-croi": {
+        ("ehe", "NJ", "ehe-suppression", "no_finite_observations_in_likelihood_window"),
+        ("ehe", "PA", "ehe-suppression", "no_finite_observations_in_likelihood_window"),
+    },
+    "ryan-white-msa": {
+        ("ehe", "C.37980", "ehe-awareness", "no_finite_observations_in_likelihood_window"),
+        ("ehe", "C.37980", "ehe-suppression", "no_finite_observations_in_likelihood_window"),
+        ("ehe", "C.37980", "ehe-testing", "selection_outcome_not_in_archived_manager"),
+        ("ehe", "C.47900", "ehe-awareness", "no_finite_observations_in_likelihood_window"),
+        ("ehe", "C.47900", "ehe-testing", "selection_outcome_not_in_archived_manager"),
+        ("ryan-white", "C.16980", "rw-msa-adap-ratio", "no_finite_observations_in_likelihood_window"),
+        ("ryan-white", "C.32820", "rw-msa-adap-ratio", "no_finite_observations_in_likelihood_window"),
+        ("ryan-white", "C.35620", "rw-msa-adap-ratio", "no_finite_observations_in_likelihood_window"),
+        ("ryan-white", "C.37980", "rw-msa-adap-ratio", "no_finite_observations_in_likelihood_window"),
+        ("ryan-white", "C.47900", "rw-msa-adap-ratio", "no_finite_observations_in_likelihood_window"),
+    },
+}
 
 
 def test_artifact_schema_has_a_closed_versioned_top_level_contract():
@@ -20,6 +39,7 @@ def test_artifact_schema_has_a_closed_versioned_top_level_contract():
     assert set(SCHEMA["required"]) >= {
         "model", "stage", "location", "ensemble", "simulation_source",
         "runtime_source", "exporter_source", "registry_source", "manager_sources", "targets",
+        "coverage_source",
     }
 
 
@@ -56,6 +76,9 @@ def test_exporter_fails_closed_on_known_provenance_boundaries():
         "has no total-level observations",
         "workspace does not contain required .jheem2_state",
         "workspace .jheem2_state is incomplete",
+        "observation coverage registry SHA-256 mismatch",
+        "observation coverage target set mismatch",
+        "observation coverage contains an unsupported or unresolved status",
     )
     for fragment in required_fragments:
         assert fragment in EXPORTER
@@ -102,6 +125,10 @@ def test_representative_artifact_validates_against_schema():
             "filename": "registry.yml",
             "sha256": SHA,
         },
+        "coverage_source": {
+            "filename": "ryan-white-msa.json",
+            "sha256": SHA,
+        },
         "manager_sources": [{
             "manager_id": "ryan-white-web-display-2025-04-08",
             "controlled_release": "ryan-white-web-display-manager-v2025.04.08",
@@ -117,6 +144,7 @@ def test_representative_artifact_validates_against_schema():
             "likelihood_year_window": {"from_year": 2017, "to_year": None},
             "observation_provenance_confidence": "verified",
             "observation_location_binding": "modeled_location",
+            "availability": {"status": "available", "reason": None},
             "panels": [{
                 "facet": "total",
                 "posterior": [{
@@ -133,3 +161,43 @@ def test_representative_artifact_validates_against_schema():
         }],
     }
     jsonschema.Draft202012Validator(SCHEMA).validate(artifact)
+
+
+def test_unavailable_target_is_explicit_and_has_no_fit_panel():
+    target_schema = {
+        "$schema": SCHEMA["$schema"],
+        "$defs": SCHEMA["$defs"],
+        "$ref": "#/$defs/target",
+    }
+    validator = jsonschema.Draft202012Validator(target_schema)
+    value = {
+        "target_id": "ehe-testing",
+        "label": "HIV testing",
+        "classification": "active_likelihood_target",
+        "public_panel": "calibration_target",
+        "unit": "proportion",
+        "likelihood_year_window": {"from_year": 2008, "to_year": None},
+        "observation_provenance_confidence": "reconstructed",
+        "observation_location_binding": "nested_likelihood_locations",
+        "availability": {
+            "status": "unavailable",
+            "reason": "selection_outcome_not_in_archived_manager",
+        },
+        "panels": [],
+    }
+    validator.validate(value)
+
+
+def test_reviewed_observation_coverage_has_no_unresolved_errors():
+    for model, expected in EXPECTED_UNAVAILABLE.items():
+        lock = json.loads(
+            (CALIBRATION / "observation-coverage" / f"{model}.json").read_text()
+        )
+        assert lock["model"] == model
+        assert all(record["status"] != "error" for record in lock["records"])
+        actual = {
+            (record["stage"], record["location"], record["target_id"], record["reason"])
+            for record in lock["records"]
+            if record["status"] == "unavailable"
+        }
+        assert actual == expected

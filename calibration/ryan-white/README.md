@@ -33,6 +33,14 @@ window, which is included in the artifact. This excludes mathematically undefine
 from pre-epidemic years without weakening the finite-value requirement inside the calibration
 period.
 
+`inspect_observation_coverage.R` performs a manager-only preflight without loading simulation
+sets. Its deterministic, product-specific results are committed under `observation-coverage/`.
+The release workflow must reproduce those files byte-for-byte before starting the expensive export.
+Every target remains explicit in the artifact: `available` targets carry fit panels, reviewed
+`unavailable` targets carry a bounded reason and no panel, and policy-excluded targets are marked
+`not_exported`. A target locked as available still fails closed if the full exporter cannot resolve
+total-level observations; the coverage lock is not a general-purpose error suppression mechanism.
+
 MSA-level nested proportion targets preserve the fitting likelihood's explicit observation
 geography rule: overlapping state and CBSA series are selected, capped at two per geography type,
 with denominator-weighted selection where a modeled MSA overlaps more candidates. The artifact
@@ -56,6 +64,7 @@ Rscript calibration/ryan-white/export_calibration.R \
   --simulation-asset-sha256 "$SIMSET_SHA256" \
   --workspace /app/ryan_white_workspace.RData \
   --runtime-image ghcr.io/ncsizemore/jheem-ryan-white-msa@sha256:... \
+  --coverage calibration/ryan-white/observation-coverage/ryan-white-msa.json \
   --manager ryan-white-web-display-2025-04-08=/controlled/ryan.white.web.data.manager.rdata \
   --manager ryan-white-full-2026-03-16=/controlled/ryan.white.data.manager.rdata \
   --output /outputs/ryan-white-msa.ryan-white.C.12060.json
