@@ -21,7 +21,7 @@ release   <- args[1]
 location  <- args[2]
 cache_dir <- args[3]
 link_dir  <- args[4]
-repo      <- if (length(args) >= 5 && nzchar(args[5])) args[5] else "ncsizemore/jheem-simulations"
+repo      <- if (length(args) >= 5 && nzchar(args[5])) args[5] else "CIPHER-Epi/jheem-simulations"
 suffix    <- if (length(args) >= 6 && nzchar(args[6])) args[6] else "_base"
 
 dir.create(cache_dir, recursive = TRUE, showWarnings = FALSE)

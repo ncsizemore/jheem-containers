@@ -128,7 +128,7 @@ new focused artifact; do not overwrite the historical result in place.
 - [`jheem-backend`](https://github.com/ncsizemore/jheem-backend) consumes promoted image tags and launches
   custom simulations.
 - [`jheem-portal`](https://github.com/ncsizemore/jheem-portal) is the public web interface.
-- [`jheem-simulations`](https://github.com/ncsizemore/jheem-simulations) stores simulation artifacts and
+- [`jheem-simulations`](https://github.com/CIPHER-Epi/jheem-simulations) stores simulation artifacts and
   release data used by the portal.
 
 Legacy per-image repositories remain available for historical tags and external references, but publishing
