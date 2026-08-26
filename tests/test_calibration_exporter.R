@@ -29,6 +29,52 @@ stopifnot(identical(observations[[1]]$manager_source, "example"))
 stopifnot(is.list(observations[[1]]$public_source_ids))
 stopifnot(all(vapply(observations, function(x) is.finite(x$value), logical(1))))
 
+policy_registry <- list(
+  policies = list(public_observation_exclusions = list(list(
+    policy_id = "lhd-suppression-public-v1",
+    source_id = "local-health-department-suppression",
+    manager_source = "lhd",
+    manager_ontology = "lhd",
+    reason = "unresolved_source_identity_and_reuse_terms",
+    scope = "public_calibration_artifacts"
+  ))),
+  sources = list(`local-health-department-suppression` = list()),
+  targets = list(clean = list(observation = list(manager_bindings = list(
+    msa = list(list(
+      source = "cdc.hiv", ontology = "cdc", public_source_ids = list("cdc-nhss-atlasplus")
+    ))
+  ))))
+)
+stopifnot(isTRUE(validate_public_observation_policy(policy_registry)))
+clean_artifact <- list(targets = list(list(panels = list(list(observations = observations)))))
+stopifnot(isTRUE(validate_public_artifact_policy(clean_artifact, policy_registry)))
+forbidden_records <- list(
+  list(manager_source = "lhd", manager_ontology = "cdc", public_source_ids = list("cdc-nhss-atlasplus")),
+  list(manager_source = "cdc.hiv", manager_ontology = "lhd", public_source_ids = list("cdc-nhss-atlasplus")),
+  list(
+    manager_source = "cdc.hiv", manager_ontology = "cdc",
+    public_source_ids = list("local-health-department-suppression")
+  )
+)
+for (forbidden in forbidden_records) {
+  artifact <- list(targets = list(list(panels = list(list(observations = list(forbidden))))))
+  stopifnot(inherits(try(
+    validate_public_artifact_policy(artifact, policy_registry), silent = TRUE
+  ), "try-error"))
+}
+forbidden_registry <- policy_registry
+forbidden_registry$targets$clean$observation$manager_bindings$msa[[1]]$source <- "lhd"
+stopifnot(inherits(try(
+  validate_public_observation_policy(forbidden_registry), silent = TRUE
+), "try-error"))
+forbidden_registry <- policy_registry
+forbidden_registry$targets$clean$observation$source_ids <- list(
+  "local-health-department-suppression"
+)
+stopifnot(inherits(try(
+  validate_public_observation_policy(forbidden_registry), silent = TRUE
+), "try-error"))
+
 posterior_with_undefined_prefit_values <- posterior
 posterior_with_undefined_prefit_values[1, ] <- NaN
 fit_records <- posterior_records(

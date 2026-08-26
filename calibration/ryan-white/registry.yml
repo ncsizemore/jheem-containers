@@ -15,6 +15,13 @@ policies:
   public_artifacts: minimal_derived_payloads
   historical_confidence_values: [verified, reconstructed, unknown]
   manager_binding_semantics: all_explicit_series_mappable_to_model_geography
+  public_observation_exclusions:
+    - policy_id: lhd-suppression-public-v1
+      source_id: local-health-department-suppression
+      manager_source: lhd
+      manager_ontology: lhd
+      reason: unresolved_source_identity_and_reuse_terms
+      scope: public_calibration_artifacts
 
 data_managers:
   ryan-white-web-display-2025-04-08:
@@ -72,7 +79,7 @@ sources:
     label: Local health department viral suppression reports embedded in the archived manager
     url: https://jheem.org/ryan-white/explorer
     attribution_required: true
-    public_reuse_status: minimal_derived_values_pending_source_confirmation
+    public_reuse_status: excluded_from_public_v1_pending_provenance_and_reuse_confirmation
 
 definition_evidence:
   ryan-white-msa-likelihood:
@@ -308,7 +315,6 @@ targets:
         msa:
           - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
           - {source: cdc.aggregated.proportion, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
-          - {source: lhd, ontology: lhd, public_source_ids: [local-health-department-suppression]}
         state:
           - {source: cdc.hiv, ontology: cdc, public_source_ids: [cdc-nhss-atlasplus]}
     likelihood:

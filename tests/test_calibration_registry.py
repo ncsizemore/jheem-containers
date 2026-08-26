@@ -87,6 +87,30 @@ def test_sources_have_https_urls_attribution_and_reuse_disposition():
         assert source["public_reuse_status"], source_id
 
 
+def test_lhd_observations_are_explicitly_excluded_from_public_v1():
+    exclusion = REGISTRY["policies"]["public_observation_exclusions"]
+    assert exclusion == [{
+        "policy_id": "lhd-suppression-public-v1",
+        "source_id": "local-health-department-suppression",
+        "manager_source": "lhd",
+        "manager_ontology": "lhd",
+        "reason": "unresolved_source_identity_and_reuse_terms",
+        "scope": "public_calibration_artifacts",
+    }]
+    assert REGISTRY["sources"]["local-health-department-suppression"][
+        "public_reuse_status"
+    ] == "excluded_from_public_v1_pending_provenance_and_reuse_confirmation"
+    bindings = REGISTRY["targets"]["ehe-suppression"]["observation"][
+        "manager_bindings"
+    ]["msa"]
+    assert all(binding["source"] != "lhd" for binding in bindings)
+    assert all(binding["ontology"] != "lhd" for binding in bindings)
+    assert all(
+        "local-health-department-suppression" not in binding["public_source_ids"]
+        for binding in bindings
+    )
+
+
 def test_target_sets_reference_unique_known_targets_for_the_correct_stage():
     targets = REGISTRY["targets"]
     for set_id, target_set in REGISTRY["target_sets"].items():

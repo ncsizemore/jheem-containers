@@ -155,6 +155,7 @@ coverage_main <- function() {
   })
   args <- parse_coverage_cli(commandArgs(trailingOnly = TRUE))
   registry <- yaml::read_yaml(args$registry)
+  validate_public_observation_policy(registry)
   model <- registry$models[[args$model]]
   if (is.null(model)) fail("unknown registry model: ", args$model)
   target_ids <- unique(unlist(lapply(model$stages, function(stage) {
@@ -173,6 +174,7 @@ coverage_main <- function() {
     registry_sha256 = sha256_file(args$registry),
     model = args$model,
     locations = as.list(sort(unique(locations))),
+    public_observation_exclusions = registry$policies$public_observation_exclusions,
     records = records
   )
   dir.create(dirname(args$output), recursive = TRUE, showWarnings = FALSE)

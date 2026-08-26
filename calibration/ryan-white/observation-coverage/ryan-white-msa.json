@@ -1,7 +1,7 @@
 {
   "schema_version": "jheem-calibration-observation-coverage/v1",
   "registry_id": "ryan-white-calibration-targets-v1",
-  "registry_sha256": "384f64e37ba64f3764857cb9494c8c7a3d9238f5435208c540416aa2274b9d09",
+  "registry_sha256": "5003b4d8f4ae0dc5ba0463a94269ac21659103bfcfb9c1213e166444c1ef6b3a",
   "model": "ryan-white-msa",
   "locations": [
     "C.12060",
@@ -35,6 +35,16 @@
     "C.42660",
     "C.45300",
     "C.47900"
+  ],
+  "public_observation_exclusions": [
+    {
+      "policy_id": "lhd-suppression-public-v1",
+      "source_id": "local-health-department-suppression",
+      "manager_source": "lhd",
+      "manager_ontology": "lhd",
+      "reason": "unresolved_source_identity_and_reuse_terms",
+      "scope": "public_calibration_artifacts"
+    }
   ],
   "records": [
     {
@@ -144,7 +154,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 16,
+      "observation_count": 14,
       "reason": null
     },
     {
@@ -210,7 +220,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 22,
+      "observation_count": 14,
       "reason": null
     },
     {
@@ -276,7 +286,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 21,
+      "observation_count": 15,
       "reason": null
     },
     {
@@ -540,7 +550,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 15,
+      "observation_count": 9,
       "reason": null
     },
     {
@@ -606,7 +616,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 15,
+      "observation_count": 9,
       "reason": null
     },
     {
@@ -672,7 +682,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 19,
+      "observation_count": 14,
       "reason": null
     },
     {
@@ -738,7 +748,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 19,
+      "observation_count": 15,
       "reason": null
     },
     {
@@ -870,7 +880,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 16,
+      "observation_count": 15,
       "reason": null
     },
     {
@@ -1729,7 +1739,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 17,
+      "observation_count": 16,
       "reason": null
     },
     {
@@ -2059,7 +2069,7 @@
       "public_panel": "model_fit_check",
       "observation_location_binding": "nested_likelihood_locations",
       "status": "available",
-      "observation_count": 14,
+      "observation_count": 3,
       "reason": null
     },
     {
