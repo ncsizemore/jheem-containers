@@ -205,6 +205,12 @@ def test_reviewed_observation_coverage_has_no_unresolved_errors():
             ["public_observation_exclusions"]
         )
         assert all(record["status"] != "error" for record in lock["records"])
+        for record in lock["records"]:
+            if record["status"] == "available":
+                assert record["observation_count"] > 0
+                assert record["reason"] is None
+            elif record["status"] in {"unavailable", "not_exported"}:
+                assert record["observation_count"] == 0
         actual = {
             (record["stage"], record["location"], record["target_id"], record["reason"])
             for record in lock["records"]
