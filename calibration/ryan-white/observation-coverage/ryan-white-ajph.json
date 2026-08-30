@@ -1,7 +1,7 @@
 {
   "schema_version": "jheem-calibration-observation-coverage/v1",
   "registry_id": "ryan-white-calibration-targets-v1",
-  "registry_sha256": "384f64e37ba64f3764857cb9494c8c7a3d9238f5435208c540416aa2274b9d09",
+  "registry_sha256": "5003b4d8f4ae0dc5ba0463a94269ac21659103bfcfb9c1213e166444c1ef6b3a",
   "model": "ryan-white-ajph",
   "locations": [
     "AL",
@@ -15,6 +15,16 @@
     "NY",
     "TX",
     "WI"
+  ],
+  "public_observation_exclusions": [
+    {
+      "policy_id": "lhd-suppression-public-v1",
+      "source_id": "local-health-department-suppression",
+      "manager_source": "lhd",
+      "manager_ontology": "lhd",
+      "reason": "unresolved_source_identity_and_reuse_terms",
+      "scope": "public_calibration_artifacts"
+    }
   ],
   "records": [
     {

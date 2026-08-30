@@ -1,9 +1,11 @@
 """Static contract tests for the deterministic calibration exporter."""
 
+import hashlib
 import json
 import pathlib
 
 import jsonschema
+import yaml
 
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -79,6 +81,7 @@ def test_exporter_fails_closed_on_known_provenance_boundaries():
         "observation coverage registry SHA-256 mismatch",
         "observation coverage target set mismatch",
         "observation coverage contains an unsupported or unresolved status",
+        "public artifact contains observation excluded by public-source policy",
     )
     for fragment in required_fragments:
         assert fragment in EXPORTER
@@ -194,7 +197,20 @@ def test_reviewed_observation_coverage_has_no_unresolved_errors():
             (CALIBRATION / "observation-coverage" / f"{model}.json").read_text()
         )
         assert lock["model"] == model
+        assert lock["registry_sha256"] == hashlib.sha256(
+            (CALIBRATION / "registry.yml").read_bytes()
+        ).hexdigest()
+        assert lock["public_observation_exclusions"] == (
+            yaml.safe_load((CALIBRATION / "registry.yml").read_text())["policies"]
+            ["public_observation_exclusions"]
+        )
         assert all(record["status"] != "error" for record in lock["records"])
+        for record in lock["records"]:
+            if record["status"] == "available":
+                assert record["observation_count"] > 0
+                assert record["reason"] is None
+            elif record["status"] in {"unavailable", "not_exported"}:
+                assert record["observation_count"] == 0
         actual = {
             (record["stage"], record["location"], record["target_id"], record["reason"])
             for record in lock["records"]

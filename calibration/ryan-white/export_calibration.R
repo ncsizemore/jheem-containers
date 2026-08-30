@@ -47,6 +47,87 @@ parse_manager_args <- function(values) {
   stats::setNames(vapply(parts, `[[`, character(1), 2L), ids)
 }
 
+matches_public_observation_exclusion <- function(manager_source, manager_ontology,
+                                                 public_source_ids, exclusion) {
+  manager_source %in% exclusion$manager_source ||
+    manager_ontology %in% exclusion$manager_ontology ||
+    any(unname(unlist(public_source_ids)) %in% exclusion$source_id)
+}
+
+validate_public_observation_policy <- function(registry) {
+  exclusions <- registry$policies$public_observation_exclusions
+  if (is.null(exclusions) || !length(exclusions)) {
+    fail("registry must define public observation exclusions")
+  }
+  required <- c(
+    "policy_id", "source_id", "manager_source", "manager_ontology", "reason", "scope"
+  )
+  valid <- vapply(exclusions, function(exclusion) {
+    all(required %in% names(exclusion)) &&
+      all(vapply(required, function(name) {
+        value <- exclusion[[name]]
+        is.character(value) && length(value) == 1L && nzchar(value)
+      }, logical(1))) &&
+      exclusion$source_id %in% names(registry$sources) &&
+      identical(exclusion$scope, "public_calibration_artifacts")
+  }, logical(1))
+  if (any(!valid)) fail("registry contains an invalid public observation exclusion")
+  policy_ids <- vapply(exclusions, function(exclusion) exclusion$policy_id, character(1))
+  if (anyDuplicated(policy_ids)) fail("public observation exclusion policy IDs must be unique")
+
+  for (target_id in names(registry$targets)) {
+    observation <- registry$targets[[target_id]]$observation
+    bindings_by_geography <- observation$manager_bindings
+    for (exclusion in exclusions) {
+      if (exclusion$source_id %in% unname(unlist(observation$source_ids))) {
+        fail(
+          "public target source violates observation exclusion ", exclusion$policy_id,
+          " for target ", target_id
+        )
+      }
+    }
+    for (bindings in bindings_by_geography) {
+      for (binding in bindings) {
+        for (exclusion in exclusions) {
+          if (matches_public_observation_exclusion(
+            binding$source, binding$ontology, binding$public_source_ids, exclusion
+          )) {
+            fail(
+              "public manager binding violates observation exclusion ", exclusion$policy_id,
+              " for target ", target_id
+            )
+          }
+        }
+      }
+    }
+  }
+  invisible(TRUE)
+}
+
+validate_public_artifact_policy <- function(artifact, registry) {
+  exclusions <- registry$policies$public_observation_exclusions
+  for (target in artifact$targets) {
+    for (panel in target$panels %||% list()) {
+      for (observation in panel$observations %||% list()) {
+        for (exclusion in exclusions) {
+          if (matches_public_observation_exclusion(
+            observation$manager_source,
+            observation$manager_ontology,
+            observation$public_source_ids,
+            exclusion
+          )) {
+            fail(
+              "public artifact contains observation excluded by public-source policy: ",
+              exclusion$policy_id
+            )
+          }
+        }
+      }
+    }
+  }
+  invisible(TRUE)
+}
+
 load_single_object <- function(path, predicate, label) {
   env <- new.env(parent = globalenv())
   loaded <- load(path, envir = env)
@@ -445,6 +526,7 @@ main <- function() {
   })
   args <- parse_cli(commandArgs(trailingOnly = TRUE))
   registry <- yaml::read_yaml(args$registry)
+  validate_public_observation_policy(registry)
   model <- registry$models[[args$model]]
   if (is.null(model)) fail("unknown registry model: ", args$model)
   stage <- model$stages[[args$stage]]
@@ -531,6 +613,7 @@ main <- function() {
     manager_sources = manager_sources,
     targets = targets
   )
+  validate_public_artifact_policy(artifact, registry)
   dir.create(dirname(args$output), recursive = TRUE, showWarnings = FALSE)
   jsonlite::write_json(artifact, args$output, auto_unbox = TRUE, pretty = TRUE, digits = 15, na = "null")
   cat(sha256_file(args$output), "  ", basename(args$output), "\n", sep = "")

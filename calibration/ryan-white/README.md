@@ -28,6 +28,13 @@ separate observed source series; exports 95%/50% posterior bands plus the median
 non-finite or dimensionally inconsistent results. The raw simulations and controlled manager
 binaries are never copied into the artifact.
 
+The public v1 overlay intentionally omits local-health-department viral-suppression observations.
+Those observations remain in the controlled historical manager and informed model fitting, but
+their report-level identity and republication basis are not sufficiently resolved for a public
+derived dataset. The registry records this exclusion, the coverage locks reproduce it, and the
+exporter fails closed if an excluded manager source, ontology, or public source ID reaches an
+assembled artifact. Posterior summaries are not changed by this observed-data publication policy.
+
 Each panel is restricted to the target likelihood's registered `from_year`/`to_year` fitting
 window, which is included in the artifact. This excludes mathematically undefined ratio outcomes
 from pre-epidemic years without weakening the finite-value requirement inside the calibration
