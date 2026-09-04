@@ -1,7 +1,7 @@
 {
   "schema_version": "jheem-calibration-observation-coverage/v1",
   "registry_id": "ryan-white-calibration-targets-v1",
-  "registry_sha256": "5003b4d8f4ae0dc5ba0463a94269ac21659103bfcfb9c1213e166444c1ef6b3a",
+  "registry_sha256": "31cbc0eb56771e3d0f8618655b918b0a6ab23289026d93c8ed268ba9c4b965eb",
   "model": "ryan-white-ajph",
   "locations": [
     "AL",

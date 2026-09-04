@@ -55,7 +55,20 @@ sources:
     label: National RWHAP Part B ADAP Monitoring Project Annual Reports
     url: https://nastad.org/adap-monitoring-project
     attribution_required: true
-    public_reuse_status: minimal_derived_values_pending_confirmation
+    public_reuse_status: minimal_aggregate_factual_values_with_attribution_no_affirmative_license
+    reuse_review:
+      repository: CIPHER-Epi/jheem-data-managers
+      revision: 99ce808a0a1a475667e64665c8c2afd02907ebfb
+      path: docs/releases/ryan-white-calibration-v1.0.0-nastad-source-review.md
+      scope: exact_ryan_white_calibration_v1_candidate
+      boundary: >-
+        Risk-managed engineering and data-governance disposition; not legal advice, an open-license
+        claim, or authorization to redistribute reports, source tables, or manager binaries.
+    annual_report_sources:
+      CY2019: https://nastad.org/sites/default/files/2022-01/Table_12.pdf
+      CY2020: https://nastad.org/sites/default/files/2022-01/Table_12.pdf
+      CY2021: https://nastad.org/2023-rwhap-part-b-adap-monitoring-report/table-chart-index
+      CY2022: https://nastad.org/sites/default/files/2024-03/PDF-2024-ADAP-Table-14_0.pdf
   cdc-nhss-atlasplus:
     family: NHSS
     label: CDC National HIV Surveillance System and AtlasPlus
