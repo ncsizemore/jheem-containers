@@ -87,6 +87,31 @@ def test_sources_have_https_urls_attribution_and_reuse_disposition():
         assert source["public_reuse_status"], source_id
 
 
+def test_nastad_reuse_disposition_is_review_pinned_and_year_specific():
+    source = REGISTRY["sources"]["nastad-adap-monitoring"]
+    assert source["public_reuse_status"] == (
+        "minimal_aggregate_factual_values_with_attribution_no_affirmative_license"
+    )
+    assert source["reuse_review"] == {
+        "repository": "CIPHER-Epi/jheem-data-managers",
+        "revision": "99ce808a0a1a475667e64665c8c2afd02907ebfb",
+        "path": (
+            "docs/releases/"
+            "ryan-white-calibration-v1.0.0-nastad-source-review.md"
+        ),
+        "scope": "exact_ryan_white_calibration_v1_candidate",
+        "boundary": (
+            "Risk-managed engineering and data-governance disposition; not legal advice, "
+            "an open-license claim, or authorization to redistribute reports, source "
+            "tables, or manager binaries."
+        ),
+    }
+    reports = source["annual_report_sources"]
+    assert set(reports) == {"CY2019", "CY2020", "CY2021", "CY2022"}
+    assert reports["CY2019"] == reports["CY2020"]
+    assert all(url.startswith("https://nastad.org/") for url in reports.values())
+
+
 def test_lhd_observations_are_explicitly_excluded_from_public_v1():
     exclusion = REGISTRY["policies"]["public_observation_exclusions"]
     assert exclusion == [{

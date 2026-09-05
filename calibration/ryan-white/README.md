@@ -35,6 +35,13 @@ derived dataset. The registry records this exclusion, the coverage locks reprodu
 exporter fails closed if an excluded manager source, ontology, or public source ID reaches an
 assembled artifact. Posterior summaries are not changed by this observed-data publication policy.
 
+The included NASTAD observations have a narrower, review-pinned disposition. They are aggregate
+jurisdiction/year factual proportions from the public CY2019–CY2022 annual-report tables, retained
+with attribution and without claiming an affirmative open license. The registry pins the exact
+review revision and per-year report sources. That decision applies only to the exact Ryan White
+calibration v1 candidate; it does not authorize redistribution of NASTAD reports, source tables, or
+manager binaries.
+
 Each panel is restricted to the target likelihood's registered `from_year`/`to_year` fitting
 window, which is included in the artifact. This excludes mathematically undefined ratio outcomes
 from pre-epidemic years without weakening the finite-value requirement inside the calibration
