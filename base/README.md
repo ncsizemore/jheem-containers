@@ -39,24 +39,24 @@ Current downstream defaults:
 
 | Model image | Base version | Notes |
 | --- | --- | --- |
-| `jheem-ryan-white-msa` | `1.6.5` | Published MSA analysis; prebuilt workspace, `jheem2` pinned to the compatible historical ref. |
-| `jheem-ryan-white-ajph` | `1.6.5` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
-| `jheem-ryan-white-croi` | `1.6.5` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
-| `jheem-cdc-testing` | `1.6.5` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-ryan-white-msa` | `1.7.0` | Published MSA analysis; prebuilt workspace, `jheem2` pinned to the compatible historical ref. |
+| `jheem-ryan-white-ajph` | `1.7.0` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-ryan-white-croi` | `1.7.0` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
+| `jheem-cdc-testing` | `1.7.0` | Heavy state model; large simsets rely on the base's fetch + release-API retry/resume/verify. |
 
 Downstream models pin this base **by digest** (`…:${BASE_VERSION}@sha256:…`), not the mutable tag: a
 `cache-from: type=gha` build once served stale base layers for a tag, silently shipping models without the
 base's fixes. `tests/test_base_pin.py` enforces the pin against the registry on every PR. The model-image
-gate validates each model candidate by digest; a base-candidate cascade that proves a new base image against
-all downstream models before promotion is still an open architecture item.
+gate validates each model candidate by digest. A base-candidate cascade now builds every model from the exact
+candidate base digest and runs every downstream behavior test before a base tag can be promoted.
 
 ## Usage from a model Dockerfile
 
 ```dockerfile
-ARG BASE_VERSION=1.6.5
+ARG BASE_VERSION=1.7.0
 # Pin by digest, not the mutable tag (a gha-cache build can otherwise serve stale
 # base layers). Update both the version and the digest on a base bump.
-FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+FROM ghcr.io/ncsizemore/jheem-base:${BASE_VERSION}@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3
 
 # Add model-specific workspace/scripts here.
 ENTRYPOINT ["./container_entrypoint.sh"]
@@ -73,12 +73,13 @@ docker build -t ghcr.io/ncsizemore/jheem-base:local .
 
 ## Release notes
 
-- **`base:1.6.4` is yanked / superseded by `1.6.5`.** 1.6.4 shipped a broken `fetch_simset.R` (a curl
-  code-capture that misbehaves under R's `system2`); the promotion gate caught it before any model pinned
-  it. The tag remains published (no-retag policy) but nothing should build `FROM` it — use `1.6.5`.
+- **`base:1.6.4` is yanked.** 1.6.4 shipped a broken `fetch_simset.R` (a curl code-capture that misbehaves
+  under R's `system2`); the promotion gate caught it before any model pinned it. It was superseded by 1.6.5,
+  and the current tested base is 1.7.0. The old tags remain published under the no-retag policy, but nothing
+  should build `FROM` 1.6.4.
 - Downstream model Dockerfiles own their `ARG BASE_VERSION` defaults.
 - Do not force all models to the same base tag unless the affected model goldens have passed.
-- Promotion currently re-tags tested model-image digests; full base-to-model cascade promotion is still
-  tracked as future work.
+- Base promotion requires the full candidate-base-to-model compatibility cascade and an explicit
+  `base-vX.Y.Z` tag.
 
 See the top-level [`README.md`](../README.md) for the monorepo release model.

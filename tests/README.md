@@ -59,7 +59,7 @@ deleted rather than generated). To change what the gate tests, edit `models.yml`
 
 `models.yml` is scoped to container build/test/provenance metadata. Backend
 `models.json` remains authoritative for application/runtime/product configuration, and
-shared fields should be checked by CI. See
+shared fields are checked by the always-running contract job. See
 [`docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md`](../docs/CONFIG-OWNERSHIP-AND-CONTRACTS.md).
 
 For coordinated pull requests, CI first checks the backend branch matching the
@@ -84,6 +84,8 @@ The rule: **a green PR means the full model-output gate ran** on the affected im
 release-impacting change cannot merge on smoke alone. `select` scopes builds to changed
 paths (a docs-only PR builds no images — but the contract job still runs, so repo-state
 checks always fire), so PR cost equals the blast radius of the
-change. Promotion only ever happens on push-to-`main` / release tags, only on the *tested*
-digest, and only if every test passed. During active development, iterate on a feature
-branch and use `workflow_dispatch` for ad-hoc full runs.
+change. Shared tests and workflow changes may intentionally broaden validation, but promotion uses a
+separate matrix: on `main`, only models whose own build context changed may advance `latest`; explicit model
+tags may promote only their named model. Promotion still uses only the *tested* digest and only if every test
+passed. During active development, iterate on a feature branch and use `workflow_dispatch` for ad-hoc full
+runs.

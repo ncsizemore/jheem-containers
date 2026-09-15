@@ -1,8 +1,10 @@
 # Configuration Ownership and Cross-Repo Contracts
 
-**Status:** target architecture  
-**Date:** 2026-07-01  
-**Scope:** `jheem-containers`, `jheem-backend`, and the future container `models.yml`
+**Status:** implemented architecture
+
+**Date:** 2026-09-15
+
+**Scope:** `jheem-containers/models.yml` and `jheem-backend/.github/config/models.json`
 
 ## Summary
 
@@ -47,8 +49,9 @@ The sharper target is:
 - `models.yml` is the source of truth for the container-facing build and release contract.
 - Shared facts are validated, not trusted by convention.
 
-Without this boundary, `models.yml` would become another drift surface alongside Dockerfiles,
-`tests/test_config.json`, backend `models.json`, documentation, and workflow defaults.
+Without this boundary, `models.yml` would become another drift surface alongside Dockerfiles, backend
+`models.json`, documentation, and workflow defaults. The former hand-maintained
+`tests/test_config.json` was deleted; tests now read `models.yml` directly.
 
 ## Ownership principles
 
@@ -94,14 +97,14 @@ Without this boundary, `models.yml` would become another drift surface alongside
 | Simset/data release used by `run` defaults | Backend owns operational data release; container mirrors for runtime default | Cross-repo validation | This is shared because backend data workflows and container `run` defaults must agree. |
 | Custom simulation parameter ids, defaults, labels, units | Backend `models.json` | Container generated/validated `PARAM_ENV_MAP` and perturbation tests | Backend owns user/API contract. |
 | Parameter `id -> envVar` mapping | Backend `models.json` | Container `PARAM_ENV_MAP`, tests | The CDC bug came from this drifting. |
-| Golden/perturbation test locations and values | Container `models.yml` | Generated `tests/test_config.json` | Test design belongs with the container gate, but parameter ids should reference backend-owned ids. |
+| Golden/perturbation test locations and values | Container `models.yml` | Test fixtures and candidate-image behavior tests | Tests read the manifest directly; parameter ids reference backend-owned ids. |
 | Release notes / archival DOI / image digest report | Container release metadata | Backend may consume/pin | Provenance artifact, not product config. |
 
 ## Expected `models.yml` role
 
 `models.yml` should describe the container release contract, not the full application model.
 
-A future entry should look conceptually like this:
+An entry looks conceptually like this:
 
 ```yaml
 models:
@@ -113,8 +116,8 @@ models:
 
     base:
       image: ghcr.io/ncsizemore/jheem-base
-      version: 1.6.5
-      digest: sha256:34e4116f864bb4df05c9a2d9f4f88781a451dbea036cbf2e340d706cbac19af8
+      version: 1.7.0
+      digest: sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3
 
     sources:
       jheem_analyses_ref: fc3fe1d2d5f859b322414da8b11f0182e635993b
@@ -150,13 +153,13 @@ configuration. Those stay in backend `models.json`.
 
 ## Generated or validated artifacts
 
-The following should eventually be generated from or validated against `models.yml`:
+The following are generated from, read from, or validated against `models.yml`:
 
 - model Dockerfile `ARG BASE_VERSION`;
 - model Dockerfile base digest;
 - model Dockerfile default `CMD`;
 - model Dockerfile provenance `ENV`;
-- `tests/test_config.json`;
+- candidate-image test configuration (read directly by `tests/conftest.py`);
 - GitHub Actions build matrix;
 - optional shared Dockerfile template inputs.
 
@@ -179,7 +182,8 @@ The container repo should have fast structural tests that run on every PR:
 2. Validate every listed model has a Docker context.
 3. Validate every model Dockerfile is digest-pinned.
 4. Validate every pinned base digest matches the GHCR digest for the claimed base version.
-5. Validate generated or mirrored test config agrees with `models.yml`.
+5. Validate test artifacts and parameter selections referenced by `models.yml` exist and are internally
+   consistent.
 6. Validate Dockerfile provenance fields agree with `models.yml`.
 
 `tests/test_base_pin.py` is the first concrete version of this pattern.
@@ -204,18 +208,24 @@ authenticate GitHub release API requests and avoid rate-limit failures. That tok
 narrowly as possible at the job level. Build/promotion may need package write privileges; test jobs should
 not.
 
-## Migration path
+## Completed migration sequence
 
-1. Add `models.yml` with only container-owned fields.
-2. Add local validation against Dockerfiles and `tests/test_config.json`.
-3. Generate `tests/test_config.json` from `models.yml`, or make CI fail if it drifts.
-4. Generate or validate `PARAM_ENV_MAP` from backend-owned `customSimulation.parameters`.
-5. Add cross-repo validation against backend `models.json`.
-6. Move the GitHub Actions matrix to read from `models.yml`.
-7. Only then consider Dockerfile templates.
+1. Added `models.yml` with only container-owned fields.
+2. Added local validation against Dockerfiles.
+3. Deleted `tests/test_config.json` and made the test suite read `models.yml` directly.
+4. Validated `PARAM_ENV_MAP` against backend-owned `customSimulation.parameters`.
+5. Added cross-repo validation against backend `models.json`.
+6. Moved the GitHub Actions build matrix and model path selection to `models.yml`.
 
-The ordering matters. Do not combine canonical-config work with a large Dockerfile-template refactor unless
-the validation layer is already in place.
+Dockerfile templates remain optional. The validation layer is in place, so a future template refactor can be
+considered independently rather than being coupled to canonical-configuration work.
+
+## Validation versus promotion
+
+The manifest-driven validation matrix is intentionally allowed to broaden for shared tests, workflow changes,
+or base compatibility. Promotion eligibility is narrower: on a `main` push, a model may advance `latest` only
+when its own build context changed; explicit model tags may promote only the named model. See
+[`ADR-VALIDATION-AND-PROMOTION-SELECTION.md`](ADR-VALIDATION-AND-PROMOTION-SELECTION.md).
 
 ## Non-goals
 
@@ -229,7 +239,7 @@ the validation layer is already in place.
 
 ## Current status
 
-As of 2026-07-01:
+As of 2026-09-15:
 
 - backend `models.json` remains the application/runtime/product manifest;
 - container **`models.yml` exists** with the container-owned fields (migration step 1);
@@ -248,7 +258,8 @@ As of 2026-07-01:
   the ref for coordinated cross-repo changes; `BACKEND_MODELS_PATH` points at a local clone for offline
   work. A failed fetch fails the suite — never skips.
 
-The validation layer (steps 1–6) is complete. Remaining, deliberately later: Dockerfile templates (only
-now that validation exists), and the backend-side reciprocal check (its pinned image tags correspond to
-released container images). Known backend-side staleness: `container.repository` still names the old
-per-model repos — a backend edit to make when production cuts over to monorepo-built releases.
+The validation layer (steps 1–6) is complete. Validation and promotion selection are now independent, so a
+shared contract change can test every model without implicitly releasing every model. Remaining,
+deliberately later: optional Dockerfile templates and the backend-side reciprocal check that pinned image
+tags correspond to released container images. Known backend-side staleness: `container.repository` still
+names the old per-model repositories even though the semver pins have moved to monorepo-built releases.

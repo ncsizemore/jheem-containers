@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
     inputs:
       image:
-        description: 'all | base | ryan-white-msa | ryan-white-ajph | ryan-white-croi | cdc-testing'
+        description: 'all | base | a model key from models.yml'
         default: all
 
 permissions:
@@ -29,12 +29,14 @@ jobs:
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
       model_matrix: ${{ steps.pick.outputs.model_matrix }}
+      promotion_matrix: ${{ steps.pick.outputs.promotion_matrix }}
       any: ${{ steps.pick.outputs.any }}
       models_any: ${{ steps.pick.outputs.models_any }}
+      promotions_any: ${{ steps.pick.outputs.promotions_any }}
       base_selected: ${{ steps.pick.outputs.base_selected }}
       base_cascade: ${{ steps.pick.outputs.base_cascade }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: pick
@@ -50,16 +52,24 @@ jobs:
             m["models"].each { |k, v| list << {"name"=>k, "image"=>v["image"].split("/").last, "context"=>v["context"]} }
             puts JSON.generate(list)')
           MODELS=$(echo "$ALL" | jq -c '[.[] | select(.name != "base")]')
+          MODEL_NAMES=$(echo "$MODELS" | jq -r '.[].name')
           echo "manifest matrix: $ALL"
 
           pick=""
+          promote_names=""
           files=""
           cascade=false
           case "$GITHUB_EVENT_NAME" in
             workflow_dispatch)
               case "${IMAGE:-all}" in
                 all|base) pick="ALL"; cascade=true ;;
-                *) pick="$IMAGE" ;;
+                *)
+                  if ! printf '%s\n' "$MODEL_NAMES" | grep -Fxq "$IMAGE"; then
+                    echo "ERROR: unknown workflow_dispatch image: $IMAGE" >&2
+                    exit 1
+                  fi
+                  pick="$IMAGE"
+                  ;;
               esac
               ;;
             pull_request)
@@ -81,7 +91,12 @@ jobs:
                   pick="ALL"
                   cascade=true
                 else
+                  if ! printf '%s\n' "$MODEL_NAMES" | grep -Fxq "$target"; then
+                    echo "ERROR: tag target is not in models.yml: $target" >&2
+                    exit 1
+                  fi
                   pick="$target"
+                  promote_names="$target"
                 fi
               elif [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
                 files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || true)
@@ -91,15 +106,27 @@ jobs:
               ;;
           esac
 
+          # Validation can broaden for shared changes, but a main-branch push may
+          # promote only models whose own build context changed. Explicit model
+          # release tags set promote_names above; PRs and dispatches never do.
+          if [ "$GITHUB_EVENT_NAME" = "push" ] && \
+             [ "$GITHUB_REF" = "refs/heads/main" ] && [ -n "$files" ]; then
+            for name in $MODEL_NAMES; do
+              echo "$files" | grep -q "^models/$name/" && promote_names="$promote_names $name"
+            done
+          fi
+
           if [ -z "$pick" ] && [ -n "$files" ]; then
             if echo "$files" | grep -qE '^base/'; then
+              pick="ALL"
+              cascade=true
+            elif echo "$files" | grep -qE '^\.github/workflows/build\.yml$'; then
               pick="ALL"
               cascade=true
             elif echo "$files" | grep -qE '^(tests/|\.github/|models\.yml$)'; then
               pick="MODELS"
             else
-              model_names=$(echo "$MODELS" | jq -r '.[].name')
-              for name in $model_names; do
+              for name in $MODEL_NAMES; do
                 echo "$files" | grep -q "^models/$name/" && pick="$pick $name"
               done
             fi
@@ -119,17 +146,28 @@ jobs:
 
           matrix=$(echo "$matrix" | jq -c .)
           model_matrix=$(echo "$matrix" | jq -c '[.[] | select(.name != "base")]')
+          if [ -z "$(echo "$promote_names" | tr -d ' ')" ]; then
+            promotion_matrix="[]"
+          else
+            promotion_names=$(printf '%s\n' $promote_names | jq -R . | jq -cs 'unique')
+            promotion_matrix=$(echo "$MODELS" | jq -c --argjson names "$promotion_names" \
+              '[.[] | select(.name as $n | $names | index($n))]')
+          fi
           base_selected=$(echo "$matrix" | jq -r 'any(.name == "base")')
           if [ "$(echo "$matrix" | jq 'length')" -gt 0 ]; then any=true; else any=false; fi
           if [ "$(echo "$model_matrix" | jq 'length')" -gt 0 ]; then models_any=true; else models_any=false; fi
+          if [ "$(echo "$promotion_matrix" | jq 'length')" -gt 0 ]; then promotions_any=true; else promotions_any=false; fi
 
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
           echo "model_matrix=$model_matrix" >> "$GITHUB_OUTPUT"
+          echo "promotion_matrix=$promotion_matrix" >> "$GITHUB_OUTPUT"
           echo "any=$any" >> "$GITHUB_OUTPUT"
           echo "models_any=$models_any" >> "$GITHUB_OUTPUT"
+          echo "promotions_any=$promotions_any" >> "$GITHUB_OUTPUT"
           echo "base_selected=$base_selected" >> "$GITHUB_OUTPUT"
           echo "base_cascade=$cascade" >> "$GITHUB_OUTPUT"
           echo "Selected: $matrix (base cascade: $cascade)"
+          echo "Promotion eligible: $promotion_matrix"
 
   contract:
     runs-on: ubuntu-latest
@@ -137,8 +175,8 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - uses: r-lib/actions/setup-r@v2
@@ -165,15 +203,15 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: base
           file: base/Dockerfile
@@ -188,7 +226,7 @@ jobs:
           printf 'ghcr.io/%s/jheem-base@%s' \
             "${{ github.repository_owner }}" "${{ steps.build.outputs.digest }}" > dg/ref
           echo "candidate base: $(cat dg/ref)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ref-base
           path: dg/ref
@@ -201,11 +239,11 @@ jobs:
       contents: read
       packages: read
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ref-base
           path: dg
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -229,8 +267,8 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.select.outputs.model_matrix) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         if: ${{ needs.select.outputs.base_cascade == 'true' }}
         with:
           name: ref-base
@@ -248,14 +286,14 @@ jobs:
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
           echo "model base: $ref"
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.context }}/Dockerfile
@@ -273,7 +311,7 @@ jobs:
             "${{ github.repository_owner }}" "${{ matrix.image }}" \
             "${{ steps.build.outputs.digest }}" > dg/ref
           echo "candidate model: $(cat dg/ref)"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ref-${{ matrix.name }}
           path: dg/ref
@@ -294,17 +332,17 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.select.outputs.model_matrix) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
         with:
           name: ref-${{ matrix.name }}
           path: dg
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
@@ -328,7 +366,7 @@ jobs:
           pytest tests/test_smoke.py tests/test_golden.py -k "${{ matrix.name }}" -v
       - name: retain candidate outputs for reviewed golden changes
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: outputs-${{ matrix.name }}-${{ github.sha }}
           path: /tmp/gate_out
@@ -342,6 +380,7 @@ jobs:
       needs.build-models.result == 'success' &&
       needs.test-models.result == 'success' &&
       needs.contract.result == 'success' &&
+      needs.select.outputs.promotions_any == 'true' &&
       needs.select.outputs.base_cascade != 'true' &&
       github.event_name == 'push' &&
       (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
@@ -352,19 +391,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include: ${{ fromJSON(needs.select.outputs.model_matrix) }}
+        include: ${{ fromJSON(needs.select.outputs.promotion_matrix) }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ref-${{ matrix.name }}
           path: dg
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
           tags: |
@@ -394,17 +433,17 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ref-base
           path: dg
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository_owner }}/jheem-base
           tags: |

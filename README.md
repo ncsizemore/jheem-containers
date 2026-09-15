@@ -22,7 +22,10 @@ Implemented:
 - Fail-closed promotion to `latest` and semver tags: CI re-tags the exact digest that passed tests instead
   of rebuilding for release.
 - Retry/resume/verify for large simulation-set downloads and an **authenticated** release-API query
-  (`jheem-base:1.6.5`, via `GITHUB_TOKEN`), so transient blips and API rate limits don't fail a run.
+  (introduced in `jheem-base:1.6.5`, via `GITHUB_TOKEN`), so transient blips and API rate limits don't fail a
+  run.
+- Separate validation and promotion selection: shared test/workflow changes may validate every image, but a
+  `main` push advances `latest` only for models whose own build context changed.
 
 Still open:
 
@@ -46,6 +49,7 @@ explicit backend pin change.
 | --- | --- |
 | `base/` | Shared R runtime, model-agnostic scripts, simulation-set fetch tooling, and the custom-simulation orchestrator. |
 | `models/` | One directory per model image, each built from `ghcr.io/ncsizemore/jheem-base`. |
+| `calibration/` | Release-specific calibration export contracts and derived-artifact tooling; not active calibration state. |
 | `tests/` | CI/local tests for smoke checks, golden-output regression, and perturbation behavior. |
 | `docs/` | Migration notes, independent reviews, and responses tracking the release-system design. |
 
@@ -59,12 +63,12 @@ Models are driven via `custom` (backend pipeline) or `run` (standalone); a bare 
 | Context | Image | Current base | Gate coverage |
 | --- | --- | --- | --- |
 | `base/` | `jheem-base` | n/a (shared runtime) | Static contract + every downstream model |
-| `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.6.5` | Smoke + golden + perturbation |
-| `models/ryan-white-ajph/` | `jheem-ryan-white-ajph` | `1.6.5` | Smoke + golden + perturbation |
-| `models/ryan-white-croi/` | `jheem-ryan-white-croi` | `1.6.5` | Smoke + golden + perturbation |
-| `models/cdc-testing/` | `jheem-cdc-testing` | `1.6.5` | Smoke + golden + perturbation |
+| `models/ryan-white-msa/` | `jheem-ryan-white-msa` | `1.7.0` | Smoke + golden + perturbation |
+| `models/ryan-white-ajph/` | `jheem-ryan-white-ajph` | `1.7.0` | Smoke + golden + perturbation |
+| `models/ryan-white-croi/` | `jheem-ryan-white-croi` | `1.7.0` | Smoke + golden + perturbation |
+| `models/cdc-testing/` | `jheem-cdc-testing` | `1.7.0` | Smoke + golden + perturbation |
 
-All model images build on a single base version (`jheem-base:1.6.5`), pinned by digest.
+All model images currently build on `jheem-base:1.7.0`, pinned by digest.
 
 ## CI and promotion model
 
@@ -82,12 +86,15 @@ Promotion behavior:
 | Pull request changing a model | Full smoke + slow tests for affected models | No promotion |
 | Pull request changing `base/` | Base contract plus all model smoke + slow tests against the candidate base digest | No promotion |
 | Push to `main` changing models | Full affected-model suite | Promote tested model digests to `latest` |
+| Push to `main` changing shared tests/workflows only | Broad validation, potentially including every model | No model promotion |
 | Push to `main` changing `base/` | Full base compatibility cascade | No promotion; base releases require an explicit tag |
 | Tag `base-vX.Y.Z` | Full base compatibility cascade | Promote the tested base digest to `X.Y.Z`, `X.Y`, and `latest` |
 | Tag `<image>-vX.Y.Z` | Full test suite for the tagged image | Promote tested digest to `X.Y.Z` and `X.Y` |
 | Manual workflow dispatch | Full test suite | No promotion |
 
 This prevents the common failure mode where CI tests one image but publishes another.
+Validation selection may intentionally be broader than promotion eligibility. See
+[`docs/ADR-VALIDATION-AND-PROMOTION-SELECTION.md`](docs/ADR-VALIDATION-AND-PROMOTION-SELECTION.md).
 
 ### Releasing a base change
 
@@ -133,3 +140,6 @@ new focused artifact; do not overwrite the historical result in place.
 
 Legacy per-image repositories remain available for historical tags and external references, but publishing
 from them is disabled. This monorepo is the only current writer for the GHCR packages.
+
+The target architecture for a future active-development/calibration SHIELD image is documented separately in
+[`docs/SHIELD-CONTAINERIZATION-TARGET-ARCHITECTURE.md`](docs/SHIELD-CONTAINERIZATION-TARGET-ARCHITECTURE.md).
