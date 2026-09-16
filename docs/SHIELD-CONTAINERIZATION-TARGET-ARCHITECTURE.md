@@ -1,8 +1,43 @@
 # SHIELD Containerization Target Architecture
 
-**Status:** target architecture; implementation deferred  
-**Date:** 2026-09-15  
+**Status:** target architecture; Phase 0 implemented on an isolated source branch; Phase 1 spike in progress
+
+**Date:** 2026-09-16
+
 **Scope:** active SHIELD development and calibration workloads
+
+## Implementation checkpoint
+
+The first implementation pass is intentionally split across repositories:
+
+- `jheem_analyses` canonical staging branch `codex/shield-source-readiness` at
+  `accd7b64dd0ab1f38f5ccad993a643c3c7544de2` implements the Phase 0 runtime,
+  provenance, retry/resume, path, engine-test, and immutable census/syphilis
+  manager changes. Verified offline managers can be consumed from a read-only
+  cache without attempting a writer lock. The branch also removes SHIELD's
+  unused Google-mobility cache load. It is based on the current upstream
+  `master`. It is published for repeatable testing but is not approved or
+  scheduled for merge to `master`.
+- `jheem2` is currently evaluated at
+  `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1` (version `1.12.3.9000`).
+- `locations` is overlaid at
+  `2481fc440cf1d981bb1005dd903708a88a528d13` (version `0.5.0.9000`) because
+  SHIELD requires the newer Oakland TGA definitions than the shared base
+  currently provides.
+- `workloads/shield/` contains the initial development/recorded image spike.
+  It is deliberately outside `models.yml` until the workload contract is
+  demonstrated rather than guessed.
+
+Both package-mode and source-mode source-level integration tests now load the
+real cached managers, construct the SHIELD engine, run one median-parameter
+simulation through 2030, and assert a finite population outcome. This is
+evidence of source readiness. The recorded image also builds successfully on a
+clean GitHub Linux/amd64 runner; the PR workflow now loads the ephemeral image
+and exercises preflight and the real engine with pinned inputs and networking
+disabled. A real two-iteration MCMC canary has also demonstrated finite initial
+likelihood, durable checkpointing across forced termination, selective resume,
+and summary generation. Final simulation-set assembly exceeded hosted-runner
+memory even at two simulations and remains a SHIELD-server acceptance test.
 
 ## Summary
 
@@ -144,17 +179,25 @@ mapping, SELinux behavior, and a bounded calibration. Full scientific calibratio
 
 ### Phase 0: source readiness
 
-1. Reconcile active `jheem_analyses` work with upstream, including provenance changes.
-2. Remove runtime Git mutation from model initialization.
-3. Introduce explicit root/cache/state configuration.
-4. Correct retry, exit-status, resume, and incomplete-assembly behavior.
-5. Establish a small automated SHIELD engine test independent of the container.
+1. **Implemented on the canonical staging branch:** reconcile active `jheem_analyses` work with upstream,
+   including provenance changes.
+2. **Implemented:** remove runtime Git mutation from model initialization.
+3. **Partially implemented:** introduce explicit root/cache configuration. State and final outputs still
+   share the engine's `JHEEM_ROOT_DIR` layout and must not yet be represented as separate mounts.
+4. **Implemented:** correct retry, exit-status, resume, and incomplete-assembly behavior.
+5. **Implemented and run locally:** establish a small automated SHIELD engine test independent of the
+   container, in both package and source modes.
 
 ### Phase 1: container spike
 
-1. Evaluate the required R version against the exact active `jheem2` and `jheem_analyses` revisions.
-2. Create a locked dependency environment and minimal development/recorded-run targets.
-3. Run deterministic engine and tiny-calibration tests locally.
+1. **Source and CI image build complete; runtime test added:** evaluate the required R version against the
+   exact active `jheem2` and `jheem_analyses` revisions.
+2. **In progress:** create minimal development/recorded-run targets. The shared base is digest-pinned and
+   source revisions are exact; the SHIELD-specific dependency overlay still needs a standalone lockfile.
+3. **Implemented in CI:** run the deterministic engine plus an opt-in,
+   two-iteration calibration canary that is killed after one durable chunk and
+   resumes only the remaining chunk. Final assembly remains server-only because
+   the full simulation objects exceed hosted-runner memory.
 4. Pilot rootless Podman or Docker on `shield3` using the actual NAS and shared-group permissions.
 5. Benchmark host versus container behavior and verify checkpoint/resume after forced termination.
 

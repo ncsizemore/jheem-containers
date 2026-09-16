@@ -1,0 +1,81 @@
+name: shield-spike
+
+# Validation only. SHIELD is not a deployed backend model, is not listed in
+# models.yml, and must not enter the normal model promotion path from here.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - workloads/shield/**
+      - .github/workflows/shield-spike.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shield-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: pip install -r tests/requirements.txt
+      - name: validate spike contract
+        run: pytest workloads/shield/tests/test_contract.py -q
+
+  build-recorded:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: build recorded SHIELD candidate without publishing
+        uses: docker/build-push-action@v7
+        with:
+          context: workloads/shield
+          file: workloads/shield/Dockerfile
+          target: recorded
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: jheem-shield:ci
+          build-contexts: |
+            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#accd7b64dd0ab1f38f5ccad993a643c3c7544de2
+            jheem2=https://github.com/tfojo1/jheem2.git#90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1
+            locations=https://github.com/tfojo1/locations.git#2481fc440cf1d981bb1005dd903708a88a528d13
+          cache-from: type=gha,scope=shield-spike-v1
+          cache-to: type=gha,mode=max,scope=shield-spike-v1
+      - name: prepare pinned test inputs
+        run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache"
+      - name: preflight and run the real SHIELD engine offline
+        env:
+          CENSUS_TAG: data-managers-v2026.08.26
+          SYPHILIS_TAG: syphilis-manager-v2026.03.26
+        run: |
+          mkdir -p "$RUNNER_TEMP/shield-state"
+          run_shield() {
+            docker run --rm --network none \
+              --user "$(id -u):$(id -g)" \
+              --mount "type=bind,src=$RUNNER_TEMP/shield-cache,dst=/work/cache,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/shield-state,dst=/work/state" \
+              --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG" \
+              --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG" \
+              jheem-shield:ci "$@"
+          }
+          run_shield preflight
+          run_shield engine-test
+      - name: interrupt and resume a real tiny calibration offline
+        env:
+          CENSUS_TAG: data-managers-v2026.08.26
+          SYPHILIS_TAG: syphilis-manager-v2026.03.26
+          SHIELD_IMAGE: jheem-shield:ci
+          SHIELD_CACHE: ${{ runner.temp }}/shield-cache
+          SHIELD_STATE: ${{ runner.temp }}/shield-state
+        run: bash workloads/shield/tests/test_checkpoint_resume.sh
