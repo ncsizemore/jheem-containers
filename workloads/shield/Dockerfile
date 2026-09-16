@@ -45,6 +45,13 @@ RUN R --slave -e "stopifnot( \
       identical(as.character(packageVersion('jheem2')), '${JHEEM2_VERSION}') \
     ); cat('SHIELD dependency overlay verified\n')"
 
+# renv's project library uses symlinks into the build user's global cache.
+# Recorded workloads run as an arbitrary host UID, so make only the package
+# cache traversable/readable; otherwise renv mistakes the inaccessible package
+# for a missing one and attempts a forbidden runtime bootstrap.
+RUN chmod o+x /root /root/.cache /root/.cache/R \
+    && chmod -R a+rX /root/.cache/R/renv
+
 COPY container-entrypoint.sh preflight.R /opt/shield/
 RUN chmod 0755 /opt/shield/container-entrypoint.sh \
     && mkdir -p /work/cache /work/state

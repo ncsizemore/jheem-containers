@@ -21,11 +21,13 @@ def test_recorded_image_pins_base_and_source_defaults():
 
 
 def test_runtime_does_not_mutate_source_or_install_packages():
+    dockerfile = (ROOT / "Dockerfile").read_text()
     entrypoint = (ROOT / "container-entrypoint.sh").read_text()
     preflight = (ROOT / "preflight.R").read_text()
     runtime_text = entrypoint + preflight
     forbidden = ("git pull", "git fetch", "git reset", "git checkout", "install.packages")
     assert all(token not in runtime_text for token in forbidden)
+    assert "chmod -R a+rX /root/.cache/R/renv" in dockerfile
 
 
 def test_recorded_profile_is_fail_closed():
