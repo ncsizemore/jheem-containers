@@ -48,7 +48,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `ae08d999aec0dff644e0f687fdff836e9bcf9d3a`
+- `jheem_analyses`: `d982a79652cd5aa9628b52caa544138235376b51`
 - `jheem2`: `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1`
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
@@ -67,7 +67,7 @@ docker run --rm \
   --mount type=bind,src=/path/to/shield-state,dst=/work/state \
   --env JHEEM_CENSUS_MANAGER_TAG=data-managers-v2026.08.26 \
   --env JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-vYYYY.MM.DD \
-  jheem-shield:recorded-ae08d999aec0 \
+  jheem-shield:recorded-d982a79652cd \
   engine-test
 ```
 
@@ -87,7 +87,7 @@ docker run --rm \
   --env JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-vYYYY.MM.DD \
   --env SHIELD_RUN_ID=my-unique-run-id \
   --env SHIELD_RUN_MODE=fresh \
-  jheem-shield:recorded-ae08d999aec0 \
+  jheem-shield:recorded-d982a79652cd \
   calibration-stage C.12580 shield_calibration_stage all 1
 ```
 
@@ -112,7 +112,7 @@ docker run --rm -it \
   --env JHEEM2_PATH=/workspace/jheem2 \
   --env JHEEM_ANALYSES_REF= \
   --env JHEEM2_REF= \
-  jheem-shield:development-ae08d999aec0 \
+  jheem-shield:development-d982a79652cd \
   shell
 ```
 

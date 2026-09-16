@@ -80,6 +80,10 @@ def test_ci_build_is_pinned_validation_only():
     assert "JHEEM_SYPHILIS_MANAGER_TAG" in workflow_text
     assert "run_shield preflight" in workflow_text
     assert "run_shield engine-test" in workflow_text
+    assert "test_checkpoint_resume.sh" in workflow_text
+    assert "SHIELD_ENABLE_CONTAINER_SMOKE=true" in (
+        ROOT / "tests" / "test_checkpoint_resume.sh"
+    ).read_text()
 
 
 def test_ci_input_fixture_uses_immutable_release_assets():
