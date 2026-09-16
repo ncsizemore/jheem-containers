@@ -27,9 +27,9 @@ INPUTS = (
     },
     {
         "manager": "syphilis.manager.rdata",
-        "tag": "syphilis-manager-v2026.09.09",
-        "sha256": "c3e3c983d6b4e9c961f735f9c59d45483bd63cfa715cf75c1fae874da2d129e6",
-        "published_at": "2026-09-09T19:22:51Z",
+        "tag": "syphilis-manager-v2026.03.26",
+        "sha256": "9e91257253c459e91ef11640c1002a7ae03d61fe7e832510bac8656f1bdf3b92",
+        "published_at": "2026-03-26T16:35:30Z",
     },
 )
 

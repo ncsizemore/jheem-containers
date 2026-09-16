@@ -86,6 +86,6 @@ def test_ci_input_fixture_uses_immutable_release_assets():
     preparer = (ROOT / "tests" / "prepare_inputs.py").read_text()
     assert "-latest" not in preparer
     assert "data-managers-v2026.08.26" in preparer
-    assert "syphilis-manager-v2026.09.09" in preparer
+    assert "syphilis-manager-v2026.03.26" in preparer
     assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 2
     assert "os.replace(temporary_path, artifact)" in preparer

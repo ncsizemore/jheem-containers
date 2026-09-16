@@ -125,6 +125,9 @@ fully reproducible recorded run.
   Docker/Podman runtime validation on a developer machine or `shield3`.
 - CI uses exact census and syphilis manager releases and digests; the team must
   still select the manager releases for the first retained pilot calibration.
+  The engine canary deliberately uses `syphilis-manager-v2026.03.26`, whose
+  digest matches the manager used by the successful source-level integration
+  test, rather than silently following the newest release.
 - Tiny calibration, forced termination/resume, finite likelihood, NAS
   UID/GID/SELinux behavior, and host-versus-container performance remain live
   acceptance tests.

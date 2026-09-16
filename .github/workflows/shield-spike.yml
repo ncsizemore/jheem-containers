@@ -57,7 +57,7 @@ jobs:
       - name: preflight and run the real SHIELD engine offline
         env:
           CENSUS_TAG: data-managers-v2026.08.26
-          SYPHILIS_TAG: syphilis-manager-v2026.09.09
+          SYPHILIS_TAG: syphilis-manager-v2026.03.26
         run: |
           mkdir -p "$RUNNER_TEMP/shield-state"
           run_shield() {
