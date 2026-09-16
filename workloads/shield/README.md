@@ -19,7 +19,11 @@ Neither target stores input managers or calibration state in the image.
 - Source-level SHIELD integration passes with the pinned revisions in both
   installed-package and source-loading modes. Each run constructs the real
   engine and produces finite population output through 2030.
-- The three spike contract tests and shell/R parse checks pass.
+- The four spike contract tests and shell/R parse checks pass.
+- `.github/workflows/shield-spike.yml` provides a PR-triggered, Linux/amd64,
+  validation-only build from the exact canonical source commits. It has no
+  registry login, write permission, image push, promotion, or `models.yml`
+  integration.
 - The first Docker build accepted the Dockerfile and both named source
   contexts, then stalled resolving the pinned base through this workstation's
   Docker Desktop registry proxy. A direct pull stalled at the same point even

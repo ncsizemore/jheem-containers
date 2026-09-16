@@ -1,0 +1,51 @@
+name: shield-spike
+
+# Validation only. SHIELD is not a deployed backend model, is not listed in
+# models.yml, and must not enter the normal model promotion path from here.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - workloads/shield/**
+      - .github/workflows/shield-spike.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shield-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: pip install -r tests/requirements.txt
+      - name: validate spike contract
+        run: pytest workloads/shield/tests/test_contract.py -q
+
+  build-recorded:
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: build recorded SHIELD candidate without publishing
+        uses: docker/build-push-action@v7
+        with:
+          context: workloads/shield
+          file: workloads/shield/Dockerfile
+          target: recorded
+          platforms: linux/amd64
+          push: false
+          build-contexts: |
+            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#31df932a292b784823ce36ebd1937e39f547163b
+            jheem2=https://github.com/tfojo1/jheem2.git#90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1
+          cache-from: type=gha,scope=shield-spike-v1
+          cache-to: type=gha,mode=max,scope=shield-spike-v1

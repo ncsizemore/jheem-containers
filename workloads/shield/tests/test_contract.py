@@ -1,8 +1,12 @@
 from pathlib import Path
 import re
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = ROOT.parents[1]
+WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "shield-spike.yml"
 
 
 def test_recorded_image_pins_base_and_source_defaults():
@@ -32,3 +36,33 @@ def test_recorded_profile_is_fail_closed():
     assert "SHIELD_ALLOW_INCOMPLETE=false" in dockerfile
     assert "Recorded profile does not permit incomplete assembly" in preflight
     assert "full JHEEM_ANALYSES_REF and JHEEM2_REF" in preflight
+
+
+def test_ci_build_is_pinned_validation_only():
+    workflow_text = WORKFLOW.read_text()
+    workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+    dockerfile = (ROOT / "Dockerfile").read_text()
+
+    assert workflow["permissions"] == {"contents": "read"}
+    assert set(workflow["on"]) == {"pull_request", "workflow_dispatch"}
+
+    build = workflow["jobs"]["build-recorded"]
+    assert build["needs"] == "contract"
+    build_step = next(
+        step for step in build["steps"]
+        if step.get("uses") == "docker/build-push-action@v7"
+    )
+    build_inputs = build_step["with"]
+
+    assert build_inputs["target"] == "recorded"
+    assert build_inputs["platforms"] == "linux/amd64"
+    assert build_inputs["push"] == "false"
+    assert "docker/login-action" not in workflow_text
+    assert "packages: write" not in workflow_text
+    assert "promot" not in workflow_text.lower().replace("promotion path", "")
+
+    analyses_ref = re.search(r"JHEEM_ANALYSES_REF=([0-9a-f]{40})", dockerfile).group(1)
+    jheem2_ref = re.search(r"JHEEM2_REF=([0-9a-f]{40})", dockerfile).group(1)
+    contexts = build_inputs["build-contexts"]
+    assert f"jheem_analyses.git#{analyses_ref}" in contexts
+    assert f"jheem2.git#{jheem2_ref}" in contexts
