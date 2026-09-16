@@ -17,6 +17,7 @@ chain_dir="$cache_dir/chain_1"
 control_file="$cache_dir/chain1_control.Rdata"
 first_chunk="$chain_dir/chain1_chunk1.Rdata"
 last_chunk="$chain_dir/chain1_chunk${expected_chunks}.Rdata"
+summary_file="$SHIELD_STATE/mcmc_summaries/shield/$calibration/summary_shield_${location}_${calibration}.Rdata"
 interrupted_log="$SHIELD_STATE/interrupted-calibration.log"
 
 mkdir -p "$SHIELD_STATE"
@@ -113,7 +114,7 @@ run_stage resume calibration-stage "$location" "$calibration" run 1
 chunks_after_resume=$(find "$chain_dir" -maxdepth 1 -type f -name 'chain1_chunk*.Rdata' | wc -l | tr -d ' ')
 [[ "$chunks_after_resume" -eq "$expected_chunks" ]] \
   || fail "resume produced $chunks_after_resume of $expected_chunks chunks"
+[[ -s "$summary_file" ]] || fail "completed calibration did not produce an MCMC summary"
 
-run_stage resume calibration-stage "$location" "$calibration" assemble 1
 printf 'SHIELD checkpoint/resume test passed: %s -> %s chunks\n' \
   "$chunks_before_resume" "$chunks_after_resume"

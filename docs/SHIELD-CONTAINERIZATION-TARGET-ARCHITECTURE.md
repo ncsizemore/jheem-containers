@@ -34,7 +34,10 @@ simulation through 2030, and assert a finite population outcome. This is
 evidence of source readiness. The recorded image also builds successfully on a
 clean GitHub Linux/amd64 runner; the PR workflow now loads the ephemeral image
 and exercises preflight and the real engine with pinned inputs and networking
-disabled. A real calibration on a SHIELD server remains unproven.
+disabled. A real two-iteration MCMC canary has also demonstrated finite initial
+likelihood, durable checkpointing across forced termination, selective resume,
+and summary generation. Final simulation-set assembly exceeded hosted-runner
+memory even at two simulations and remains a SHIELD-server acceptance test.
 
 ## Summary
 
@@ -191,7 +194,10 @@ mapping, SELinux behavior, and a bounded calibration. Full scientific calibratio
    exact active `jheem2` and `jheem_analyses` revisions.
 2. **In progress:** create minimal development/recorded-run targets. The shared base is digest-pinned and
    source revisions are exact; the SHIELD-specific dependency overlay still needs a standalone lockfile.
-3. Run deterministic engine and tiny-calibration tests locally.
+3. **Implemented in CI:** run the deterministic engine plus an opt-in,
+   two-iteration calibration canary that is killed after one durable chunk and
+   resumes only the remaining chunk. Final assembly remains server-only because
+   the full simulation objects exceed hosted-runner memory.
 4. Pilot rootless Podman or Docker on `shield3` using the actual NAS and shared-group permissions.
 5. Benchmark host versus container behavior and verify checkpoint/resume after forced termination.
 

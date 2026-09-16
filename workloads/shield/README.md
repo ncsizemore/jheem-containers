@@ -25,8 +25,11 @@ Neither target stores input managers or calibration state in the image.
   live run built the recorded image successfully in 5m14s. The workflow now
   loads that image only into its ephemeral runner, materializes two
   digest-pinned public manager releases, and runs preflight plus the real
-  engine test with networking disabled. It has no registry login, write
-  permission, image push, promotion, or `models.yml` integration.
+  engine test with networking disabled. A real two-iteration calibration has
+  also produced a finite initial likelihood, survived forced termination after
+  its first durable chunk, resumed only the remaining chunk, and written its
+  completed MCMC summary. It has no registry login, write permission, image
+  push, promotion, or `models.yml` integration.
 - Docker Desktop on the development workstation still stalls resolving the
   pinned base through its configured registry proxy. That local proxy issue is
   not on the critical path now that the same image definition builds on a clean
@@ -128,9 +131,12 @@ fully reproducible recorded run.
   The engine canary deliberately uses `syphilis-manager-v2026.03.26`, whose
   digest matches the manager used by the successful source-level integration
   test, rather than silently following the newest release.
-- Tiny calibration, forced termination/resume, finite likelihood, NAS
-  UID/GID/SELinux behavior, and host-versus-container performance remain live
-  acceptance tests.
+- NAS UID/GID/SELinux behavior, host-versus-container performance, and final
+  simulation-set assembly remain server acceptance tests. Assembly of even
+  two full SHIELD simulation objects exceeded the memory available on the
+  GitHub-hosted runner, after calibration and summary generation had completed;
+  CI therefore verifies the checkpoint and MCMC summary rather than pretending
+  to validate a production-sized assembly environment.
 - The source overlay is reproducible, but its two delta installs are not yet
   represented by a standalone SHIELD lockfile. That should be resolved before
   promoting a recorded environment.
