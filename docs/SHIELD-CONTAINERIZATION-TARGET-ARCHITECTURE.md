@@ -11,11 +11,13 @@
 The first implementation pass is intentionally split across repositories:
 
 - `jheem_analyses` canonical staging branch `codex/shield-source-readiness` at
-  `bde63a32d1e946e7bb560abeed8bc3509beda7d0` implements the Phase 0 runtime,
+  `ae08d999aec0dff644e0f687fdff836e9bcf9d3a` implements the Phase 0 runtime,
   provenance, retry/resume, path, engine-test, and immutable census/syphilis
-  manager changes. It also removes SHIELD's unused Google-mobility cache load.
-  It is based on the current upstream `master`. It is published for repeatable
-  testing but is not approved or scheduled for merge to `master`.
+  manager changes. Verified offline managers can be consumed from a read-only
+  cache without attempting a writer lock. The branch also removes SHIELD's
+  unused Google-mobility cache load. It is based on the current upstream
+  `master`. It is published for repeatable testing but is not approved or
+  scheduled for merge to `master`.
 - `jheem2` is currently evaluated at
   `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1` (version `1.12.3.9000`).
 - `locations` is overlaid at
