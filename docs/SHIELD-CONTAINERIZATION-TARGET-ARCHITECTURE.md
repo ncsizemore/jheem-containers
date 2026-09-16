@@ -11,7 +11,7 @@
 The first implementation pass is intentionally split across repositories:
 
 - `jheem_analyses` canonical staging branch `codex/shield-source-readiness` at
-  `d982a79652cd5aa9628b52caa544138235376b51` implements the Phase 0 runtime,
+  `accd7b64dd0ab1f38f5ccad993a643c3c7544de2` implements the Phase 0 runtime,
   provenance, retry/resume, path, engine-test, and immutable census/syphilis
   manager changes. Verified offline managers can be consumed from a read-only
   cache without attempting a writer lock. The branch also removes SHIELD's

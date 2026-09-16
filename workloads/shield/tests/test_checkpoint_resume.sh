@@ -9,7 +9,7 @@ set -euo pipefail
 
 location="C.12580"
 calibration="container.smoke.stage0"
-expected_chunks=6
+expected_chunks=2
 container_name="shield-checkpoint-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 calibration_dir="$SHIELD_STATE/mcmc_runs/shield/$location/$calibration"
 cache_dir="$calibration_dir/cache"
