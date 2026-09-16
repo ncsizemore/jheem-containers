@@ -56,7 +56,9 @@ def test_ci_build_is_pinned_validation_only():
 
     assert build_inputs["target"] == "recorded"
     assert build_inputs["platforms"] == "linux/amd64"
+    assert build_inputs["load"] == "true"
     assert build_inputs["push"] == "false"
+    assert build_inputs["tags"] == "jheem-shield:ci"
     assert "docker/login-action" not in workflow_text
     assert "packages: write" not in workflow_text
     assert "promot" not in workflow_text.lower().replace("promotion path", "")
@@ -66,3 +68,19 @@ def test_ci_build_is_pinned_validation_only():
     contexts = build_inputs["build-contexts"]
     assert f"jheem_analyses.git#{analyses_ref}" in contexts
     assert f"jheem2.git#{jheem2_ref}" in contexts
+
+    assert "prepare_inputs.py" in workflow_text
+    assert "--network none" in workflow_text
+    assert "JHEEM_CENSUS_MANAGER_TAG" in workflow_text
+    assert "JHEEM_SYPHILIS_MANAGER_TAG" in workflow_text
+    assert "run_shield preflight" in workflow_text
+    assert "run_shield engine-test" in workflow_text
+
+
+def test_ci_input_fixture_uses_immutable_release_assets():
+    preparer = (ROOT / "tests" / "prepare_inputs.py").read_text()
+    assert "-latest" not in preparer
+    assert "data-managers-v2026.08.26" in preparer
+    assert "syphilis-manager-v2026.09.09" in preparer
+    assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 2
+    assert "os.replace(temporary_path, artifact)" in preparer

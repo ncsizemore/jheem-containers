@@ -33,8 +33,22 @@ if (identical(profile, "recorded")) {
   }
 }
 
-if (!file.exists(file.path(config$cache_dir, "google_mobility_data.Rdata"))) {
-  stop("JHEEM_CACHE_DIR is missing google_mobility_data.Rdata", call. = FALSE)
+required.managers <- c(
+  census.manager.rdata = config$census_manager_tag,
+  syphilis.manager.rdata = config$syphilis_manager_tag
+)
+for (manager in names(required.managers)) {
+  tag <- required.managers[[manager]]
+  if (!is.null(tag)) {
+    artifact <- file.path(config$cache_dir, "data-managers", manager, tag, manager)
+    metadata <- file.path(dirname(artifact), "resolution.json")
+    if (!file.exists(artifact) || !file.exists(metadata)) {
+      stop(
+        sprintf("JHEEM_CACHE_DIR is missing verified %s release %s", manager, tag),
+        call. = FALSE
+      )
+    }
+  }
 }
 
 cat(sprintf(

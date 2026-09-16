@@ -43,9 +43,30 @@ jobs:
           file: workloads/shield/Dockerfile
           target: recorded
           platforms: linux/amd64
+          load: true
           push: false
+          tags: jheem-shield:ci
           build-contexts: |
-            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#31df932a292b784823ce36ebd1937e39f547163b
+            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#bde63a32d1e946e7bb560abeed8bc3509beda7d0
             jheem2=https://github.com/tfojo1/jheem2.git#90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1
           cache-from: type=gha,scope=shield-spike-v1
           cache-to: type=gha,mode=max,scope=shield-spike-v1
+      - name: prepare pinned test inputs
+        run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache"
+      - name: preflight and run the real SHIELD engine offline
+        env:
+          CENSUS_TAG: data-managers-v2026.08.26
+          SYPHILIS_TAG: syphilis-manager-v2026.09.09
+        run: |
+          mkdir -p "$RUNNER_TEMP/shield-state"
+          run_shield() {
+            docker run --rm --network none \
+              --user "$(id -u):$(id -g)" \
+              --mount "type=bind,src=$RUNNER_TEMP/shield-cache,dst=/work/cache,readonly" \
+              --mount "type=bind,src=$RUNNER_TEMP/shield-state,dst=/work/state" \
+              --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG" \
+              --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG" \
+              jheem-shield:ci "$@"
+          }
+          run_shield preflight
+          run_shield engine-test

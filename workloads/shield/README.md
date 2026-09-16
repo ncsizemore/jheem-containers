@@ -19,16 +19,18 @@ Neither target stores input managers or calibration state in the image.
 - Source-level SHIELD integration passes with the pinned revisions in both
   installed-package and source-loading modes. Each run constructs the real
   engine and produces finite population output through 2030.
-- The four spike contract tests and shell/R parse checks pass.
+- The five spike contract tests and shell/R parse checks pass.
 - `.github/workflows/shield-spike.yml` provides a PR-triggered, Linux/amd64,
-  validation-only build from the exact canonical source commits. It has no
-  registry login, write permission, image push, promotion, or `models.yml`
-  integration.
-- The first Docker build accepted the Dockerfile and both named source
-  contexts, then stalled resolving the pinned base through this workstation's
-  Docker Desktop registry proxy. A direct pull stalled at the same point even
-  though host-side GHCR access and anonymous-token issuance succeeded. No
-  completed image build or container test is claimed yet.
+  validation-only build from the exact canonical source commits. The first
+  live run built the recorded image successfully in 5m14s. The workflow now
+  loads that image only into its ephemeral runner, materializes two
+  digest-pinned public manager releases, and runs preflight plus the real
+  engine test with networking disabled. It has no registry login, write
+  permission, image push, promotion, or `models.yml` integration.
+- Docker Desktop on the development workstation still stalls resolving the
+  pinned base through its configured registry proxy. That local proxy issue is
+  not on the critical path now that the same image definition builds on a clean
+  GitHub Linux/amd64 runner.
 
 ## Build from clean local worktrees
 
@@ -45,7 +47,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `31df932a292b784823ce36ebd1937e39f547163b`
+- `jheem_analyses`: `bde63a32d1e946e7bb560abeed8bc3509beda7d0`
 - `jheem2`: `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1`
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
@@ -61,8 +63,9 @@ docker run --rm \
   --user "$(id -u):$(id -g)" \
   --mount type=bind,src=/path/to/cached,dst=/work/cache,readonly \
   --mount type=bind,src=/path/to/shield-state,dst=/work/state \
+  --env JHEEM_CENSUS_MANAGER_TAG=data-managers-v2026.08.26 \
   --env JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-vYYYY.MM.DD \
-  jheem-shield:recorded-31df932a292b \
+  jheem-shield:recorded-bde63a32d1e9 \
   engine-test
 ```
 
@@ -78,10 +81,11 @@ docker run --rm \
   --user "$(id -u):$(id -g)" \
   --mount type=bind,src=/path/to/cached,dst=/work/cache,readonly \
   --mount type=bind,src=/path/to/shield-state,dst=/work/state \
+  --env JHEEM_CENSUS_MANAGER_TAG=data-managers-v2026.08.26 \
   --env JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-vYYYY.MM.DD \
   --env SHIELD_RUN_ID=my-unique-run-id \
   --env SHIELD_RUN_MODE=fresh \
-  jheem-shield:recorded-31df932a292b \
+  jheem-shield:recorded-bde63a32d1e9 \
   calibration-stage C.12580 shield_calibration_stage all 1
 ```
 
@@ -106,7 +110,7 @@ docker run --rm -it \
   --env JHEEM2_PATH=/workspace/jheem2 \
   --env JHEEM_ANALYSES_REF= \
   --env JHEEM2_REF= \
-  jheem-shield:development-31df932a292b \
+  jheem-shield:development-bde63a32d1e9 \
   shell
 ```
 
@@ -115,10 +119,10 @@ fully reproducible recorded run.
 
 ## What this spike does not yet prove
 
-- The image has not yet passed the real Docker/Podman build on both a developer
-  machine and `shield3`.
-- The exact immutable manager tag and digest for the pilot still need to be
-  selected.
+- The image has passed a real Linux/amd64 CI build, but not yet a complete
+  Docker/Podman runtime validation on a developer machine or `shield3`.
+- CI uses exact census and syphilis manager releases and digests; the team must
+  still select the manager releases for the first retained pilot calibration.
 - Tiny calibration, forced termination/resume, finite likelihood, NAS
   UID/GID/SELinux behavior, and host-versus-container performance remain live
   acceptance tests.
