@@ -49,6 +49,7 @@ jobs:
           build-contexts: |
             jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#bde63a32d1e946e7bb560abeed8bc3509beda7d0
             jheem2=https://github.com/tfojo1/jheem2.git#90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1
+            locations=https://github.com/tfojo1/locations.git#2481fc440cf1d981bb1005dd903708a88a528d13
           cache-from: type=gha,scope=shield-spike-v1
           cache-to: type=gha,mode=max,scope=shield-spike-v1
       - name: prepare pinned test inputs

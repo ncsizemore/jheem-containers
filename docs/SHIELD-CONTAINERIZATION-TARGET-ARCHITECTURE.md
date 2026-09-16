@@ -18,6 +18,10 @@ The first implementation pass is intentionally split across repositories:
   testing but is not approved or scheduled for merge to `master`.
 - `jheem2` is currently evaluated at
   `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1` (version `1.12.3.9000`).
+- `locations` is overlaid at
+  `2481fc440cf1d981bb1005dd903708a88a528d13` (version `0.4.0`) because SHIELD
+  requires the newer Oakland TGA definitions than the shared base currently
+  provides.
 - `workloads/shield/` contains the initial development/recorded image spike.
   It is deliberately outside `models.yml` until the workload contract is
   demonstrated rather than guessed.

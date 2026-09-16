@@ -41,6 +41,7 @@ The helper verifies that both source trees are clean and passes their actual
 workloads/shield/build-local.sh \
   /path/to/jheem_analyses \
   /path/to/jheem2 \
+  /path/to/locations \
   recorded
 ```
 
@@ -49,6 +50,7 @@ published merely to perform a local spike. The current reviewed defaults are:
 
 - `jheem_analyses`: `bde63a32d1e946e7bb560abeed8bc3509beda7d0`
 - `jheem2`: `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1`
+- `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
 ## Run the engine integration test

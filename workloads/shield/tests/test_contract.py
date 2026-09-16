@@ -14,6 +14,7 @@ def test_recorded_image_pins_base_and_source_defaults():
     assert re.search(r"BASE_IMAGE=.*@sha256:[0-9a-f]{64}", dockerfile)
     assert re.search(r"JHEEM_ANALYSES_REF=[0-9a-f]{40}", dockerfile)
     assert re.search(r"JHEEM2_REF=[0-9a-f]{40}", dockerfile)
+    assert re.search(r"LOCATIONS_REF=[0-9a-f]{40}", dockerfile)
     assert "FROM runtime AS recorded" in dockerfile
     assert "FROM runtime AS development" in dockerfile
     assert "FROM ${BASE_IMAGE} AS source-preparer" in dockerfile
@@ -67,9 +68,11 @@ def test_ci_build_is_pinned_validation_only():
 
     analyses_ref = re.search(r"JHEEM_ANALYSES_REF=([0-9a-f]{40})", dockerfile).group(1)
     jheem2_ref = re.search(r"JHEEM2_REF=([0-9a-f]{40})", dockerfile).group(1)
+    locations_ref = re.search(r"LOCATIONS_REF=([0-9a-f]{40})", dockerfile).group(1)
     contexts = build_inputs["build-contexts"]
     assert f"jheem_analyses.git#{analyses_ref}" in contexts
     assert f"jheem2.git#{jheem2_ref}" in contexts
+    assert f"locations.git#{locations_ref}" in contexts
 
     assert "prepare_inputs.py" in workflow_text
     assert "--network none" in workflow_text
