@@ -51,7 +51,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `3e8845dfbee4696a53bd8929dedffff7d542c882` (branch `codex/shield-recorded-contract`)
+- `jheem_analyses`: `1394ea93f38f16f22876ecc1e946593b500f513b` (branch `codex/shield-recorded-contract`)
 - `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`

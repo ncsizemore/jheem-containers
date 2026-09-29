@@ -32,6 +32,8 @@ docker_args=(
   --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG"
   --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG"
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true
+  # Assembling SHIELD simulations exceeds the hosted runner's memory.
+  --env SHIELD_ASSEMBLE=false
   --env SHIELD_CACHE_FREQUENCY=1
   --env SHIELD_UPDATE_FREQUENCY=1
   --env SHIELD_RANDOM_SEED=20260916
