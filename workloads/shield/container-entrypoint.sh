@@ -28,10 +28,6 @@ case "$command_name" in
   preflight)
     exec Rscript /opt/shield/preflight.R
     ;;
-  engine-test)
-    Rscript /opt/shield/preflight.R
-    exec Rscript "${JHEEM_ANALYSES_PATH}/applications/SHIELD/shield_engine_test.R"
-    ;;
   calibrate)
     [ "$#" -eq 3 ] || fail "usage: calibrate <location> <calibration-code>"
     Rscript /opt/shield/preflight.R
@@ -39,16 +35,7 @@ case "$command_name" in
       "${JHEEM_ANALYSES_PATH}/applications/SHIELD/shield_calib_setup_and_run.R" \
       "$2" "$3"
     ;;
-  calibration-stage)
-    [ "$#" -ge 4 ] && [ "$#" -le 5 ] \
-      || fail "usage: calibration-stage <location> <calibration-code> <setup|run|assemble|all> [chain]"
-    Rscript /opt/shield/preflight.R
-    shift
-    exec Rscript \
-      "${JHEEM_ANALYSES_PATH}/applications/SHIELD/shield_calib_setup_and_run_modular.R" \
-      "$@"
-    ;;
   *)
-    fail "unknown command '$command_name' (expected preflight, engine-test, calibrate, calibration-stage, or shell)"
+    fail "unknown command '$command_name' (expected preflight, calibrate, or shell)"
     ;;
 esac

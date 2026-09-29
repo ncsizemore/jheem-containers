@@ -34,11 +34,11 @@ def test_runtime_does_not_mutate_source_or_install_packages():
 def test_recorded_profile_is_fail_closed():
     dockerfile = (ROOT / "Dockerfile").read_text()
     preflight = (ROOT / "preflight.R").read_text()
-    assert "SHIELD_INPUT_OFFLINE=true" in dockerfile
+    assert "SHIELD_RECORDED_RUN=true" in dockerfile
     assert "SHIELD_REQUIRE_IMMUTABLE_INPUTS=true" in dockerfile
-    assert "SHIELD_ALLOW_INCOMPLETE=false" in dockerfile
-    assert "Recorded profile does not permit incomplete assembly" in preflight
-    assert "full JHEEM_ANALYSES_REF and JHEEM2_REF" in preflight
+    assert "shield.recorded.config()" in preflight
+    assert "Recorded profile requires SHIELD_RECORDED_RUN=true" in preflight
+    assert "fails SHA-256 verification" in preflight
 
 
 def test_ci_build_is_pinned_validation_only():
@@ -79,7 +79,6 @@ def test_ci_build_is_pinned_validation_only():
     assert "JHEEM_CENSUS_MANAGER_TAG" in workflow_text
     assert "JHEEM_SYPHILIS_MANAGER_TAG" in workflow_text
     assert "run_shield preflight" in workflow_text
-    assert "run_shield engine-test" in workflow_text
     assert "test_checkpoint_resume.sh" in workflow_text
     assert "SHIELD_ENABLE_CONTAINER_SMOKE=true" in (
         ROOT / "tests" / "test_checkpoint_resume.sh"
@@ -90,6 +89,6 @@ def test_ci_input_fixture_uses_immutable_release_assets():
     preparer = (ROOT / "tests" / "prepare_inputs.py").read_text()
     assert "-latest" not in preparer
     assert "data-managers-v2026.08.26" in preparer
-    assert "syphilis-manager-v2026.03.26" in preparer
+    assert "syphilis-manager-v2026.07.27" in preparer
     assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 2
     assert "os.replace(temporary_path, artifact)" in preparer

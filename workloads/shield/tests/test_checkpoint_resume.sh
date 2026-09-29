@@ -11,7 +11,8 @@ location="C.12580"
 calibration="container.smoke.stage0"
 expected_chunks=2
 container_name="shield-checkpoint-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
-calibration_dir="$SHIELD_STATE/mcmc_runs/shield/$location/$calibration"
+# Layout of the pinned jheem2 (since jheem2@ccb1f9b): <version>/<calibration>/<location>.
+calibration_dir="$SHIELD_STATE/mcmc_runs/shield/$calibration/$location"
 cache_dir="$calibration_dir/cache"
 chain_dir="$cache_dir/chain_1"
 control_file="$cache_dir/chain1_control.Rdata"
@@ -54,13 +55,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-run_stage fresh calibration-stage "$location" "$calibration" setup 1
-
+# A fresh recorded run sets up and starts sampling in one process; stop it
+# after the first durable checkpoint, then resume with a separate process.
 docker run "${docker_args[@]}" \
   --name "$container_name" \
-  --env SHIELD_RUN_MODE=resume \
+  --env SHIELD_RUN_MODE=fresh \
   "$SHIELD_IMAGE" \
-  calibration-stage "$location" "$calibration" run 1 \
+  calibrate "$location" "$calibration" \
   >"$interrupted_log" 2>&1 &
 interrupted_pid=$!
 
@@ -108,7 +109,7 @@ fi
 printf 'Forced termination preserved %s of %s chunks; resuming\n' \
   "$chunks_before_resume" "$expected_chunks"
 
-run_stage resume calibration-stage "$location" "$calibration" run 1
+run_stage resume calibrate "$location" "$calibration"
 
 [[ -f "$last_chunk" ]] || fail "resume did not complete the final checkpoint chunk"
 chunks_after_resume=$(find "$chain_dir" -maxdepth 1 -type f -name 'chain1_chunk*.Rdata' | wc -l | tr -d ' ')

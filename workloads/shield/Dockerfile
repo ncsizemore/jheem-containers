@@ -23,8 +23,8 @@ RUN rm -rf /opt/jheem/jheem_analyses/.git /opt/jheem/jheem2/.git \
 
 FROM ${BASE_IMAGE} AS runtime
 
-ARG JHEEM_ANALYSES_REF=accd7b64dd0ab1f38f5ccad993a643c3c7544de2
-ARG JHEEM2_REF=90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1
+ARG JHEEM_ANALYSES_REF=3e8845dfbee4696a53bd8929dedffff7d542c882
+ARG JHEEM2_REF=ccb1f9bfe40844143dbcec65ffd27829aa39d7ef
 ARG LOCATIONS_REF=2481fc440cf1d981bb1005dd903708a88a528d13
 ARG JHEEM2_VERSION=1.12.3.9000
 ARG LOCATIONS_VERSION=0.5.0.9000
@@ -71,10 +71,6 @@ ENV JHEEM_ANALYSES_PATH=/opt/jheem/jheem_analyses \
     LOCATIONS_REF=${LOCATIONS_REF} \
     JHEEM_CACHE_DIR=/work/cache \
     JHEEM_ROOT_DIR=/work/state \
-    JHEEM_PROVENANCE_SPOOL_DIR=/work/state/provenance-spool \
-    SHIELD_INPUT_OFFLINE=true \
-    SHIELD_ALLOW_INCOMPLETE=false \
-    SHIELD_MAX_ATTEMPTS=1 \
     SHIELD_ALLOW_ROOT=false
 
 ENTRYPOINT ["/opt/shield/container-entrypoint.sh"]
@@ -82,7 +78,11 @@ CMD ["preflight"]
 
 FROM runtime AS recorded
 
-ENV SHIELD_CONTAINER_PROFILE=recorded \
+# Recorded mode in jheem_analyses (applications/SHIELD/RECORDED-RUN-PILOT.md):
+# declared source revisions and manager releases, verified offline inputs, and
+# non-destructive fresh/resume state rules.
+ENV SHIELD_RECORDED_RUN=true \
+    SHIELD_CONTAINER_PROFILE=recorded \
     JHEEM2_MODE=package \
     SHIELD_REQUIRE_IMMUTABLE_INPUTS=true \
     SHIELD_RUN_MODE=resume

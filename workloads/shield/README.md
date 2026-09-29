@@ -51,8 +51,8 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `accd7b64dd0ab1f38f5ccad993a643c3c7544de2`
-- `jheem2`: `90b68ad500c12bdfe8f9dc6616e9a846fb4ae3d1`
+- `jheem_analyses`: `3e8845dfbee4696a53bd8929dedffff7d542c882` (branch `codex/shield-recorded-contract`)
+- `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
@@ -70,8 +70,9 @@ docker run --rm \
   --mount type=bind,src=/path/to/shield-state,dst=/work/state \
   --env JHEEM_CENSUS_MANAGER_TAG=data-managers-v2026.08.26 \
   --env JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-vYYYY.MM.DD \
-  jheem-shield:recorded-accd7b64dd0a \
-  engine-test
+  --env SHIELD_RANDOM_SEED=20260916 \
+  jheem-shield:recorded \
+  preflight
 ```
 
 Do not weaken recorded mode merely to accommodate an unversioned manager. Use
@@ -79,7 +80,11 @@ the development target while preparing or validating a release instead.
 
 ## Run or resume calibration
 
-Fresh setup is explicit and destructive for the selected location/code:
+The recorded image runs the monolithic SHIELD launcher in recorded mode (see
+`applications/SHIELD/RECORDED-RUN-PILOT.md` in `jheem_analyses`). `fresh` sets
+up and starts a new calibration and refuses to replace existing state; it never
+clears a cache. `resume` (the default) continues from the last checkpoint and
+fails if there is none or if the recorded inputs changed:
 
 ```bash
 docker run --rm \
@@ -88,21 +93,24 @@ docker run --rm \
   --mount type=bind,src=/path/to/shield-state,dst=/work/state \
   --env JHEEM_CENSUS_MANAGER_TAG=data-managers-v2026.08.26 \
   --env JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-vYYYY.MM.DD \
-  --env SHIELD_RUN_ID=my-unique-run-id \
+  --env SHIELD_RANDOM_SEED=20260916 \
   --env SHIELD_RUN_MODE=fresh \
-  jheem-shield:recorded-accd7b64dd0a \
-  calibration-stage C.12580 shield_calibration_stage all 1
+  jheem-shield:recorded \
+  calibrate C.12580 <calibration-code>
 ```
 
 For continuation, use the same state mount and identifiers with
-`SHIELD_RUN_MODE=resume`. The default is resume and it fails when no checkpoint
-exists. The entrypoint refuses root by default so NAS files are not silently
-created under the wrong ownership.
+`SHIELD_RUN_MODE=resume`. The entrypoint refuses root by default so NAS files
+are not silently created under the wrong ownership.
+
+CI validates this with `container.smoke.stage0` (enabled by
+`SHIELD_ENABLE_CONTAINER_SMOKE=true`): two iterations with a checkpoint after
+each, killed after the first and resumed to completion.
 
 ## Development source overrides
 
-Build the `development` target, mount both worktrees, and clear the baked source
-declarations so provenance inspects their Git state directly:
+Build the `development` target and mount both worktrees. It runs the ordinary
+(non-recorded) SHIELD path against the mounted source:
 
 ```bash
 docker run --rm -it \
@@ -115,7 +123,7 @@ docker run --rm -it \
   --env JHEEM2_PATH=/workspace/jheem2 \
   --env JHEEM_ANALYSES_REF= \
   --env JHEEM2_REF= \
-  jheem-shield:development-accd7b64dd0a \
+  jheem-shield:development \
   shell
 ```
 
@@ -128,9 +136,8 @@ fully reproducible recorded run.
   Docker/Podman runtime validation on a developer machine or `shield3`.
 - CI uses exact census and syphilis manager releases and digests; the team must
   still select the manager releases for the first retained pilot calibration.
-  The engine canary deliberately uses `syphilis-manager-v2026.03.26`, whose
-  digest matches the manager used by the successful source-level integration
-  test, rather than silently following the newest release.
+  The canary uses `syphilis-manager-v2026.07.27`, the release current SHIELD
+  source pins, rather than silently following the newest release.
 - NAS UID/GID/SELinux behavior, host-versus-container performance, and final
   simulation-set assembly remain server acceptance tests. Assembly of even
   two full SHIELD simulation objects exceeded the memory available on the
