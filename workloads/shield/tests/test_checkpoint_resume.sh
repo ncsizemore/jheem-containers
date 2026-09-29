@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+# Container checkpoint/resume canary for the recorded SHIELD image.
+#
+# Proves: the recorded image runs the real SHIELD model offline, writes a
+# durable checkpoint, survives SIGKILL, and a separate resumed process continues
+# from that checkpoint and writes the next one.
+#
+# Does not cover: the MCMC summary, simulation-set assembly, production-sized
+# runs, or server storage and ownership. On a 16 GB hosted runner SHIELD peaks
+# above the available memory while summarizing, so those are verified on a team
+# server (see workloads/shield/README.md).
 set -euo pipefail
 
 : "${SHIELD_IMAGE:?SHIELD_IMAGE is required}"
@@ -10,21 +20,17 @@ set -euo pipefail
 location="C.12580"
 calibration="container.smoke.stage0"
 expected_chunks=2
-container_name="shield-checkpoint-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
+run_id="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 # Layout of the pinned jheem2 (since jheem2@ccb1f9b): <version>/<calibration>/<location>.
 calibration_dir="$SHIELD_STATE/mcmc_runs/shield/$calibration/$location"
 cache_dir="$calibration_dir/cache"
 chain_dir="$cache_dir/chain_1"
 control_file="$cache_dir/chain1_control.Rdata"
-first_chunk="$chain_dir/chain1_chunk1.Rdata"
-last_chunk="$chain_dir/chain1_chunk${expected_chunks}.Rdata"
-summary_file="$SHIELD_STATE/mcmc_summaries/shield/$calibration/summary_shield_${location}_${calibration}.Rdata"
-interrupted_log="$SHIELD_STATE/interrupted-calibration.log"
+diagnostics="$SHIELD_STATE/diagnostics"
 
-mkdir -p "$SHIELD_STATE"
+mkdir -p "$SHIELD_STATE" "$diagnostics"
 
 docker_args=(
-  --rm
   --network none
   --user "$(id -u):$(id -g)"
   --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly"
@@ -32,134 +38,90 @@ docker_args=(
   --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG"
   --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG"
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true
-  # Assembling SHIELD simulations exceeds the hosted runner's memory.
-  --env SHIELD_ASSEMBLE=false
   --env SHIELD_CACHE_FREQUENCY=1
   --env SHIELD_UPDATE_FREQUENCY=1
   --env SHIELD_RANDOM_SEED=20260916
 )
-
-run_stage() {
-  local run_mode="$1"
-  shift
-  docker run "${docker_args[@]}" \
-    --env "SHIELD_RUN_MODE=$run_mode" \
-    "$SHIELD_IMAGE" "$@"
-}
 
 fail() {
   printf 'SHIELD checkpoint test failed: %s\n' "$*" >&2
   exit 1
 }
 
+containers=()
 cleanup() {
-  docker rm -f "$container_name" >/dev/null 2>&1 || true
+  for name in "${containers[@]}"; do
+    docker rm -f "$name" >/dev/null 2>&1 || true
+  done
 }
 trap cleanup EXIT
 
-# A fresh recorded run sets up and starts sampling in one process; stop it
-# after the first durable checkpoint, then resume with a separate process.
-docker run "${docker_args[@]}" \
-  --name "$container_name" \
-  --env SHIELD_RUN_MODE=fresh \
-  "$SHIELD_IMAGE" \
-  calibrate "$location" "$calibration" \
-  >"$interrupted_log" 2>&1 &
-interrupted_pid=$!
+chunk_count() {
+  find "$chain_dir" -maxdepth 1 -type f -name 'chain1_chunk*.Rdata' 2>/dev/null | wc -l | tr -d ' '
+}
 
-checkpoint_ready=false
-for _ in $(seq 1 3000); do
-  if ! kill -0 "$interrupted_pid" 2>/dev/null; then
-    set +e
-    wait "$interrupted_pid"
-    interrupted_status=$?
-    set -e
-    cat "$interrupted_log"
-    fail "calibration exited with status $interrupted_status before interruption"
+# Run `calibrate` in the given mode until chunk N is durable, then SIGKILL it.
+# The control file is saved immediately after each chunk, so a control newer
+# than the chunk proves the chunk, chain state, and next seed are all on disk.
+run_until_checkpoint() {
+  local mode="$1" chunk="$2"
+  local name="shield-$mode-$run_id"
+  local chunk_file="$chain_dir/chain1_chunk${chunk}.Rdata"
+  local log="$diagnostics/$mode.log"
+  local memory="$diagnostics/$mode-memory.txt"
+  containers+=("$name")
+
+  docker run "${docker_args[@]}" --name "$name" --env "SHIELD_RUN_MODE=$mode" \
+    "$SHIELD_IMAGE" calibrate "$location" "$calibration" >"$log" 2>&1 &
+  local pid=$!
+
+  local ready=false polls=0
+  while (( polls < 3000 )); do
+    if [[ -f "$chunk_file" && "$control_file" -nt "$chunk_file" ]]; then
+      ready=true
+      break
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      break
+    fi
+    if (( polls % 75 == 0 )); then
+      printf '%s %s\n' "$(date -u +%H:%M:%S)" \
+        "$(docker stats --no-stream --format '{{.MemUsage}}' "$name" 2>/dev/null || echo n/a)" >>"$memory"
+    fi
+    polls=$((polls + 1))
+    sleep 0.2
+  done
+
+  if [[ "$ready" != true ]]; then
+    docker inspect --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}}' \
+      "$name" >"$diagnostics/$mode-state.txt" 2>&1 || true
+    cat "$diagnostics/$mode-state.txt" "$log"
+    fail "$mode run stopped or timed out before chunk $chunk was durable"
   fi
 
-  # The control is saved immediately after the chunk. Waiting until it is newer
-  # proves that the completed chunk, updated chain state, and next seed are all
-  # durable before sending SIGKILL.
-  if [[ -f "$first_chunk" && "$control_file" -nt "$first_chunk" ]]; then
-    checkpoint_ready=true
-    break
-  fi
-  sleep 0.2
-done
+  docker kill --signal KILL "$name" >/dev/null 2>&1 || true
+  set +e
+  wait "$pid"
+  set -e
+  printf '%s run: chunk %s durable; peak sampled memory %s\n' "$mode" "$chunk" \
+    "$(awk '{print $2}' "$memory" 2>/dev/null | sort -h | tail -1)"
+}
 
-if [[ "$checkpoint_ready" != true ]]; then
-  cat "$interrupted_log"
-  fail "no durable checkpoint appeared within 10 minutes"
-fi
+# 1. A fresh recorded run sets up and samples; stop it after its first checkpoint.
+run_until_checkpoint fresh 1
+chunks_before_resume=$(chunk_count)
+[[ "$chunks_before_resume" -eq 1 ]] \
+  || fail "expected 1 of $expected_chunks chunks after interruption; found $chunks_before_resume"
+chunk1_sha=$(sha256sum "$chain_dir/chain1_chunk1.Rdata" | cut -d' ' -f1)
 
-docker kill --signal KILL "$container_name" >/dev/null
-set +e
-wait "$interrupted_pid"
-interrupted_status=$?
-set -e
-
-if [[ "$interrupted_status" -eq 0 ]]; then
-  fail "forced interruption unexpectedly exited successfully"
-fi
-
-chunks_before_resume=$(find "$chain_dir" -maxdepth 1 -type f -name 'chain1_chunk*.Rdata' | wc -l | tr -d ' ')
-if [[ "$chunks_before_resume" -lt 1 || "$chunks_before_resume" -ge "$expected_chunks" ]]; then
-  cat "$interrupted_log"
-  fail "expected a partial checkpoint; found $chunks_before_resume of $expected_chunks chunks"
-fi
-printf 'Forced termination preserved %s of %s chunks; resuming\n' \
-  "$chunks_before_resume" "$expected_chunks"
-
-# Resume in a named container that is kept after exit, sampling memory so a
-# failure can be diagnosed (Docker's OOM flag, kernel OOM lines, peak usage).
-diagnostics="$SHIELD_STATE/diagnostics"
-mkdir -p "$diagnostics"
-ls -la "$chain_dir" "$cache_dir" >"$diagnostics/checkpoint-files-before-resume.txt" 2>&1 || true
-resume_name="shield-resume-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
-docker run "${docker_args[@]:1}" \
-  --name "$resume_name" \
-  --env SHIELD_RUN_MODE=resume \
-  "$SHIELD_IMAGE" \
-  calibrate "$location" "$calibration" \
-  >"$diagnostics/resume.log" 2>&1 &
-resume_pid=$!
-while kill -0 "$resume_pid" 2>/dev/null; do
-  {
-    printf '%s container=' "$(date -u +%H:%M:%S)"
-    docker stats --no-stream --format '{{.MemUsage}} cpu={{.CPUPerc}}' "$resume_name" 2>/dev/null || printf 'n/a\n'
-    free -m | awk '/^Mem:/ {printf "           host used=%sMB total=%sMB available=%sMB\n", $3, $2, $7}'
-  } >>"$diagnostics/memory.txt"
-  sleep 15
-done
-set +e
-wait "$resume_pid"
-resume_status=$?
-set -e
-docker inspect --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' \
-  "$resume_name" >"$diagnostics/container-state.txt" 2>&1 || true
-sudo dmesg 2>/dev/null | grep -iE 'out of memory|oom|killed process' | tail -20 >"$diagnostics/kernel-oom.txt" || true
-ls -la "$chain_dir" "$cache_dir" >"$diagnostics/checkpoint-files-after-resume.txt" 2>&1 || true
-docker rm -f "$resume_name" >/dev/null 2>&1 || true
-
-printf '\n--- resume diagnostics ---\n'
-cat "$diagnostics/container-state.txt"
-printf 'Peak container memory samples (top 5):\n'
-grep -o 'container=[0-9.]*[KMG]iB' "$diagnostics/memory.txt" | sort -t= -k2 -h | tail -5 || true
-printf 'Last memory samples:\n'
-tail -6 "$diagnostics/memory.txt" || true
-printf 'Kernel OOM lines:\n'
-cat "$diagnostics/kernel-oom.txt"
-printf 'Resume log tail:\n'
-tail -15 "$diagnostics/resume.log"
-printf -- '--- end diagnostics ---\n\n'
-[[ "$resume_status" -eq 0 ]] || fail "resume exited with status $resume_status (see diagnostics above)"
-
-[[ -f "$last_chunk" ]] || fail "resume did not complete the final checkpoint chunk"
-chunks_after_resume=$(find "$chain_dir" -maxdepth 1 -type f -name 'chain1_chunk*.Rdata' | wc -l | tr -d ' ')
+# 2. A separate resumed process continues from that checkpoint and writes the next.
+run_until_checkpoint resume "$expected_chunks"
+chunks_after_resume=$(chunk_count)
 [[ "$chunks_after_resume" -eq "$expected_chunks" ]] \
   || fail "resume produced $chunks_after_resume of $expected_chunks chunks"
-[[ -s "$summary_file" ]] || fail "completed calibration did not produce an MCMC summary"
+# Resume must continue, not restart: the first checkpoint is left untouched.
+[[ "$(sha256sum "$chain_dir/chain1_chunk1.Rdata" | cut -d' ' -f1)" == "$chunk1_sha" ]] \
+  || fail "resume rewrote the first checkpoint instead of continuing from it"
 
 printf 'SHIELD checkpoint/resume test passed: %s -> %s chunks\n' \
   "$chunks_before_resume" "$chunks_after_resume"

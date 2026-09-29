@@ -22,13 +22,13 @@ Neither target stores input managers or calibration state in the image.
 - The five spike contract tests and shell/R parse checks pass.
 - `.github/workflows/shield-spike.yml` provides a PR-triggered, Linux/amd64,
   validation-only build from the exact canonical source commits. The first
-  live run built the recorded image successfully in 5m14s. The workflow now
+  live run built the recorded image successfully in 5m14s. The workflow
   loads that image only into its ephemeral runner, materializes two
-  digest-pinned public manager releases, and runs preflight plus the real
-  engine test with networking disabled. A real two-iteration calibration has
-  also produced a finite initial likelihood, survived forced termination after
-  its first durable chunk, resumed only the remaining chunk, and written its
-  completed MCMC summary. It has no registry login, write permission, image
+  digest-pinned public manager releases, and runs preflight with networking
+  disabled. That earlier spike (older analyses source and jheem2) also
+  completed a summary. Since 2026-09-29 the image builds from the recorded-run
+  source; its canary stops at the resumed checkpoint, as described under
+  "What CI proves" below. It has no registry login, write permission, image
   push, promotion, or `models.yml` integration.
 - Docker Desktop on the development workstation still stalls resolving the
   pinned base through its configured registry proxy. That local proxy issue is
@@ -51,7 +51,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `1394ea93f38f16f22876ecc1e946593b500f513b` (branch `codex/shield-recorded-contract`)
+- `jheem_analyses`: `e0580817212079fec1cb249f424bf5df9cfbeb3f` (branch `codex/shield-recorded-contract`)
 - `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
@@ -103,9 +103,31 @@ For continuation, use the same state mount and identifiers with
 `SHIELD_RUN_MODE=resume`. The entrypoint refuses root by default so NAS files
 are not silently created under the wrong ownership.
 
-CI validates this with `container.smoke.stage0` (enabled by
-`SHIELD_ENABLE_CONTAINER_SMOKE=true`): two iterations with a checkpoint after
-each, killed after the first and resumed to completion.
+## What CI proves, and what it doesn't
+
+The hosted canary (`tests/test_checkpoint_resume.sh`) runs `container.smoke.stage0`
+(enabled by `SHIELD_ENABLE_CONTAINER_SMOKE=true`): the real SHIELD model and
+stage-0 likelihood, two iterations, a checkpoint after each. It proves that the
+image builds from its pinned sources, preflight verifies the recorded settings
+and manager digests, a fresh run writes a durable checkpoint and survives
+SIGKILL, and a separate resumed process continues from that checkpoint without
+rewriting it and writes the next one.
+
+It stops the resumed run once that second checkpoint is durable. It does **not**
+cover the MCMC summary, simulation-set assembly, production-sized stages, or
+server storage, ownership, and concurrency. On the 16 GB hosted runner SHIELD
+uses about 9 GB to load and sample and exceeds the runner's memory while
+building the summary (run 36593697214). Those steps belong to the server pilot:
+
+1. Run the same canary calibration on a team server without interruption
+   through summary and assembly, recording peak memory.
+2. Run one realistic stage for one location and compare runtime with the
+   ordinary launcher.
+3. Check NAS mounts, file ownership, and output locations.
+4. Have another team member launch, interrupt, and resume from this README.
+
+A green CI run means the container contract holds, not that SHIELD
+calibrations work end to end on a server.
 
 ## Development source overrides
 
@@ -138,12 +160,10 @@ fully reproducible recorded run.
   still select the manager releases for the first retained pilot calibration.
   The canary uses `syphilis-manager-v2026.07.27`, the release current SHIELD
   source pins, rather than silently following the newest release.
-- NAS UID/GID/SELinux behavior, host-versus-container performance, and final
-  simulation-set assembly remain server acceptance tests. Assembly of even
-  two full SHIELD simulation objects exceeded the memory available on the
-  GitHub-hosted runner, after calibration and summary generation had completed;
-  CI therefore verifies the checkpoint and MCMC summary rather than pretending
-  to validate a production-sized assembly environment.
+- NAS UID/GID/SELinux behavior, host-versus-container performance, the MCMC
+  summary, and simulation-set assembly remain server acceptance tests. With the
+  pinned jheem2, building the summary alone exceeds the hosted runner's memory,
+  so CI stops at the resumed checkpoint (see "What CI proves" above).
 - The source overlay is reproducible, but its two delta installs are not yet
   represented by a standalone SHIELD lockfile. That should be resolved before
   promoting a recorded environment.
