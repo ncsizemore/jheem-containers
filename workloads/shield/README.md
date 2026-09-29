@@ -150,7 +150,7 @@ the NAS only once an administrator enables the `virt_use_samba` SELinux boolean.
 
 ```bash
 export CONTAINER_ENGINE=podman SHIELD_MOUNT_RELABEL=shared \
-  SHIELD_IMAGE=localhost/jheem-shield:ci SHIELD_CACHE=~/shield-pilot/cache \
+  SHIELD_IMAGE=docker.io/library/jheem-shield:ci SHIELD_CACHE=~/shield-pilot/cache \
   CENSUS_TAG=data-managers-v2026.08.26 SYPHILIS_TAG=syphilis-manager-v2026.07.27
 
 SHIELD_STATE=~/shield-pilot/full bash tests/pilot_full_run.sh        # summary and assembly

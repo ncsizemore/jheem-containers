@@ -73,8 +73,11 @@ chunk_count() {
 }
 
 # Run `calibrate` in the given mode until chunk N is durable, then SIGKILL it.
-# The control file is saved immediately after each chunk, so a control newer
-# than the chunk proves the chunk, chain state, and next seed are all on disk.
+# The control file is saved immediately after each chunk (chain state and next
+# seed). While the chunk is being written its mtime keeps moving past the
+# control's, so a control that is not older than the chunk proves both are on
+# disk. Kernel timestamps are coarse: the two saves can land in the same tick,
+# so "newer" would miss the checkpoint (observed on shield2).
 run_until_checkpoint() {
   local mode="$1" chunk="$2"
   local name="shield-$mode-$run_id"
@@ -89,7 +92,7 @@ run_until_checkpoint() {
 
   local ready=false polls=0
   while (( polls < 3000 )); do
-    if [[ -f "$chunk_file" && "$control_file" -nt "$chunk_file" ]]; then
+    if [[ -f "$chunk_file" && -f "$control_file" && ! "$chunk_file" -nt "$control_file" ]]; then
       ready=true
       break
     fi
