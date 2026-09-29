@@ -30,11 +30,23 @@ diagnostics="$SHIELD_STATE/diagnostics"
 
 mkdir -p "$SHIELD_STATE" "$diagnostics"
 
+# docker in CI; podman (rootless) on the RHEL team servers. Under rootless
+# podman, keep-id runs the container as the invoking user so files it writes
+# keep that owner. SHIELD_MOUNT_RELABEL=shared relabels local bind mounts for
+# SELinux; leave it unset for NAS (CIFS) paths, which can't be relabeled.
+engine="${CONTAINER_ENGINE:-docker}"
+relabel="${SHIELD_MOUNT_RELABEL:+,relabel=$SHIELD_MOUNT_RELABEL}"
+engine_args=()
+if [[ "$engine" == podman && "$(id -u)" != 0 ]]; then
+  engine_args+=(--userns=keep-id)
+fi
+
 docker_args=(
+  "${engine_args[@]}"
   --network none
   --user "$(id -u):$(id -g)"
-  --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly"
-  --mount "type=bind,src=$SHIELD_STATE,dst=/work/state"
+  --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly$relabel"
+  --mount "type=bind,src=$SHIELD_STATE,dst=/work/state$relabel"
   --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG"
   --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG"
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true
@@ -51,7 +63,7 @@ fail() {
 containers=()
 cleanup() {
   for name in "${containers[@]}"; do
-    docker rm -f "$name" >/dev/null 2>&1 || true
+    "$engine" rm -f "$name" >/dev/null 2>&1 || true
   done
 }
 trap cleanup EXIT
@@ -71,7 +83,7 @@ run_until_checkpoint() {
   local memory="$diagnostics/$mode-memory.txt"
   containers+=("$name")
 
-  docker run "${docker_args[@]}" --name "$name" --env "SHIELD_RUN_MODE=$mode" \
+  "$engine" run "${docker_args[@]}" --name "$name" --env "SHIELD_RUN_MODE=$mode" \
     "$SHIELD_IMAGE" calibrate "$location" "$calibration" >"$log" 2>&1 &
   local pid=$!
 
@@ -86,20 +98,20 @@ run_until_checkpoint() {
     fi
     if (( polls % 75 == 0 )); then
       printf '%s %s\n' "$(date -u +%H:%M:%S)" \
-        "$(docker stats --no-stream --format '{{.MemUsage}}' "$name" 2>/dev/null || echo n/a)" >>"$memory"
+        "$("$engine" stats --no-stream --format '{{.MemUsage}}' "$name" 2>/dev/null || echo n/a)" >>"$memory"
     fi
     polls=$((polls + 1))
     sleep 0.2
   done
 
   if [[ "$ready" != true ]]; then
-    docker inspect --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}}' \
+    "$engine" inspect --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}}' \
       "$name" >"$diagnostics/$mode-state.txt" 2>&1 || true
     cat "$diagnostics/$mode-state.txt" "$log"
     fail "$mode run stopped or timed out before chunk $chunk was durable"
   fi
 
-  docker kill --signal KILL "$name" >/dev/null 2>&1 || true
+  "$engine" kill --signal KILL "$name" >/dev/null 2>&1 || true
   set +e
   wait "$pid"
   set -e

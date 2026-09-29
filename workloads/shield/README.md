@@ -129,6 +129,37 @@ building the summary (run 36593697214). Those steps belong to the server pilot:
 A green CI run means the container contract holds, not that SHIELD
 calibrations work end to end on a server.
 
+### Running the pilot on a team server
+
+The team servers run RHEL 9 with rootless Podman and SELinux enforcing. Run the
+`shield-spike` workflow with image export on (the manual `export_image` input,
+or the `export-image` label on a pull request), download its
+`shield-recorded-image` artifact, check it against `IMAGE.txt`, and load it:
+
+```bash
+sha256sum -c <(grep jheem-shield-recorded.tar.gz IMAGE.txt)
+podman load -i jheem-shield-recorded.tar.gz
+python3 tests/prepare_inputs.py ~/shield-pilot/cache
+```
+
+Both scripts take `CONTAINER_ENGINE=podman` (rootless runs use
+`--userns=keep-id`, so files keep your ownership). For state on local disk, set
+`SHIELD_MOUNT_RELABEL=shared` so SELinux lets the container use the directories.
+Don't set it for NAS paths: CIFS can't be relabeled, and containers can reach
+the NAS only once an administrator enables the `virt_use_samba` SELinux boolean.
+
+```bash
+export CONTAINER_ENGINE=podman SHIELD_MOUNT_RELABEL=shared \
+  SHIELD_IMAGE=localhost/jheem-shield:ci SHIELD_CACHE=~/shield-pilot/cache \
+  CENSUS_TAG=data-managers-v2026.08.26 SYPHILIS_TAG=syphilis-manager-v2026.07.27
+
+SHIELD_STATE=~/shield-pilot/full bash tests/pilot_full_run.sh        # summary and assembly
+SHIELD_STATE=~/shield-pilot/resume bash tests/test_checkpoint_resume.sh
+```
+
+`pilot_full_run.sh` records exit status, elapsed time, peak memory, and whether
+the summary and simulation set were written, in `<state>/pilot-full-run/`.
+
 ## Development source overrides
 
 Build the `development` target and mount both worktrees. It runs the ordinary
