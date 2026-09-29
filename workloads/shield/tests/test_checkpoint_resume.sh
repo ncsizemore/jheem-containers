@@ -30,23 +30,15 @@ diagnostics="$SHIELD_STATE/diagnostics"
 
 mkdir -p "$SHIELD_STATE" "$diagnostics"
 
-# docker in CI; podman (rootless) on the RHEL team servers. Under rootless
-# podman, keep-id runs the container as the invoking user so files it writes
-# keep that owner. SHIELD_MOUNT_RELABEL=shared relabels local bind mounts for
-# SELinux; leave it unset for NAS (CIFS) paths, which can't be relabeled.
-engine="${CONTAINER_ENGINE:-docker}"
-relabel="${SHIELD_MOUNT_RELABEL:+,relabel=$SHIELD_MOUNT_RELABEL}"
-engine_args=()
-if [[ "$engine" == podman && "$(id -u)" != 0 ]]; then
-  engine_args+=(--userns=keep-id)
-fi
+# Engine, rootless-podman options, and SELinux mount options (see engine-env.sh).
+source "$(dirname "${BASH_SOURCE[0]}")/engine-env.sh"
 
 docker_args=(
   "${engine_args[@]}"
   --network none
   --user "$(id -u):$(id -g)"
-  --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly$relabel"
-  --mount "type=bind,src=$SHIELD_STATE,dst=/work/state$relabel"
+  --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly$(mount_opts "$SHIELD_CACHE")"
+  --mount "type=bind,src=$SHIELD_STATE,dst=/work/state$(mount_opts "$SHIELD_STATE")"
   --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG"
   --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG"
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true

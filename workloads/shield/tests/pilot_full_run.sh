@@ -13,8 +13,9 @@ set -euo pipefail
 
 location="C.12580"
 calibration="container.smoke.stage0"
-engine="${CONTAINER_ENGINE:-podman}"
-relabel="${SHIELD_MOUNT_RELABEL:+,relabel=$SHIELD_MOUNT_RELABEL}"
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
+# Engine, rootless-podman options, and SELinux mount options (see engine-env.sh).
+source "$(dirname "${BASH_SOURCE[0]}")/engine-env.sh"
 name="shield-pilot-full-$(date -u +%Y%m%dT%H%M%S)"
 report="$SHIELD_STATE/pilot-full-run"
 
@@ -25,17 +26,12 @@ if find "$SHIELD_STATE" -mindepth 1 -maxdepth 1 | grep -q .; then
 fi
 mkdir -p "$report"
 
-engine_args=()
-if [[ "$engine" == podman && "$(id -u)" != 0 ]]; then
-  engine_args+=(--userns=keep-id)
-fi
-
 start=$(date +%s)
 "$engine" run "${engine_args[@]}" --name "$name" \
   --network none \
   --user "$(id -u):$(id -g)" \
-  --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly$relabel" \
-  --mount "type=bind,src=$SHIELD_STATE,dst=/work/state$relabel" \
+  --mount "type=bind,src=$SHIELD_CACHE,dst=/work/cache,readonly$(mount_opts "$SHIELD_CACHE")" \
+  --mount "type=bind,src=$SHIELD_STATE,dst=/work/state$(mount_opts "$SHIELD_STATE")" \
   --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG" \
   --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG" \
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true \

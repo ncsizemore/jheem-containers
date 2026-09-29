@@ -143,10 +143,17 @@ python3 tests/prepare_inputs.py ~/shield-pilot/cache
 ```
 
 Both scripts take `CONTAINER_ENGINE=podman` (rootless runs use
-`--userns=keep-id`, so files keep your ownership). For state on local disk, set
-`SHIELD_MOUNT_RELABEL=shared` so SELinux lets the container use the directories.
-Don't set it for NAS paths: CIFS can't be relabeled, and containers can reach
-the NAS only once an administrator enables the `virt_use_samba` SELinux boolean.
+`--userns=keep-id`, so files keep your ownership); `tests/engine-env.sh` holds
+the shared settings. `SHIELD_MOUNT_RELABEL=shared` relabels local directories
+for SELinux and is skipped automatically for CIFS paths such as the NAS, which
+can't be relabeled. For state on the NAS:
+
+- an administrator enables the `virt_use_samba` SELinux boolean on the host;
+- set `SHIELD_KEEP_GROUPS=true`, so the container keeps your `jheem` group and
+  can write to the group-writable share;
+- enable lingering for the user (`loginctl enable-linger <user>`), or rootless
+  containers are stopped about 10 seconds after that user's last login session
+  ends.
 
 ```bash
 export CONTAINER_ENGINE=podman SHIELD_MOUNT_RELABEL=shared \
