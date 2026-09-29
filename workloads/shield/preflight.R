@@ -26,7 +26,8 @@ if (identical(profile, "recorded")) {
   sha256 <- function(path) {
     connection <- file(path, open = "rb")
     on.exit(close(connection))
-    as.character(openssl::sha256(connection))
+    # as.vector drops the hash class, which identical() would otherwise compare.
+    as.vector(as.character(openssl::sha256(connection)))
   }
   required.managers <- c(census.manager.rdata = config$census_tag,
                          syphilis.manager.rdata = config$syphilis_tag)
