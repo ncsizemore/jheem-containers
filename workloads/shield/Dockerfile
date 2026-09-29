@@ -71,7 +71,8 @@ ENV JHEEM_ANALYSES_PATH=/opt/jheem/jheem_analyses \
     LOCATIONS_REF=${LOCATIONS_REF} \
     JHEEM_CACHE_DIR=/work/cache \
     JHEEM_ROOT_DIR=/work/state \
-    SHIELD_ALLOW_ROOT=false
+    SHIELD_ALLOW_ROOT=false \
+    OPENBLAS_NUM_THREADS=1
 
 ENTRYPOINT ["/opt/shield/container-entrypoint.sh"]
 CMD ["preflight"]
