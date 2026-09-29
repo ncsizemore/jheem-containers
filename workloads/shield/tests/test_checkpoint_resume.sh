@@ -111,7 +111,49 @@ fi
 printf 'Forced termination preserved %s of %s chunks; resuming\n' \
   "$chunks_before_resume" "$expected_chunks"
 
-run_stage resume calibrate "$location" "$calibration"
+# Resume in a named container that is kept after exit, sampling memory so a
+# failure can be diagnosed (Docker's OOM flag, kernel OOM lines, peak usage).
+diagnostics="$SHIELD_STATE/diagnostics"
+mkdir -p "$diagnostics"
+ls -la "$chain_dir" "$cache_dir" >"$diagnostics/checkpoint-files-before-resume.txt" 2>&1 || true
+resume_name="shield-resume-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
+docker run "${docker_args[@]:1}" \
+  --name "$resume_name" \
+  --env SHIELD_RUN_MODE=resume \
+  "$SHIELD_IMAGE" \
+  calibrate "$location" "$calibration" \
+  >"$diagnostics/resume.log" 2>&1 &
+resume_pid=$!
+while kill -0 "$resume_pid" 2>/dev/null; do
+  {
+    printf '%s container=' "$(date -u +%H:%M:%S)"
+    docker stats --no-stream --format '{{.MemUsage}} cpu={{.CPUPerc}}' "$resume_name" 2>/dev/null || printf 'n/a\n'
+    free -m | awk '/^Mem:/ {printf "           host used=%sMB total=%sMB available=%sMB\n", $3, $2, $7}'
+  } >>"$diagnostics/memory.txt"
+  sleep 15
+done
+set +e
+wait "$resume_pid"
+resume_status=$?
+set -e
+docker inspect --format 'OOMKilled={{.State.OOMKilled}} ExitCode={{.State.ExitCode}} Error={{.State.Error}} StartedAt={{.State.StartedAt}} FinishedAt={{.State.FinishedAt}}' \
+  "$resume_name" >"$diagnostics/container-state.txt" 2>&1 || true
+sudo dmesg 2>/dev/null | grep -iE 'out of memory|oom|killed process' | tail -20 >"$diagnostics/kernel-oom.txt" || true
+ls -la "$chain_dir" "$cache_dir" >"$diagnostics/checkpoint-files-after-resume.txt" 2>&1 || true
+docker rm -f "$resume_name" >/dev/null 2>&1 || true
+
+printf '\n--- resume diagnostics ---\n'
+cat "$diagnostics/container-state.txt"
+printf 'Peak container memory samples (top 5):\n'
+grep -o 'container=[0-9.]*[KMG]iB' "$diagnostics/memory.txt" | sort -t= -k2 -h | tail -5 || true
+printf 'Last memory samples:\n'
+tail -6 "$diagnostics/memory.txt" || true
+printf 'Kernel OOM lines:\n'
+cat "$diagnostics/kernel-oom.txt"
+printf 'Resume log tail:\n'
+tail -15 "$diagnostics/resume.log"
+printf -- '--- end diagnostics ---\n\n'
+[[ "$resume_status" -eq 0 ]] || fail "resume exited with status $resume_status (see diagnostics above)"
 
 [[ -f "$last_chunk" ]] || fail "resume did not complete the final checkpoint chunk"
 chunks_after_resume=$(find "$chain_dir" -maxdepth 1 -type f -name 'chain1_chunk*.Rdata' | wc -l | tr -d ' ')
