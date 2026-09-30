@@ -14,6 +14,7 @@
 #   SHIELD_HOME        shared image and input folder (/home/jheem-shared/shield-container)
 #   SHIELD_STATE_ROOT  where calibration state and outputs go
 #                      (/mnt/jheem_nas_share/tmp/shield-container/<you>)
+#   SHIELD_RANDOM_SEED random seed (0, as the team's launcher uses)
 set -euo pipefail
 
 SHIELD_HOME="${SHIELD_HOME:-/home/jheem-shared/shield-container}"
@@ -21,7 +22,8 @@ STATE_ROOT="${SHIELD_STATE_ROOT:-/mnt/jheem_nas_share/tmp/shield-container/$(id 
 IMAGE="${SHIELD_IMAGE:-docker.io/library/jheem-shield:ci}"
 CENSUS_TAG="${CENSUS_TAG:-data-managers-v2026.08.26}"
 SYPHILIS_TAG="${SYPHILIS_TAG:-syphilis-manager-v2026.07.27}"
-SEED="${SHIELD_RANDOM_SEED:-20260916}"
+# The team's launcher runs set.seed(00000); use the same seed by default.
+SEED="${SHIELD_RANDOM_SEED:-0}"
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'shield-run: %s\n' "$*" >&2; exit 1; }

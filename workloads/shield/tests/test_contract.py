@@ -79,7 +79,14 @@ def test_ci_build_is_pinned_validation_only():
     jheem2_ref = re.search(r"JHEEM2_REF=([0-9a-f]{40})", dockerfile).group(1)
     locations_ref = re.search(r"LOCATIONS_REF=([0-9a-f]{40})", dockerfile).group(1)
     contexts = build_inputs["build-contexts"]
-    assert f"jheem_analyses.git#{analyses_ref}" in contexts
+    # A manual run may name another analyses commit; the default is the
+    # Dockerfile's, and the image records whichever was built.
+    assert "jheem_analyses.git#${{ env.JHEEM_ANALYSES_REF }}" in contexts
+    assert build["env"]["JHEEM_ANALYSES_REF"] == (
+        "${{ inputs.jheem_analyses_ref || '" + analyses_ref + "' }}"
+    )
+    assert "JHEEM_ANALYSES_REF=${{ env.JHEEM_ANALYSES_REF }}" in build_inputs["build-args"]
+    assert "^[0-9a-f]{40}$" in workflow_text
     assert f"jheem2.git#{jheem2_ref}" in contexts
     assert f"locations.git#{locations_ref}" in contexts
 

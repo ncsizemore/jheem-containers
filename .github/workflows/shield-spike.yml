@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      jheem_analyses_ref:
+        description: 'jheem_analyses commit to build (full SHA; must include the recorded runtime). Empty uses the Dockerfile default.'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -39,8 +44,17 @@ jobs:
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    env:
+      # A manual run can build another SHIELD commit, such as the one a team
+      # calibration is about to use; otherwise the reviewed Dockerfile default.
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '373faf2775f584093ac16c17ce18432959c609d9' }}
     steps:
       - uses: actions/checkout@v7
+      - name: check the SHIELD source commit
+        run: |
+          [[ "$JHEEM_ANALYSES_REF" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo "jheem_analyses_ref must be a full 40-character commit SHA" >&2; exit 1; }
+          echo "Building jheem_analyses $JHEEM_ANALYSES_REF"
       - uses: docker/setup-buildx-action@v4
       - name: build recorded SHIELD candidate without publishing
         uses: docker/build-push-action@v7
@@ -52,8 +66,10 @@ jobs:
           load: true
           push: false
           tags: jheem-shield:ci
+          build-args: |
+            JHEEM_ANALYSES_REF=${{ env.JHEEM_ANALYSES_REF }}
           build-contexts: |
-            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#373faf2775f584093ac16c17ce18432959c609d9
+            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#${{ env.JHEEM_ANALYSES_REF }}
             jheem2=https://github.com/CIPHER-Epi/jheem2.git#ccb1f9bfe40844143dbcec65ffd27829aa39d7ef
             locations=https://github.com/tfojo1/locations.git#2481fc440cf1d981bb1005dd903708a88a528d13
             bayesian_simulations=https://github.com/tfojo1/bayesian.simulations.git#4e0d13e85857396bb0e6e2ac1d244775b2145f75
@@ -118,6 +134,7 @@ jobs:
             echo "image_id=$(docker image inspect --format '{{.Id}}' jheem-shield:ci)"
             echo "workflow_run=$GITHUB_RUN_ID"
             echo "containers_commit=$GITHUB_SHA"
+            echo "jheem_analyses_ref=$JHEEM_ANALYSES_REF"
             (cd "$RUNNER_TEMP/shield-image" && sha256sum jheem-shield-recorded.tar.gz)
           } >"$RUNNER_TEMP/shield-image/IMAGE.txt"
           cat "$RUNNER_TEMP/shield-image/IMAGE.txt"

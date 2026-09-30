@@ -183,7 +183,18 @@ calibrations work end to end on a server.
 The team servers run RHEL 9 with rootless Podman and SELinux enforcing. Run the
 `shield-spike` workflow with image export on (the manual `export_image` input,
 or the `export-image` label on a pull request), download its
-`shield-recorded-image` artifact, check it against `IMAGE.txt`, and load it:
+`shield-recorded-image` artifact, check it against `IMAGE.txt`, and load it.
+To follow the team's code, a manual run can build another `jheem_analyses`
+commit with the `jheem_analyses_ref` input (a full SHA that includes the
+recorded runtime); it reuses the package layers, and `IMAGE.txt` names the
+commit.
+
+```bash
+gh workflow run shield-spike.yml --repo ncsizemore/jheem-containers \
+  --ref <branch> -f export_image=true -f jheem_analyses_ref=<40-character SHA>
+```
+
+Then:
 
 ```bash
 sha256sum -c <(grep jheem-shield-recorded.tar.gz IMAGE.txt)
