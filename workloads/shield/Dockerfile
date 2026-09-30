@@ -60,9 +60,12 @@ COPY --from=source-preparer /opt/jheem/ /opt/jheem/
 # about 20 MB natively), and R's default install omits them.
 RUN R --slave -e "renv::install('filelock@${FILELOCK_VERSION}', project = '/app')"
 
+# renv prints status messages on startup; keep only the last output line.
 RUN cd /app \
-    && LIB="$(Rscript -e 'cat(.libPaths()[1])')" \
-    && LIBS="$(Rscript -e 'cat(paste(.libPaths(), collapse = ":"))')" \
+    && export RENV_CONFIG_SYNCHRONIZED_CHECK=FALSE \
+    && LIB="$(Rscript -e 'writeLines(.libPaths()[1])' | tail -n 1)" \
+    && LIBS="$(Rscript -e 'writeLines(paste(.libPaths(), collapse = ":"))' | tail -n 1)" \
+    && test -d "$LIB" \
     && for pkg in distributions bayesian.simulations locations jheem2; do \
          R_LIBS="$LIBS" R CMD INSTALL --without-keep.source --no-test-load \
            -l "$LIB" "/opt/jheem/$pkg" || exit 1; \
