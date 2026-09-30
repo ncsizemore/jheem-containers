@@ -55,9 +55,32 @@ it saves a checkpoint every 500 iterations (about every 30 minutes for stage 0).
   up from the last saved checkpoint; work since that checkpoint is redone.
 
 `start` always begins a new calibration and refuses if that calibration already
-has saved results; it tells you to use `resume`, or which folder to remove to
-start over. Don't start the same calibration for the same location twice at the
-same time, including from another account.
+has saved results; it tells you to use `resume`, or which folders to remove to
+start over. The script refuses to run a calibration you're already running, but
+it can't see other accounts' runs: don't run the same calibration for the same
+location from two accounts.
+
+## Running stages 0, 1 and 2 in one go
+
+`pipeline` runs stages one after another, each starting when the previous one
+finishes, as the usual phase 1 does:
+
+```bash
+shield-run pipeline C.12580 calib.9.28.stage0 calib.9.28.stage1 calib.9.28.stage2
+```
+
+Run one pipeline per location; different locations can run at the same time.
+`shield-run status` lists each stage as `done`, `checkpoints saved: N`, or `not
+started`. `logs` and `stop` take any of the pipeline's calibrations, for example
+`shield-run stop C.12580 calib.9.28.stage1` stops the whole pipeline.
+
+To continue a pipeline after a stop or a failure, run the same `pipeline`
+command again: finished stages are skipped, the interrupted stage continues from
+its last checkpoint, and the rest follow. If a stage fails, the later stages
+don't run.
+
+Stage 3 (four chains) can't run in the container yet; `start` and `pipeline`
+refuse it. Run stage 3 the usual way for now.
 
 ## Practice: stop and resume (about 1 hour)
 
@@ -80,11 +103,17 @@ layout:
 - `mcmc_runs/shield/<calibration>/<location>/`: the calibration's checkpoints
 - `mcmc_summaries/shield/<calibration>/`: the MCMC summary, when it finishes
 - `simulations/shield/<calibration>-<n>/<location>/`: the simulation set
-- `run_records/shield/<location>/<calibration>/inputs.json`: exactly which code
-  and data versions the run used
+- `run_records/shield/<location>/<calibration>/`: the run's records:
+  - `inputs.json`: exactly which code and data versions it used, and for stage
+    1 or 2, which earlier stage's results it started from
+  - `outputs.json`: fingerprints of the summary and simulation set it produced
+  - `attempts/`: one small file per start or resume: who ran it, where, with
+    which container, when, and how it ended
 
 These are test locations while the container is being tried out; they don't
-touch the team's usual `mcmc_runs`.
+touch the team's usual `mcmc_runs`. Please don't edit or delete the
+`run_records` files; they're how we can later tell which code and data produced
+a result.
 
 ## If something goes wrong
 
@@ -92,6 +121,10 @@ touch the team's usual `mcmc_runs`.
   administrator setup isn't finished; send the message to the administrator.
 - **`is already running`**: that calibration is still going; check `shield-run
   status`.
+- **`single-chain calibrations only`**: that calibration is a stage 3 (four
+  chains); run it the usual way for now.
+- **`has no recorded outputs`**: a stage 1 or 2 needs the earlier stage to have
+  finished in the container first; run the stages with `pipeline`.
 - **`status` shows `exited` with a number other than 0:** run `shield-run logs
   <location> <calibration>` and send the last lines to whoever supports the
   container.

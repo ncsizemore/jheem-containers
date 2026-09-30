@@ -18,7 +18,13 @@ def test_recorded_image_pins_base_and_source_defaults():
     assert "FROM runtime AS recorded" in dockerfile
     assert "FROM runtime AS development" in dockerfile
     assert "FROM ${BASE_IMAGE} AS source-preparer" in dockerfile
-    assert "COPY --from=source-preparer /opt/jheem/ /opt/jheem/" in dockerfile
+    # Team packages are installed before the SHIELD code is copied or its
+    # revision declared, so a SHIELD-only change reuses the installed layers.
+    install = dockerfile.index("R CMD INSTALL")
+    assert install < dockerfile.index("ARG JHEEM_ANALYSES_REF=")
+    assert install < dockerfile.index(
+        "COPY --from=source-preparer /opt/jheem/jheem_analyses/ /opt/jheem/jheem_analyses/"
+    )
 
 
 def test_runtime_does_not_mutate_source_or_install_packages():
@@ -83,6 +89,10 @@ def test_ci_build_is_pinned_validation_only():
     assert "JHEEM_SYPHILIS_MANAGER_TAG" in workflow_text
     assert "run_shield preflight" in workflow_text
     assert "test_checkpoint_resume.sh" in workflow_text
+    assert "test_records_and_pipeline.sh" in workflow_text
+    assert workflow_text.index("test_checkpoint_resume.sh") < workflow_text.index(
+        "test_records_and_pipeline.sh"
+    )
     assert "SHIELD_ENABLE_CONTAINER_SMOKE=true" in (
         ROOT / "tests" / "test_checkpoint_resume.sh"
     ).read_text()
@@ -95,3 +105,16 @@ def test_ci_input_fixture_uses_immutable_release_assets():
     assert "syphilis-manager-v2026.07.27" in preparer
     assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 2
     assert "os.replace(temporary_path, artifact)" in preparer
+
+
+def test_entrypoint_records_every_attempt():
+    entrypoint = (ROOT / "container-entrypoint.sh").read_text()
+    # Attempts are recorded before any work and again when they end, so the
+    # launcher runs as a child rather than replacing the shell.
+    assert 'write_attempt started null ""' in entrypoint
+    assert 'write_attempt "$stage_status" "$stage_exit"' in entrypoint
+    assert "exec Rscript \"${JHEEM_ANALYSES_PATH}" not in entrypoint
+    # A pipeline decides each stage from the recorded files, never by clearing state.
+    assert '"$records/outputs.json"' in entrypoint
+    assert '"$records/inputs.json"' in entrypoint
+    assert "clear.calibration.cache" not in entrypoint

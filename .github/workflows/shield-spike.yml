@@ -53,7 +53,7 @@ jobs:
           push: false
           tags: jheem-shield:ci
           build-contexts: |
-            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#e0580817212079fec1cb249f424bf5df9cfbeb3f
+            jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#373faf2775f584093ac16c17ce18432959c609d9
             jheem2=https://github.com/CIPHER-Epi/jheem2.git#ccb1f9bfe40844143dbcec65ffd27829aa39d7ef
             locations=https://github.com/tfojo1/locations.git#2481fc440cf1d981bb1005dd903708a88a528d13
             bayesian_simulations=https://github.com/tfojo1/bayesian.simulations.git#4e0d13e85857396bb0e6e2ac1d244775b2145f75
@@ -87,12 +87,22 @@ jobs:
           SHIELD_CACHE: ${{ runner.temp }}/shield-cache
           SHIELD_STATE: ${{ runner.temp }}/shield-state
         run: bash workloads/shield/tests/test_checkpoint_resume.sh
-      - name: upload canary diagnostics
+      - name: complete the calibration, check run records, and run a two-stage pipeline
+        env:
+          CENSUS_TAG: data-managers-v2026.08.26
+          SYPHILIS_TAG: syphilis-manager-v2026.07.27
+          SHIELD_IMAGE: jheem-shield:ci
+          SHIELD_CACHE: ${{ runner.temp }}/shield-cache
+          SHIELD_STATE: ${{ runner.temp }}/shield-state
+        run: bash workloads/shield/tests/test_records_and_pipeline.sh
+      - name: upload canary diagnostics and run records
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: shield-canary-diagnostics
-          path: ${{ runner.temp }}/shield-state/diagnostics/
+          path: |
+            ${{ runner.temp }}/shield-state/diagnostics/
+            ${{ runner.temp }}/shield-state/run_records/
           if-no-files-found: ignore
           retention-days: 14
       # A server pilot loads exactly the image this run tested; nothing is pushed

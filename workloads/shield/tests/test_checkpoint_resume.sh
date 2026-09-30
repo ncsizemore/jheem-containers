@@ -5,10 +5,9 @@
 # durable checkpoint, survives SIGKILL, and a separate resumed process continues
 # from that checkpoint and writes the next one.
 #
-# Does not cover: the MCMC summary, simulation-set assembly, production-sized
-# runs, or server storage and ownership. On a 16 GB hosted runner SHIELD peaks
-# above the available memory while summarizing, so those are verified on a team
-# server (see workloads/shield/README.md).
+# Does not cover: the MCMC summary, simulation-set assembly, or run records
+# (test_records_and_pipeline.sh continues from this state), production-sized
+# runs, or server storage and ownership (see workloads/shield/README.md).
 set -euo pipefail
 
 : "${SHIELD_IMAGE:?SHIELD_IMAGE is required}"
@@ -45,6 +44,8 @@ docker_args=(
   --env SHIELD_CACHE_FREQUENCY=1
   --env SHIELD_UPDATE_FREQUENCY=1
   --env SHIELD_RANDOM_SEED=20260916
+  --env "SHIELD_IMAGE_ID=$("$engine" image inspect --format '{{.Id}}' "$SHIELD_IMAGE")"
+  --env SHIELD_OPERATOR=canary
 )
 
 fail() {

@@ -29,7 +29,6 @@ RUN rm -rf /opt/jheem/jheem_analyses/.git /opt/jheem/jheem2/.git \
 
 FROM ${BASE_IMAGE} AS runtime
 
-ARG JHEEM_ANALYSES_REF=e0580817212079fec1cb249f424bf5df9cfbeb3f
 ARG JHEEM2_REF=ccb1f9bfe40844143dbcec65ffd27829aa39d7ef
 ARG LOCATIONS_REF=2481fc440cf1d981bb1005dd903708a88a528d13
 ARG BAYESIAN_SIMULATIONS_REF=4e0d13e85857396bb0e6e2ac1d244775b2145f75
@@ -40,17 +39,15 @@ ARG BAYESIAN_SIMULATIONS_VERSION=0.2.2
 ARG DISTRIBUTIONS_VERSION=1.0.0
 ARG FILELOCK_VERSION=1.0.3
 
-LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers" \
-      org.opencontainers.image.description="SHIELD research and calibration environment" \
-      org.jheem.shield.jheem-analyses-ref="${JHEEM_ANALYSES_REF}" \
-      org.jheem.shield.jheem2-ref="${JHEEM2_REF}" \
-      org.jheem.shield.locations-ref="${LOCATIONS_REF}" \
-      org.jheem.shield.bayesian-simulations-ref="${BAYESIAN_SIMULATIONS_REF}" \
-      org.jheem.shield.distributions-ref="${DISTRIBUTIONS_REF}"
-
 WORKDIR /app
 
-COPY --from=source-preparer /opt/jheem/ /opt/jheem/
+# The team packages change rarely and SHIELD code often, so the packages are
+# installed before the SHIELD code is copied (and before its revision is
+# declared): a SHIELD-only change then reuses the installed layers.
+COPY --from=source-preparer /opt/jheem/jheem2/ /opt/jheem/jheem2/
+COPY --from=source-preparer /opt/jheem/locations/ /opt/jheem/locations/
+COPY --from=source-preparer /opt/jheem/bayesian.simulations/ /opt/jheem/bayesian.simulations/
+COPY --from=source-preparer /opt/jheem/distributions/ /opt/jheem/distributions/
 
 # The shared base owns the broad dependency lock. SHIELD adds one exact CRAN
 # package and replaces the base's team packages with the exact revisions the
@@ -91,6 +88,17 @@ RUN cd /app && R --slave -e "stopifnot( \
 # for a missing one and attempts a forbidden runtime bootstrap.
 RUN chmod o+x /root /root/.cache /root/.cache/R \
     && chmod -R a+rX /root/.cache/R/renv
+
+ARG JHEEM_ANALYSES_REF=373faf2775f584093ac16c17ce18432959c609d9
+COPY --from=source-preparer /opt/jheem/jheem_analyses/ /opt/jheem/jheem_analyses/
+
+LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers" \
+      org.opencontainers.image.description="SHIELD research and calibration environment" \
+      org.jheem.shield.jheem-analyses-ref="${JHEEM_ANALYSES_REF}" \
+      org.jheem.shield.jheem2-ref="${JHEEM2_REF}" \
+      org.jheem.shield.locations-ref="${LOCATIONS_REF}" \
+      org.jheem.shield.bayesian-simulations-ref="${BAYESIAN_SIMULATIONS_REF}" \
+      org.jheem.shield.distributions-ref="${DISTRIBUTIONS_REF}"
 
 COPY container-entrypoint.sh preflight.R /opt/shield/
 RUN chmod 0755 /opt/shield/container-entrypoint.sh \

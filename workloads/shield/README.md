@@ -21,16 +21,18 @@ the `shield-run.sh` wrapper instead of the commands below.
 
 - **CI** (`.github/workflows/shield-spike.yml`, validation only): builds the
   recorded image from exact source commits, checks that no team package keeps
-  source references, runs preflight offline, and runs the kill-and-resume
-  canary. With image export on, it saves the tested image as an artifact. It has
-  no registry login, image push, promotion, or `models.yml` integration.
+  source references, runs preflight offline, runs the kill-and-resume canary,
+  completes it through summary and assembly, checks its run records, and runs a
+  two-stage pipeline. With image export on, it saves the tested image as an
+  artifact. It has no registry login, image push, promotion, or `models.yml`
+  integration.
 - **Team server (shield2, rootless Podman):** the canary calibration runs end to
   end, through summary and assembly, with state on local disk or the NAS
   (101 s, peak 11.1 GB, 5.4 MB checkpoints), and kill-and-resume passes. One
   full `calib.9.28.stage0` run for one location matched native runtime (27.6 vs
   29.9 min per 500-iteration chunk); it ran before the source-reference fix.
-- **Not yet done:** a team member running it from the runbook, and merging the
-  recorded-run and container branches.
+- **Not yet done:** a team member running it from the runbook, a full stage
+  with the fixed image, and merging the recorded-run and container branches.
 
 ## Build from clean local worktrees
 
@@ -50,7 +52,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `e0580817212079fec1cb249f424bf5df9cfbeb3f` (branch `codex/shield-recorded-contract`)
+- `jheem_analyses`: `373faf2775f584093ac16c17ce18432959c609d9` (branch `codex/shield-recorded-contract`)
 - `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
@@ -58,7 +60,9 @@ published merely to perform a local spike. The current reviewed defaults are:
   pins (`jhu-servers` `config/team-packages.txt`)
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
-The team packages are installed with `R CMD INSTALL --without-keep.source`. With
+The team packages are installed before the SHIELD source is copied, so an image
+for a new `jheem_analyses` commit reuses the package layers. They are installed
+with `R CMD INSTALL --without-keep.source`. With
 kept source references, every simulation saved in a calibration chunk carried
 the packages' lazy-load state: about 5.6 GB per stored simulation (305 MB chunk
 files) against about 20 MB natively, which also inflated summary and assembly
@@ -114,6 +118,36 @@ For continuation, use the same state mount and identifiers with
 `SHIELD_RUN_MODE=resume`. The entrypoint refuses root by default so NAS files
 are not silently created under the wrong ownership.
 
+`pipeline <location> <calibration-code>...` runs single-chain stages in order
+(for example stages 0 to 2), each after the previous one completes, in one
+container. It ignores `SHIELD_RUN_MODE`: a stage with recorded outputs is
+skipped, a stage with a recorded start is resumed, and the rest start fresh, so
+running the same pipeline again continues it. It stops at the first failed
+stage. Recorded mode refuses multi-chain calibrations (stage 3), because the
+monolithic launcher samples chain 1 only.
+
+## Run records
+
+Each calibration gets `run_records/shield/<location>/<calibration>/` in the
+state tree:
+
+- `inputs.json` (written by jheem_analyses when a fresh run starts): the five
+  source revisions, the manager releases and SHA-256 digests, the seed, and, for
+  a later stage, the SHA-256 of each preceding stage's `outputs.json`. `resume`
+  refuses if any of these changed.
+- `outputs.json` (written by jheem_analyses once the simulation set is saved):
+  the same inputs, and the path, size, and SHA-256 of the MCMC summary and the
+  simulation set.
+- `attempts/<UTC time>-<mode>.json` (written by this entrypoint): one per fresh
+  start or resume, with the image ID, operator, host, settings, start and end
+  times, exit status, and the SHA-256 of the two files above when it ended. It
+  says `started` until the attempt ends; one left at `started` after its
+  container has gone was interrupted. `shield-run.sh` passes the image ID,
+  operator, and host; a bare `docker run` records them as `unknown` unless
+  `SHIELD_IMAGE_ID`, `SHIELD_OPERATOR`, and `SHIELD_HOST` are set.
+
+This is a first version for gathering real records; the schema may change.
+
 ## What CI proves, and what it doesn't
 
 The hosted canary (`tests/test_checkpoint_resume.sh`) runs `container.smoke.stage0`
@@ -124,12 +158,17 @@ and manager digests, a fresh run writes a durable checkpoint and survives
 SIGKILL, and a separate resumed process continues from that checkpoint without
 rewriting it and writes the next one.
 
-It stops the resumed run once that second checkpoint is durable. It does **not**
-cover the MCMC summary, simulation-set assembly, production-sized stages, or
-server storage, ownership, and concurrency. Before the source-reference fix,
-building the summary exceeded the 16 GB hosted runner's memory (run
-36593697214). With the fix, the full canary peaks at about 11 GB on shield2, so
-CI may be able to cover summary and assembly again; that hasn't been tried.
+It stops the resumed run once that second checkpoint is durable. A third
+process then resumes it to completion through the MCMC summary and assembly
+(`tests/test_records_and_pipeline.sh`), and CI checks the run records: three
+attempts (two interrupted, one succeeded), and an `outputs.json` whose sizes and
+digests match the files. `pipeline` then skips that completed stage and runs
+`container.smoke.stage1` from it, whose inputs must name stage 0's
+`outputs.json` digest; running the pipeline again must change nothing. CI does
+not cover production-sized stages, or server storage, ownership, and
+concurrency. Before the source-reference fix, building the summary exceeded the
+16 GB hosted runner's memory (run 36593697214); with the fix the full canary
+peaks at about 11 GB on shield2.
 
 The server pilot covers the rest: the canary through summary and assembly,
 one realistic stage, and NAS mounts, ownership, and output locations (all done
@@ -221,9 +260,14 @@ source and inputs are not identified or checked.
 - SHIELD state and final outputs still share `JHEEM_ROOT_DIR` because the model
   engine currently owns that layout. They should not be claimed as separate
   mounts until the source contract actually supports it.
-- A cross-process calibration lock is not implemented. Until chain-aware
-  locking is designed, the scheduler/operator must prevent duplicate writers
-  for the same location, calibration code, and chain.
+- A cross-process calibration lock is not implemented. `shield-run.sh` refuses
+  a second run of a calibration that one of your own containers is running;
+  across accounts, operators must still prevent duplicate writers for the same
+  location, calibration code, and chain.
+- Stage 3 (four parallel chains and assembly) isn't supported in recorded mode.
+- The image bakes one `jheem_analyses` commit, so a calibration registered after
+  that commit needs a new image. Running a mounted, committed checkout instead
+  is planned.
 
 Run the spike's static contract tests with:
 
