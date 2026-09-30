@@ -14,31 +14,28 @@ The image provides two targets from the same dependency layer:
 
 Neither target stores input managers or calibration state in the image.
 
-## Validation status (2026-09-16)
+**Team members running calibrations: see [RUNBOOK.md](RUNBOOK.md)**, which uses
+the `shield-run.sh` wrapper instead of the commands below.
 
-- Source-level SHIELD integration passes with the pinned revisions in both
-  installed-package and source-loading modes. Each run constructs the real
-  engine and produces finite population output through 2030.
-- The five spike contract tests and shell/R parse checks pass.
-- `.github/workflows/shield-spike.yml` provides a PR-triggered, Linux/amd64,
-  validation-only build from the exact canonical source commits. The first
-  live run built the recorded image successfully in 5m14s. The workflow
-  loads that image only into its ephemeral runner, materializes two
-  digest-pinned public manager releases, and runs preflight with networking
-  disabled. That earlier spike (older analyses source and jheem2) also
-  completed a summary. Since 2026-09-29 the image builds from the recorded-run
-  source; its canary stops at the resumed checkpoint, as described under
-  "What CI proves" below. It has no registry login, write permission, image
-  push, promotion, or `models.yml` integration.
-- Docker Desktop on the development workstation still stalls resolving the
-  pinned base through its configured registry proxy. That local proxy issue is
-  not on the critical path now that the same image definition builds on a clean
-  GitHub Linux/amd64 runner.
+## Status (2026-09-30)
+
+- **CI** (`.github/workflows/shield-spike.yml`, validation only): builds the
+  recorded image from exact source commits, checks that no team package keeps
+  source references, runs preflight offline, and runs the kill-and-resume
+  canary. With image export on, it saves the tested image as an artifact. It has
+  no registry login, image push, promotion, or `models.yml` integration.
+- **Team server (shield2, rootless Podman):** the canary calibration runs end to
+  end, through summary and assembly, with state on local disk or the NAS
+  (101 s, peak 11.1 GB, 5.4 MB checkpoints), and kill-and-resume passes. One
+  full `calib.9.28.stage0` run for one location matched native runtime (27.6 vs
+  29.9 min per 500-iteration chunk); it ran before the source-reference fix.
+- **Not yet done:** a team member running it from the runbook, and merging the
+  recorded-run and container branches.
 
 ## Build from clean local worktrees
 
-The helper verifies that both source trees are clean and passes their actual
-40-character commits into the image metadata:
+The helper verifies that the five source trees are clean and passes their
+actual 40-character commits into the image metadata:
 
 ```bash
 workloads/shield/build-local.sh \
@@ -59,6 +56,7 @@ published merely to perform a local spike. The current reviewed defaults are:
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
   `distributions`: `4d71d9644b4439a59210e804520ac8717ae8f079`, the team servers'
   pins (`jhu-servers` `config/team-packages.txt`)
+- base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
 The team packages are installed with `R CMD INSTALL --without-keep.source`. With
 kept source references, every simulation saved in a calibration chunk carried
@@ -66,12 +64,13 @@ the packages' lazy-load state: about 5.6 GB per stored simulation (305 MB chunk
 files) against about 20 MB natively, which also inflated summary and assembly
 memory. The build fails if any of these packages keeps source references, and
 the canary fails if its first chunk exceeds `SHIELD_MAX_CHUNK_MB` (100 MB).
-- base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
-## Run the engine integration test
+## Check the image (preflight)
 
 Create a disposable state directory and use an existing manager cache. The
-syphilis manager tag must identify a release already present in that cache.
+manager tags must identify releases already present in that cache. Preflight
+checks the recorded settings and the cached managers' digests without running
+the model.
 
 ```bash
 mkdir -p /path/to/shield-state
@@ -127,16 +126,15 @@ rewriting it and writes the next one.
 
 It stops the resumed run once that second checkpoint is durable. It does **not**
 cover the MCMC summary, simulation-set assembly, production-sized stages, or
-server storage, ownership, and concurrency. On the 16 GB hosted runner SHIELD
-uses about 9 GB to load and sample and exceeds the runner's memory while
-building the summary (run 36593697214). Those steps belong to the server pilot:
+server storage, ownership, and concurrency. Before the source-reference fix,
+building the summary exceeded the 16 GB hosted runner's memory (run
+36593697214). With the fix, the full canary peaks at about 11 GB on shield2, so
+CI may be able to cover summary and assembly again; that hasn't been tried.
 
-1. Run the same canary calibration on a team server without interruption
-   through summary and assembly, recording peak memory.
-2. Run one realistic stage for one location and compare runtime with the
-   ordinary launcher.
-3. Check NAS mounts, file ownership, and output locations.
-4. Have another team member launch, interrupt, and resume from this README.
+The server pilot covers the rest: the canary through summary and assembly,
+one realistic stage, and NAS mounts, ownership, and output locations (all done
+on shield2), and another team member operating it from [RUNBOOK.md](RUNBOOK.md)
+(not yet done).
 
 A green CI run means the container contract holds, not that SHIELD
 calibrations work end to end on a server.
@@ -176,8 +174,11 @@ SHIELD_STATE=~/shield-pilot/full bash tests/pilot_full_run.sh        # summary a
 SHIELD_STATE=~/shield-pilot/resume bash tests/test_checkpoint_resume.sh
 ```
 
-`pilot_full_run.sh` records exit status, elapsed time, peak memory, and whether
-the summary and simulation set were written, in `<state>/pilot-full-run/`.
+`pilot_full_run.sh` records exit status, elapsed time, peak memory, chunk
+timings, and whether the summary and simulation set were written, in
+`<state>/pilot-full-run/`; set `SHIELD_CALIBRATION` and `SHIELD_LOCATION` to run a
+real stage. For ordinary use, `shield-run.sh` wraps these settings; see
+[RUNBOOK.md](RUNBOOK.md).
 
 ## Development source overrides
 
@@ -199,24 +200,20 @@ docker run --rm -it \
   shell
 ```
 
-Dirty development work is permitted and is recorded as modified. It is not a
-fully reproducible recorded run.
+Uncommitted development work is permitted. This is not a recorded run: its
+source and inputs are not identified or checked.
 
 ## What this spike does not yet prove
 
-- The image has passed a real Linux/amd64 CI build, but not yet a complete
-  Docker/Podman runtime validation on a developer machine or `shield3`.
-- CI uses exact census and syphilis manager releases and digests; the team must
-  still select the manager releases for the first retained pilot calibration.
-  The canary uses `syphilis-manager-v2026.07.27`, the release current SHIELD
-  source pins, rather than silently following the newest release.
-- NAS UID/GID/SELinux behavior, host-versus-container performance, the MCMC
-  summary, and simulation-set assembly remain server acceptance tests. With the
-  pinned jheem2, building the summary alone exceeds the hosted runner's memory,
-  so CI stops at the resumed checkpoint (see "What CI proves" above).
-- The source overlay is reproducible, but its two delta installs are not yet
-  represented by a standalone SHIELD lockfile. That should be resolved before
-  promoting a recorded environment.
+- Runtime has been validated on shield2 (rootless Podman) and in CI (Docker),
+  not on shield1, shield3, or a developer machine.
+- CI and the runbook use exact census and syphilis manager releases and digests;
+  the team still chooses which releases a real calibration should use. The
+  defaults are `data-managers-v2026.08.26` and `syphilis-manager-v2026.07.27`,
+  the release current SHIELD source pins, rather than the newest release.
+- The source overlay is reproducible, but its package installs (the four team
+  packages and `filelock`) are not yet represented by a standalone SHIELD
+  lockfile. That should be resolved before promoting a recorded environment.
 - The local build helper verifies clean commits immediately before BuildKit
   snapshots each directory, but it is not a release-grade content handoff.
   Published recorded images should consume immutable Git contexts or verified
