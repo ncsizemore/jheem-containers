@@ -45,6 +45,8 @@ workloads/shield/build-local.sh \
   /path/to/jheem_analyses \
   /path/to/jheem2 \
   /path/to/locations \
+  /path/to/bayesian.simulations \
+  /path/to/distributions \
   recorded
 ```
 
@@ -54,6 +56,16 @@ published merely to perform a local spike. The current reviewed defaults are:
 - `jheem_analyses`: `e0580817212079fec1cb249f424bf5df9cfbeb3f` (branch `codex/shield-recorded-contract`)
 - `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
+- `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
+  `distributions`: `4d71d9644b4439a59210e804520ac8717ae8f079`, the team servers'
+  pins (`jhu-servers` `config/team-packages.txt`)
+
+The team packages are installed with `R CMD INSTALL --without-keep.source`. With
+kept source references, every simulation saved in a calibration chunk carried
+the packages' lazy-load state: about 5.6 GB per stored simulation (305 MB chunk
+files) against about 20 MB natively, which also inflated summary and assembly
+memory. The build fails if any of these packages keeps source references, and
+the canary fails if its first chunk exceeds `SHIELD_MAX_CHUNK_MB` (100 MB).
 - base: `ghcr.io/ncsizemore/jheem-base:1.7.0@sha256:a76a92ca41d38c3d7d5f77f79efd2e2fe754f8ee97be6b69aec0ea949c1282c3`
 
 ## Run the engine integration test

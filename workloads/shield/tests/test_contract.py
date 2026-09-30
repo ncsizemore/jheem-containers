@@ -29,6 +29,9 @@ def test_runtime_does_not_mutate_source_or_install_packages():
     forbidden = ("git pull", "git fetch", "git reset", "git checkout", "install.packages")
     assert all(token not in runtime_text for token in forbidden)
     assert "chmod -R a+rX /root/.cache/R/renv" in dockerfile
+    # Kept source references make every saved simulation carry package state.
+    assert "--without-keep.source" in dockerfile
+    assert "has functions with kept source references" in dockerfile
 
 
 def test_recorded_profile_is_fail_closed():

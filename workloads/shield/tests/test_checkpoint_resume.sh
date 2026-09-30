@@ -116,6 +116,14 @@ run_until_checkpoint() {
 
 # 1. A fresh recorded run sets up and samples; stop it after its first checkpoint.
 run_until_checkpoint fresh 1
+# A one-iteration chunk holds a single simulation (about 20 MB natively). A much
+# larger file means saved simulations carry extra state, as when packages are
+# installed with kept source references.
+max_chunk_mb="${SHIELD_MAX_CHUNK_MB:-100}"
+chunk1_mb=$(( $(stat -c %s "$chain_dir/chain1_chunk1.Rdata") / 1000000 ))
+printf 'first checkpoint chunk: %s MB (limit %s MB)\n' "$chunk1_mb" "$max_chunk_mb"
+(( chunk1_mb <= max_chunk_mb )) \
+  || fail "first chunk is ${chunk1_mb} MB; saved simulations carry unexpected state"
 chunks_before_resume=$(chunk_count)
 [[ "$chunks_before_resume" -eq 1 ]] \
   || fail "expected 1 of $expected_chunks chunks after interruption; found $chunks_before_resume"
