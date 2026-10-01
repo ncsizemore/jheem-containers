@@ -83,11 +83,11 @@ jobs:
             # the source tree inside R (as the supported launcher does).
             for SHIELD_TEST_SCRIPT in \
               applications/SHIELD/tests/test-recorded-runtime.R \
-              applications/SHIELD/tests/test-recorded-cache.R \
-              commoncode/tests/test_data_manager_release_selection.R; do
+              applications/SHIELD/tests/test-recorded-cache.R; do
               export SHIELD_TEST_SCRIPT
               Rscript -e '\''setwd(Sys.getenv("JHEEM_ANALYSES_PATH")); source(Sys.getenv("SHIELD_TEST_SCRIPT"))'\'' || exit 1
             done
+            Rscript "$JHEEM_ANALYSES_PATH/commoncode/tests/test_data_manager_release_selection.R"
           '
       - name: prepare pinned test inputs
         run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache"
