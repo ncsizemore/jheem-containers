@@ -97,9 +97,11 @@ def test_ci_build_is_pinned_validation_only():
     assert "run_shield preflight" in workflow_text
     assert "test_checkpoint_resume.sh" in workflow_text
     assert "test_records_and_pipeline.sh" in workflow_text
-    # Startup must activate /app's pinned library before tests change directory.
-    assert 'cd "$JHEEM_ANALYSES_PATH"' not in workflow_text
-    assert 'setwd(Sys.getenv("JHEEM_ANALYSES_PATH"))' in workflow_text
+    # Carry /app's pinned library into standalone tests in the source tree.
+    assert "writeLines(paste(.libPaths()" in workflow_text
+    assert workflow_text.index("export R_LIBS") < workflow_text.index(
+        'cd "$JHEEM_ANALYSES_PATH"'
+    )
     assert workflow_text.index("test_checkpoint_resume.sh") < workflow_text.index(
         "test_records_and_pipeline.sh"
     )

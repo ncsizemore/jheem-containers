@@ -79,15 +79,14 @@ jobs:
       - name: Check recorded runtime and cache boundaries without model data
         run: |
           docker run --rm --network none --user "$(id -u):$(id -g)" jheem-shield:ci shell -c '
-            # Start R in /app so the image library activates, then change to
-            # the source tree inside R (as the supported launcher does).
-            for SHIELD_TEST_SCRIPT in \
-              applications/SHIELD/tests/test-recorded-runtime.R \
-              applications/SHIELD/tests/test-recorded-cache.R; do
-              export SHIELD_TEST_SCRIPT
-              Rscript -e '\''setwd(Sys.getenv("JHEEM_ANALYSES_PATH")); source(Sys.getenv("SHIELD_TEST_SCRIPT"))'\'' || exit 1
-            done
-            Rscript "$JHEEM_ANALYSES_PATH/commoncode/tests/test_data_manager_release_selection.R"
+            # Discover the pinned library in /app, then retain it when each
+            # standalone test starts from the source tree.
+            R_LIBS="$(Rscript -e '\''writeLines(paste(.libPaths(), collapse = ":"))'\'' | tail -n 1)"
+            export R_LIBS
+            cd "$JHEEM_ANALYSES_PATH"
+            Rscript applications/SHIELD/tests/test-recorded-runtime.R &&
+            Rscript applications/SHIELD/tests/test-recorded-cache.R &&
+            Rscript commoncode/tests/test_data_manager_release_selection.R
           '
       - name: prepare pinned test inputs
         run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache"
