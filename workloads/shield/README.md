@@ -52,7 +52,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `373faf2775f584093ac16c17ce18432959c609d9` (branch `codex/shield-recorded-contract`)
+- `jheem_analyses`: `06505412ff4ad870ba0263361b791ba5d53737de` (branch `codex/shield-recorded-contract`)
 - `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
@@ -120,11 +120,17 @@ are not silently created under the wrong ownership.
 
 `pipeline <location> <calibration-code>...` runs single-chain stages in order
 (for example stages 0 to 2), each after the previous one completes, in one
-container. It ignores `SHIELD_RUN_MODE`: a stage with recorded outputs is
+container. It ignores `SHIELD_RUN_MODE`: a stage with verified recorded outputs is
 skipped, a stage with a recorded start is resumed, and the rest start fresh, so
 running the same pipeline again continues it. It stops at the first failed
 stage. Recorded mode refuses multi-chain calibrations (stage 3), because the
 monolithic launcher samples chain 1 only.
+
+Before skipping a completed stage, the pipeline verifies both records, actual
+output sizes and SHA-256 digests, preceding-stage lineage, and the requested
+code, manager identities, and seed. Missing, changed, or stale outputs stop the
+pipeline without repairing or clearing scientific state. The hosted test includes
+missing and modified simsets and a changed-seed request, not just successful reuse.
 
 ## Run records
 

@@ -138,4 +138,39 @@ check([(a["run_mode"], a["status"]) for a in a1] == [("fresh", "succeeded")],
       f"{stage1} attempts: {[(a['run_mode'], a['status']) for a in a1]}")
 EOF
 
-printf 'SHIELD records/pipeline test passed\n'
+# Negative checks change only the disposable canary state.
+simset="$(python3 - "$SHIELD_STATE" "$location" "$stage0" <<'EOF'
+import json, sys
+from pathlib import Path
+root, location, stage = sys.argv[1:]
+record = json.loads((Path(root) / 'run_records' / 'shield' / location / stage / 'outputs.json').read_text())
+print(Path(root) / next(o['path'] for o in record['outputs'] if o['role'] == 'simulation_set'))
+EOF
+)"
+expect_rejected() {
+  local label="$1" name status=0
+  shift
+  name="shield-reject-$label-$run_id"
+  containers+=("$name")
+  "$engine" run --name "$name" "${docker_args[@]}" "$@" \
+    >"$diagnostics/rejected-$label.log" 2>&1 || status=$?
+  (( status != 0 )) || fail "$label was incorrectly accepted as complete"
+  grep -q 'failed verification' "$diagnostics/rejected-$label.log" \
+    || { tail -30 "$diagnostics/rejected-$label.log"; fail "$label failed for the wrong reason"; }
+}
+mv "$simset" "$simset.test-backup"
+expect_rejected missing "$SHIELD_IMAGE" pipeline "$location" "$stage0" "$stage1"
+cp "$simset.test-backup" "$simset"
+python3 - "$simset" <<'EOF'
+import sys
+with open(sys.argv[1], 'r+b') as artifact:
+    first = artifact.read(1)
+    artifact.seek(0)
+    artifact.write(bytes([first[0] ^ 1]))
+EOF
+expect_rejected modified "$SHIELD_IMAGE" pipeline "$location" "$stage0" "$stage1"
+mv "$simset.test-backup" "$simset"
+expect_rejected seed --env SHIELD_RANDOM_SEED=1 "$SHIELD_IMAGE" pipeline "$location" "$stage0" "$stage1"
+run_to_end pipeline-verified "$SHIELD_IMAGE" pipeline "$location" "$stage0" "$stage1"
+
+printf 'SHIELD records/pipeline test passed, including negative reuse checks\n'

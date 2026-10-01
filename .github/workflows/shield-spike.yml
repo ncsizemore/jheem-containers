@@ -47,7 +47,7 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '373faf2775f584093ac16c17ce18432959c609d9' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '06505412ff4ad870ba0263361b791ba5d53737de' }}
     steps:
       - uses: actions/checkout@v7
       - name: check the SHIELD source commit
@@ -76,6 +76,14 @@ jobs:
             distributions=https://github.com/tfojo1/distributions.git#4d71d9644b4439a59210e804520ac8717ae8f079
           cache-from: type=gha,scope=shield-spike-v3
           cache-to: type=gha,mode=max,scope=shield-spike-v3
+      - name: Check recorded runtime and cache boundaries without model data
+        run: |
+          docker run --rm --network none --user "$(id -u):$(id -g)" jheem-shield:ci shell -c '
+            cd "$JHEEM_ANALYSES_PATH"
+            Rscript applications/SHIELD/tests/test-recorded-runtime.R &&
+            Rscript applications/SHIELD/tests/test-recorded-cache.R &&
+            Rscript commoncode/tests/test_data_manager_release_selection.R
+          '
       - name: prepare pinned test inputs
         run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache"
       - name: preflight the recorded image offline

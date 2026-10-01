@@ -197,7 +197,7 @@ Remove that folder to run this stage from the start."
 stage_progress() {
   local location="$1" calibration="$2" chunks
   if [[ -f "$(records_dir "$location" "$calibration")/outputs.json" ]]; then
-    printf 'done'
+    printf 'outputs recorded (not rechecked)'
   elif [[ -e "$(calibration_dir "$location" "$calibration")" ]]; then
     chunks="$( (find "$(calibration_dir "$location" "$calibration")/cache/chain_1" -maxdepth 1 -name 'chain1_chunk*.Rdata' 2>/dev/null || true) | wc -l | tr -d ' ')"
     printf 'checkpoints saved: %s' "$chunks"

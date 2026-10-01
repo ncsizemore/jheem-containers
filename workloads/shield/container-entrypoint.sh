@@ -143,6 +143,9 @@ case "$command_name" in
     for calibration in "$@"; do
       records="$(records_dir "$location" "$calibration")"
       if [ -f "$records/outputs.json" ]; then
+        Rscript "${JHEEM_ANALYSES_PATH}/applications/SHIELD/check_recorded_completion.R" \
+          "$location" "$calibration" \
+          || fail "completed stage $calibration failed verification; no stages were repaired or cleared"
         printf 'SHIELD pipeline: %s for %s is already complete; skipping\n' "$calibration" "$location"
         continue
       fi

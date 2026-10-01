@@ -70,8 +70,10 @@ shield-run pipeline C.12580 calib.9.28.stage0 calib.9.28.stage1 calib.9.28.stage
 ```
 
 Run one pipeline per location; different locations can run at the same time.
-`shield-run status` lists each stage as `done`, `checkpoints saved: N`, or `not
-started`. `logs` and `stop` take any of the pipeline's calibrations, for example
+`shield-run status` lists each stage as `outputs recorded (not rechecked)`,
+`checkpoints saved: N`, or `not started`. Re-running the pipeline verifies the
+recorded files and requested inputs before skipping completed stages. `logs`
+and `stop` take any of the pipeline's calibrations, for example
 `shield-run stop C.12580 calib.9.28.stage1` stops the whole pipeline.
 
 To continue a pipeline after a stop or a failure, run the same `pipeline`
@@ -130,6 +132,12 @@ a result.
   container.
 - **A `resume` fails straight away:** the run's saved inputs don't match, or
   there is no checkpoint yet. Send the `logs` output.
+- **`completed stage ... failed verification`:** preserve the run tree and send
+  the log. A record exists, but its files or requested inputs do not match.
+  Nothing is automatically deleted or repaired.
+- **Setup stopped before a checkpoint:** preserve the existing tree for diagnosis.
+  A deliberate restart can use a new `SHIELD_STATE_ROOT`; do not delete records
+  to force the existing run past its safety checks.
 
 ---
 
