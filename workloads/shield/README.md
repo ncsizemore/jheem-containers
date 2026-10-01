@@ -8,7 +8,7 @@ schema is extended.
 The image provides two targets from the same dependency layer:
 
 - `recorded`: baked clean sources, installed exact `jheem2`, offline immutable
-  inputs, resume by default, and no incomplete assembly;
+  inputs, non-destructive fresh/resume checks, and verified completed outputs;
 - `development`: the same dependencies with source-mode `jheem2`; source paths
   can be replaced by bind-mounted worktrees for active development.
 
@@ -17,7 +17,7 @@ Neither target stores input managers or calibration state in the image.
 **Team members running calibrations: see [RUNBOOK.md](RUNBOOK.md)**, which uses
 the `shield-run.sh` wrapper instead of the commands below.
 
-## Status (2026-09-30)
+## Status (2026-10-01)
 
 - **CI** (`.github/workflows/shield-spike.yml`, validation only): builds the
   recorded image from exact source commits, checks that no team package keeps
@@ -29,10 +29,18 @@ the `shield-run.sh` wrapper instead of the commands below.
 - **Team server (shield2, rootless Podman):** the canary calibration runs end to
   end, through summary and assembly, with state on local disk or the NAS
   (101 s, peak 11.1 GB, 5.4 MB checkpoints), and kill-and-resume passes. One
-  full `calib.9.28.stage0` run for one location matched native runtime (27.6 vs
-  29.9 min per 500-iteration chunk); it ran before the source-reference fix.
-- **Not yet done:** a team member running it from the runbook, a full stage
-  with the fixed image, and merging the recorded-run and container branches.
+  full `calib.9.28.stage0` run for one location took 27.6 min per 500-iteration
+  chunk versus 29.9 min in a native run; different servers, load, and source
+  revisions make this a feasibility observation, not a controlled speed or
+  scientific-equivalence comparison. It ran before the source-reference fix.
+- **Integration:** the opt-in analyses runtime and container pilot are merged
+  (`jheem_analyses@3f463e2a`, `jheem-containers@4b9f83db`). The hosted canary at
+  [run 36815091235](https://github.com/ncsizemore/jheem-containers/actions/runs/36815091235)
+  passed, including missing/modified outputs and changed requested inputs.
+- **Image retention:** the tested export is in that workflow's seven-day
+  artifact. Retention beyond Actions expiry is still pending.
+- **Not yet done:** another team member running it from the runbook, a full
+  stage with the fixed image, and multi-chain stage 3 or a tested native handoff.
 
 ## Build from clean local worktrees
 
@@ -52,7 +60,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current reviewed defaults are:
 
-- `jheem_analyses`: `06505412ff4ad870ba0263361b791ba5d53737de` (branch `codex/shield-recorded-contract`)
+- `jheem_analyses`: `06505412ff4ad870ba0263361b791ba5d53737de` (integrated into `master` by `3f463e2a`; the image retains the tested source pin)
 - `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and

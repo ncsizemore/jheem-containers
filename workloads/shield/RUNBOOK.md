@@ -55,8 +55,9 @@ it saves a checkpoint every 500 iterations (about every 30 minutes for stage 0).
   up from the last saved checkpoint; work since that checkpoint is redone.
 
 `start` always begins a new calibration and refuses if that calibration already
-has saved results; it tells you to use `resume`, or which folders to remove to
-start over. The script refuses to run a calibration you're already running, but
+has saved results. Use `resume` for a checkpointed run; preserve failed setup
+state for diagnosis and use a new state root for a deliberate restart. The
+script refuses to run a calibration you're already running, but
 it can't see other accounts' runs: don't run the same calibration for the same
 location from two accounts.
 
@@ -82,7 +83,9 @@ its last checkpoint, and the rest follow. If a stage fails, the later stages
 don't run.
 
 Stage 3 (four chains) can't run in the container yet; `start` and `pipeline`
-refuse it. Run stage 3 the usual way for now.
+refuse it. Existing native workflows remain available, but transferring this
+pilot's isolated stage-2 outputs into a native stage-3 run has not yet been
+validated. Arrange that handoff before relying on the pilot for a full analysis.
 
 ## Practice: stop and resume (about 1 hour)
 
@@ -145,14 +148,20 @@ a result.
 
 Per server, in the shared folder (`/home/jheem-shared/shield-container`):
 
-1. Download the tested image from a `shield-spike` workflow run with image export
-   on, and check it:
+1. Download the tested image from a successful `shield-spike` workflow run with
+   image export on, and check it (Actions retains this artifact for seven days):
 
    ```bash
    cd /home/jheem-shared/shield-container
    gh run download <run-id> --repo ncsizemore/jheem-containers --name shield-recorded-image --dir image
    (cd image && grep ' jheem-shield-recorded.tar.gz$' IMAGE.txt | sha256sum -c -)
    ```
+
+   `IMAGE.txt` records the image ID, archive checksum, source revisions, and
+   originating workflow run. For a newer candidate, export it from a successful
+   `shield-spike` run and retain that exact image before the temporary Actions
+   artifact expires. Do not replace a shared pilot installation while it has
+   active runs; use a separate installation directory for the new image.
 
 2. Prepare the pinned manager inputs and copy the script:
 
