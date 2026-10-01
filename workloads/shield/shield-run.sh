@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Start, check, stop, and resume SHIELD calibrations in the recorded container
-# on a team server. See RUNBOOK.md.
+# on a team server. Operator guide: jheem_analyses/applications/SHIELD/CONTAINER-PILOT.md.
 #
 #   shield-run.sh setup                                check prerequisites, load the image
 #   shield-run.sh start    <location> <calibration>    begin a new calibration
@@ -148,15 +148,19 @@ cmd_stage() {
   check_image || fail "the image isn't loaded; run: shield-run.sh setup"
   check_not_running "$location" "$calibration"
   saved="$(calibration_dir "$location" "$calibration")"
-  if [[ "$mode" == fresh && -e "$saved" ]]; then
-    fail "$calibration for $location already has saved results in:
+  if [[ "$mode" == fresh && ( -e "$saved" || -e "$(records_dir "$location" "$calibration")" ) ]]; then
+    fail "$calibration for $location already has saved state or run records in:
   $saved
-To continue it: shield-run.sh resume $location $calibration
-To start over, remove that folder and $(records_dir "$location" "$calibration") first."
+  $(records_dir "$location" "$calibration")
+If a checkpoint was saved, continue with: shield-run.sh resume $location $calibration
+Preserve this run for diagnosis. For a deliberate new attempt, ask the administrator
+to choose a separate SHIELD_STATE_ROOT; do not delete saved state or records."
   fi
   if [[ "$mode" == resume && ! -s "$saved/cache/chain1_control.Rdata" ]]; then
     fail "there's nothing to resume for $calibration $location (no saved checkpoint in $saved).
-To begin it: shield-run.sh start $location $calibration"
+If setup already started, preserve its state and records for diagnosis. Ask the
+administrator for a separate SHIELD_STATE_ROOT for a deliberate new attempt.
+Use start only for a run that has not already been started."
   fi
 
   run_container "$(safe_name "shield-$calibration-$location")" "$calibration" "$location" "$mode" \
@@ -180,7 +184,8 @@ cmd_pipeline() {
     if [[ -e "$(calibration_dir "$location" "$calibration")" && ! -f "$(records_dir "$location" "$calibration")/inputs.json" ]]; then
       fail "$calibration for $location has saved results that weren't started by this container:
   $(calibration_dir "$location" "$calibration")
-Remove that folder to run this stage from the start."
+Preserve this run for diagnosis. Ask the administrator to choose a separate
+SHIELD_STATE_ROOT for a deliberate new attempt; do not delete saved state."
     fi
   done
 

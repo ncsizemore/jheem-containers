@@ -1,6 +1,9 @@
 from pathlib import Path
+import os
 import re
+import subprocess
 
+import pytest
 import yaml
 
 
@@ -56,9 +59,11 @@ def test_ci_build_is_pinned_validation_only():
     dockerfile = (ROOT / "Dockerfile").read_text()
 
     assert workflow["permissions"] == {"contents": "read"}
-    assert set(workflow["on"]) == {"pull_request", "workflow_dispatch"}
+    assert set(workflow["on"]) == {"push", "pull_request", "workflow_dispatch"}
+    assert workflow["on"]["push"]["branches"] == ["main"]
 
     build = workflow["jobs"]["build-recorded"]
+    assert build["if"] == "github.event_name != 'push'"
     assert build["needs"] == "contract"
     build_step = next(
         step for step in build["steps"]
@@ -130,3 +135,55 @@ def test_entrypoint_records_every_attempt():
     assert '"$records/outputs.json"' in entrypoint
     assert '"$records/inputs.json"' in entrypoint
     assert "clear.calibration.cache" not in entrypoint
+
+
+@pytest.mark.parametrize("case", ["saved_state", "receipt_only", "unrecorded_pipeline", "no_checkpoint"])
+def test_wrapper_preserves_failed_state_and_gives_safe_recovery(tmp_path, case):
+    """Exercise the real shell guards, without contacting Podman or a server."""
+    shared = tmp_path / "shared"
+    state = tmp_path / "state"
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    (shared / "image").mkdir(parents=True)
+    (shared / "cache" / "data-managers").mkdir(parents=True)
+    (shared / "image" / "IMAGE.txt").write_text("image_id=sha256:abc\n")
+    saved = state / "mcmc_runs" / "shield" / "test.stage0" / "C.12580"
+    records = state / "run_records" / "shield" / "C.12580" / "test.stage0"
+    if case != "receipt_only":
+        saved.mkdir(parents=True)
+        (saved / "keep.txt").write_text("unfinished calibration\n")
+    if case in ("receipt_only", "no_checkpoint"):
+        records.mkdir(parents=True)
+        (records / "inputs.json").write_text('{"preserve": true}\n')
+
+    # Any destructive/container-start call is an unexpected test failure.
+    commands = {
+        "podman": '''case "$1 $2" in
+  "image inspect") echo abc ;;
+  "ps -a") exit 0 ;;
+  *) echo "unexpected podman operation: $*" >> "$FAKE_PODMAN_LOG"; exit 97 ;;
+esac''',
+        "loginctl": "echo yes",
+        "stat": "echo ext2",
+        "tac": "cat",
+    }
+    for name, body in commands.items():
+        path = binary / name
+        path.write_text("#!/bin/sh\n" + body + "\n")
+        path.chmod(0o755)
+    log = tmp_path / "podman.log"
+    env = dict(os.environ, SHIELD_HOME=str(shared), SHIELD_STATE_ROOT=str(state),
+               FAKE_PODMAN_LOG=str(log), PATH=str(binary) + os.pathsep + os.environ["PATH"])
+    before = {p.relative_to(state): p.read_bytes() for p in state.rglob("*") if p.is_file()}
+    action = {"unrecorded_pipeline": "pipeline", "no_checkpoint": "resume"}.get(case, "start")
+    result = subprocess.run(
+        ["bash", str(ROOT / "shield-run.sh"), action, "C.12580", "test.stage0"],
+        env=env, capture_output=True, text=True,
+    )
+    assert result.returncode == 1, result.stderr
+    assert "SHIELD_STATE_ROOT" in result.stderr
+    assert "preserve" in result.stderr.lower()
+    assert "remove that folder" not in result.stderr.lower()
+    assert not log.exists(), log.read_text() if log.exists() else ""
+    after = {p.relative_to(state): p.read_bytes() for p in state.rglob("*") if p.is_file()}
+    assert after == before

@@ -1,187 +1,122 @@
-# Running SHIELD in the container
+# SHIELD container: administrator runbook
 
-This runs a SHIELD calibration inside a fixed, tested container instead of your
-own R setup, so every run uses the same code, packages, and input data. You
-control it with one script, `shield-run.sh`. Everything below is typed in a
-terminal on the server, over SSH (not the RStudio terminal).
+Operators should use
+[Trying the SHIELD container](https://github.com/tfojo1/jheem_analyses/blob/master/applications/SHIELD/CONTAINER-PILOT.md)
+in the analyses repository. They need only that guide and the installed
+`shield-run.sh`, not a checkout of this repository. This page covers installation
+and maintenance; the [technical README](README.md) describes builds and tests.
 
-## Before you start
+## Scope and selected image
 
-The server administrator does a one-time setup for you (see the end of this
-page). After that, run this once:
+This is a single-chain pilot, not a replacement for a full calibration. Stage 3
+is refused, and handing pilot outputs to native stage 3 is not validated. Do not
+delay ordinary calibrations or change users' R installations/source checkouts.
+
+Use the retained
+[`shield-pilot-2026.10.01-r36815091235` release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.01-r36815091235).
+It contains analyses `06505412ff4ad870ba0263361b791ba5d53737de`, integrated via
+`3f463e2a`. It excludes the later screening-modifier change `3f9e2019` and
+transmission-prior change `207672f2`. This is an operational test snapshot,
+not an implicit choice for the next scientific calibration. Updating a source
+checkout does not change an existing image.
+
+Archive SHA-256:
+`01e344d5948945851f397a41e2ec24b5f77878e2335b5d8960eb5a5a3a81e60c`.
+Image ID:
+`sha256:06e81402fbff908260a5a8237f0c5b9f7c3b20361604e1c855160ae7c0bb0c95`.
+`IMAGE.txt` records both and the source revisions. The archive is about 1.9 GB;
+each user's rootless loaded image takes roughly 4 GB of local storage.
+
+## Prepare a new installation
+
+Target shield2 first. Check current jobs, memory, disk space, Podman, and the
+actual NAS mount (`findmnt -T /mnt/jheem_nas_share`). Do not create state under
+an unmounted NAS path or stop existing jobs. Inspect the proposed installation
+before writing: never replace an installation used by active runs.
+
+From a clean container-repository checkout, prepare new staging files:
 
 ```bash
+SHIELD_STAGE=$(mktemp -d)
+mkdir -p "$SHIELD_STAGE/image"
+gh release download shield-pilot-2026.10.01-r36815091235 \
+  --repo ncsizemore/jheem-containers \
+  --pattern jheem-shield-recorded.tar.gz --pattern IMAGE.txt \
+  --dir "$SHIELD_STAGE/image"
+(cd "$SHIELD_STAGE/image" && grep ' jheem-shield-recorded.tar.gz$' IMAGE.txt | sha256sum -c -)
+python3 workloads/shield/tests/prepare_inputs.py "$SHIELD_STAGE/cache"
+cp workloads/shield/shield-run.sh "$SHIELD_STAGE/shield-run.sh"
+git rev-parse HEAD
+```
+
+Check the archive/image identities against the values above as well as
+`IMAGE.txt`. The preparer verifies the pinned census (`data-managers-v2026.08.26`)
+and syphilis (`syphilis-manager-v2026.07.27`) inputs, without modifying ordinary
+caches or promoting managers.
+
+Install the verified `image/`, `cache/`, and wrapper into the new shared
+directory `/home/jheem-shared/shield-container`. Use administrator/root ownership
+and group `jheem`: directories `0750`, data `0640`, wrapper `0750`. Check inherited
+ACLs from the shared parent: operators should read/execute these files, not
+replace the wrapper, cache, or `IMAGE.txt`. Record the wrapper's commit separately
+from the image build. Outputs belong in the separate, per-user state root
+`/mnt/jheem_nas_share/tmp/shield-container/<username>/`.
+
+Label the installed local cache `container_file_t`, using persistent host
+file-context policy where available. Never relabel CIFS. NAS access requires
+`virt_use_samba` enabled on the host (`sudo setsebool -P virt_use_samba on`);
+it was enabled for the earlier shield2 pilot, so verify before changing it.
+The wrapper uses `--group-add keep-groups` and disables container networking.
+
+For each intended user, verify `jheem` membership and enable lingering with
+`sudo loginctl enable-linger <username>`. Confirm with
+`loginctl show-user <username> -p Linger`. Lingering lets jobs survive logout.
+Check home storage, rootless Podman support, input readability, and NAS writes.
+Do not disable lingering or the NAS boolean while other containers depend on them.
+
+## Verify before inviting operators
+
+Use the installed wrapper as a non-root administrator, with a unique isolated
+state root. These examples require a fresh directory chosen for this exercise:
+
+```bash
+export SHIELD_STATE_ROOT=/mnt/jheem_nas_share/tmp/shield-container/ADMIN-HANDOFF-TEST
 /home/jheem-shared/shield-container/shield-run.sh setup
+/home/jheem-shared/shield-container/shield-run.sh start C.12580 container.smoke.stage0
+/home/jheem-shared/shield-container/shield-run.sh status
+/home/jheem-shared/shield-container/shield-run.sh logs C.12580 container.smoke.stage0
+# After completion, verify its recorded outputs without rerunning the stage:
+/home/jheem-shared/shield-container/shield-run.sh pipeline C.12580 container.smoke.stage0
 ```
 
-It checks everything is in place and loads the container (a few minutes the
-first time). It ends with `Setup is complete.` To save typing, you can add a
-shortcut:
+Inspect the summary, simset, and input/output/attempt records. Confirm a detached
+container survives logout. `status` says `outputs recorded (not rechecked)`;
+only pipeline completion checks verify the referenced files and requested inputs.
 
-```bash
-alias shield-run=/home/jheem-shared/shield-container/shield-run.sh
-```
+Check each intended account's installed-file access, NAS write access, image
+loading, and lingering. Authorized administrator account checks are not an
+independent operator exercise; do not launch scientific calibrations as them.
+Record host/date, image ID, wrapper commit, users checked, output root, and
+results in the private server log. Invite users only for verified steps and
+state outstanding checks explicitly. A representative full-stage run remains
+separate from this short installation check.
 
-The examples below use that shortcut.
+## Recovery and updates
 
-## A quick test (about 2 minutes)
+- Preserve failed state and records. Resume requires a checkpoint and matching
+  inputs. If setup stopped earlier, investigate and choose a new
+  `SHIELD_STATE_ROOT`; do not delete receipts to force a restart.
+- Keep that state-root setting for subsequent commands. `status` lists the
+  account's containers, not other accounts' jobs. Prevent duplicate writers to
+  any shared run tree; the wrapper does not implement a cross-process lock.
+- New registrations or model changes require another tested image. Use the CI
+  `jheem_analyses_ref` input with a full SHA, pass the canary, then retain that
+  exact image before the temporary Actions artifact expires. Agree on the
+  scientific snapshot before using it for real work.
+- Install another candidate separately. Do not retag/replace active users'
+  images or change inputs beneath a checkpointed run. Do not automatically
+  delete stopped containers or outputs: they may hold diagnostic evidence.
 
-```bash
-shield-run start C.12580 container.smoke.stage0
-shield-run status
-```
-
-`container.smoke.stage0` is a tiny two-step test calibration for Baltimore.
-While it runs, `status` shows `running`. After about 2 minutes it shows
-`exited (exit 0)` with `checkpoints saved: 2`. `exit 0` means it finished
-successfully.
-
-## Running a real calibration
-
-Use the location and calibration code you would normally use, for example:
-
-```bash
-shield-run start C.12580 calib.9.28.stage0
-```
-
-It keeps running if you log out or close your laptop. A stage takes many hours;
-it saves a checkpoint every 500 iterations (about every 30 minutes for stage 0).
-
-- **Progress:** `shield-run status` shows each run, whether it's running, how
-  many checkpoints it has saved, and its latest output line.
-- **Latest output:** `shield-run logs C.12580 calib.9.28.stage0`
-- **Stop it:** `shield-run stop C.12580 calib.9.28.stage0`
-- **Continue it later:** `shield-run resume C.12580 calib.9.28.stage0`. It picks
-  up from the last saved checkpoint; work since that checkpoint is redone.
-
-`start` always begins a new calibration and refuses if that calibration already
-has saved results. Use `resume` for a checkpointed run; preserve failed setup
-state for diagnosis and use a new state root for a deliberate restart. The
-script refuses to run a calibration you're already running, but
-it can't see other accounts' runs: don't run the same calibration for the same
-location from two accounts.
-
-## Running stages 0, 1 and 2 in one go
-
-`pipeline` runs stages one after another, each starting when the previous one
-finishes, as the usual phase 1 does:
-
-```bash
-shield-run pipeline C.12580 calib.9.28.stage0 calib.9.28.stage1 calib.9.28.stage2
-```
-
-Run one pipeline per location; different locations can run at the same time.
-`shield-run status` lists each stage as `outputs recorded (not rechecked)`,
-`checkpoints saved: N`, or `not started`. Re-running the pipeline verifies the
-recorded files and requested inputs before skipping completed stages. `logs`
-and `stop` take any of the pipeline's calibrations, for example
-`shield-run stop C.12580 calib.9.28.stage1` stops the whole pipeline.
-
-To continue a pipeline after a stop or a failure, run the same `pipeline`
-command again: finished stages are skipped, the interrupted stage continues from
-its last checkpoint, and the rest follow. If a stage fails, the later stages
-don't run.
-
-Stage 3 (four chains) can't run in the container yet; `start` and `pipeline`
-refuse it. Existing native workflows remain available, but transferring this
-pilot's isolated stage-2 outputs into a native stage-3 run has not yet been
-validated. Arrange that handoff before relying on the pilot for a full analysis.
-
-## Practice: stop and resume (about 1 hour)
-
-This checks that an interrupted run continues where it left off.
-
-1. `shield-run start C.12580 calib.9.28.stage0`
-2. Wait until `shield-run status` shows `checkpoints saved: 1` (about 30 minutes).
-3. `shield-run stop C.12580 calib.9.28.stage0`. `status` now shows `exited`.
-4. `shield-run resume C.12580 calib.9.28.stage0`. `status` shows `running` again,
-   and `shield-run logs C.12580 calib.9.28.stage0` shows it preparing to run the
-   remaining iterations rather than all 15,000.
-5. Either let it finish (about 14 hours) or stop it again.
-
-## Where the results go
-
-Everything is written to
-`/mnt/jheem_nas_share/tmp/shield-container/<your username>/`, in the usual
-layout:
-
-- `mcmc_runs/shield/<calibration>/<location>/`: the calibration's checkpoints
-- `mcmc_summaries/shield/<calibration>/`: the MCMC summary, when it finishes
-- `simulations/shield/<calibration>-<n>/<location>/`: the simulation set
-- `run_records/shield/<location>/<calibration>/`: the run's records:
-  - `inputs.json`: exactly which code and data versions it used, and for stage
-    1 or 2, which earlier stage's results it started from
-  - `outputs.json`: fingerprints of the summary and simulation set it produced
-  - `attempts/`: one small file per start or resume: who ran it, where, with
-    which container, when, and how it ended
-
-These are test locations while the container is being tried out; they don't
-touch the team's usual `mcmc_runs`. Please don't edit or delete the
-`run_records` files; they're how we can later tell which code and data produced
-a result.
-
-## If something goes wrong
-
-- **`lingering is off`** or **`containers can't reach the NAS`**: the
-  administrator setup isn't finished; send the message to the administrator.
-- **`is already running`**: that calibration is still going; check `shield-run
-  status`.
-- **`single-chain calibrations only`**: that calibration is a stage 3 (four
-  chains); run it the usual way for now.
-- **`has no recorded outputs`**: a stage 1 or 2 needs the earlier stage to have
-  finished in the container first; run the stages with `pipeline`.
-- **`status` shows `exited` with a number other than 0:** run `shield-run logs
-  <location> <calibration>` and send the last lines to whoever supports the
-  container.
-- **A `resume` fails straight away:** the run's saved inputs don't match, or
-  there is no checkpoint yet. Send the `logs` output.
-- **`completed stage ... failed verification`:** preserve the run tree and send
-  the log. A record exists, but its files or requested inputs do not match.
-  Nothing is automatically deleted or repaired.
-- **Setup stopped before a checkpoint:** preserve the existing tree for diagnosis.
-  A deliberate restart can use a new `SHIELD_STATE_ROOT`; do not delete records
-  to force the existing run past its safety checks.
-
----
-
-## Administrator setup (once per server, and once per user)
-
-Per server, in the shared folder (`/home/jheem-shared/shield-container`):
-
-1. Download the retained, tested pilot image and check it:
-
-   ```bash
-   cd /home/jheem-shared/shield-container
-   gh release download shield-pilot-2026.10.01-r36815091235 \
-     --repo ncsizemore/jheem-containers \
-     --pattern jheem-shield-recorded.tar.gz --pattern IMAGE.txt --dir image
-   (cd image && grep ' jheem-shield-recorded.tar.gz$' IMAGE.txt | sha256sum -c -)
-   ```
-
-   `IMAGE.txt` records the image ID, archive checksum, source revisions, and
-   originating workflow run. For a newer candidate, export it from a successful
-   `shield-spike` run and retain that exact image before the temporary Actions
-   artifact expires. Do not replace a shared pilot installation while it has
-   active runs; use a separate installation directory for the new image.
-
-2. Prepare the pinned manager inputs and copy the script:
-
-   ```bash
-   python3 <jheem-containers>/workloads/shield/tests/prepare_inputs.py cache
-   cp <jheem-containers>/workloads/shield/shield-run.sh .
-   ```
-
-3. Make the folder readable to the team and to containers (SELinux):
-
-   ```bash
-   chmod -R g+rX,o-rwx /home/jheem-shared/shield-container
-   sudo chcon -R -t container_file_t /home/jheem-shared/shield-container/cache
-   ```
-
-4. Let containers reach the NAS: `sudo setsebool -P virt_use_samba on`
-
-Per user: `sudo loginctl enable-linger <username>`, so their runs survive
-logout. Users need to be in the `jheem` group to write to the NAS.
-
-Each user's container image is stored in their own home directory (about 4 GB),
-because Podman runs without root.
+Retaining the runtime does not archive its scientific outputs or run records.
+Automatic archival, full-stage validation with this image, multi-chain support,
+and deterministic replay remain separate work.

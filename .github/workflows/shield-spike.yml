@@ -3,6 +3,11 @@ name: shield-spike
 # Validation only. SHIELD is not a deployed backend model, is not listed in
 # models.yml, and must not enter the normal model promotion path from here.
 on:
+  push:
+    branches: [main]
+    paths:
+      - workloads/shield/**
+      - .github/workflows/shield-spike.yml
   pull_request:
     branches: [main]
     paths:
@@ -38,9 +43,14 @@ jobs:
           python-version: '3.12'
       - run: pip install -r tests/requirements.txt
       - name: validate spike contract
-        run: pytest workloads/shield/tests/test_contract.py -q
+        run: |
+          bash -n workloads/shield/shield-run.sh
+          pytest workloads/shield/tests/test_contract.py -q
 
   build-recorded:
+    # Main-branch handoff/script edits get fast checks without rebuilding or
+    # publishing an image. PRs and manual dispatch retain the full canary.
+    if: github.event_name != 'push'
     needs: contract
     runs-on: ubuntu-latest
     timeout-minutes: 90

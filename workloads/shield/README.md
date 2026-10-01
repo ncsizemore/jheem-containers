@@ -14,8 +14,11 @@ The image provides two targets from the same dependency layer:
 
 Neither target stores input managers or calibration state in the image.
 
-**Team members running calibrations: see [RUNBOOK.md](RUNBOOK.md)**, which uses
-the `shield-run.sh` wrapper instead of the commands below.
+**Team members trying the pilot:** use
+[Trying the SHIELD container](https://github.com/tfojo1/jheem_analyses/blob/master/applications/SHIELD/CONTAINER-PILOT.md)
+in the analyses repository. No container-repository checkout is needed.
+[RUNBOOK.md](RUNBOOK.md) covers administrator installation and maintenance.
+The pilot does not yet support a full multi-chain calibration.
 
 ## Status (2026-10-01)
 
@@ -26,6 +29,8 @@ the `shield-run.sh` wrapper instead of the commands below.
   two-stage pipeline. With image export on, it saves the tested image as an
   artifact. It has no registry login, image push, promotion, or `models.yml`
   integration.
+  Main-branch pushes run only the fast shell/contract checks; image builds and
+  real-engine canaries run on pull requests or manual dispatch.
 - **Team server (shield2, rootless Podman):** the canary calibration runs end to
   end, through summary and assembly, with state on local disk or the NAS
   (101 s, peak 11.1 GB, 5.4 MB checkpoints), and kill-and-resume passes. One
@@ -187,7 +192,7 @@ peaks at about 11 GB on shield2.
 
 The server pilot covers the rest: the canary through summary and assembly,
 one realistic stage, and NAS mounts, ownership, and output locations (all done
-on shield2), and another team member operating it from [RUNBOOK.md](RUNBOOK.md)
+on shield2), and another team member operating it from the analyses operator guide
 (not yet done).
 
 A green CI run means the container contract holds, not that SHIELD
@@ -242,8 +247,8 @@ SHIELD_STATE=~/shield-pilot/resume bash tests/test_checkpoint_resume.sh
 `pilot_full_run.sh` records exit status, elapsed time, peak memory, chunk
 timings, and whether the summary and simulation set were written, in
 `<state>/pilot-full-run/`; set `SHIELD_CALIBRATION` and `SHIELD_LOCATION` to run a
-real stage. For ordinary use, `shield-run.sh` wraps these settings; see
-[RUNBOOK.md](RUNBOOK.md).
+real stage. For the pilot, `shield-run.sh` wraps these settings; see the analyses
+operator guide linked above. Administrator preparation is in [RUNBOOK.md](RUNBOOK.md).
 
 ## Development source overrides
 
