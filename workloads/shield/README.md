@@ -297,8 +297,10 @@ source and inputs are not identified or checked.
   location, calibration code, and chain.
 - Stage 3 (four parallel chains and assembly) isn't supported in recorded mode.
 - The image bakes one `jheem_analyses` commit, so a calibration registered after
-  that commit needs a new image. Running a mounted, committed checkout instead
-  is planned.
+  that commit is unavailable through the bare image entrypoint. The operator
+  wrapper can instead capture a clean committed analysis checkout and mount
+  the preserved snapshot read-only, without rebuilding the image. See the
+  [source selection reference](SOURCE-SNAPSHOTS.md).
 
 Run the spike's static contract tests with:
 

@@ -45,7 +45,7 @@ jobs:
       - name: validate spike contract
         run: |
           bash -n workloads/shield/shield-run.sh
-          pytest workloads/shield/tests/test_contract.py -q
+          pytest workloads/shield/tests -q
 
   build-recorded:
     # Main-branch handoff/script edits get fast checks without rebuilding or

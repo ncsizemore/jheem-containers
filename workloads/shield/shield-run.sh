@@ -17,6 +17,7 @@
 #   SHIELD_RANDOM_SEED random seed (0, as the team's launcher uses)
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 SHIELD_HOME="${SHIELD_HOME:-/home/jheem-shared/shield-container}"
 STATE_ROOT="${SHIELD_STATE_ROOT:-/mnt/jheem_nas_share/tmp/shield-container/$(id -un)}"
 IMAGE="${SHIELD_IMAGE:-docker.io/library/jheem-shield:ci}"
@@ -24,6 +25,45 @@ CENSUS_TAG="${CENSUS_TAG:-data-managers-v2026.08.26}"
 SYPHILIS_TAG="${SYPHILIS_TAG:-syphilis-manager-v2026.07.27}"
 # The team's launcher runs set.seed(00000); use the same seed by default.
 SEED="${SHIELD_RANDOM_SEED:-0}"
+LAUNCH_LOCKS=()
+
+release_launch_locks() {
+  local lock
+  for lock in ${LAUNCH_LOCKS[@]+"${LAUNCH_LOCKS[@]}"}; do rmdir -- "$lock"; done
+}
+
+lock_launch() {
+  local location="$1" code lock
+  shift
+  [[ "$location" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "invalid location"
+  for code in "$@"; do
+    [[ "$code" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "invalid calibration code"
+  done
+  mkdir -p "$STATE_ROOT/run_locks"
+  trap release_launch_locks EXIT
+  for code in "$@"; do
+    lock="$STATE_ROOT/run_locks/$location--$code"
+    mkdir -- "$lock" 2>/dev/null || fail "a launch is already in progress for $location $code; inspect an interrupted launch before retrying."
+    LAUNCH_LOCKS+=("$lock")
+  done
+}
+
+# Source selections are shared by all locations of a calibration code within
+# this state root. A pipeline binds all requested stages to one selection.
+select_source() {
+  local mode="$1" details have resume_args=()
+  shift
+  [[ "$mode" != resume ]] || resume_args=(--resume)
+  details="$(python3 "$SCRIPT_DIR/source_snapshot.py" \
+    --root "$STATE_ROOT" --source "${SHIELD_SOURCE_DIR:-$PWD}" \
+    --image "$(expected_image_id)" --census "$CENSUS_TAG" \
+    --syphilis "$SYPHILIS_TAG" --seed "$SEED" ${resume_args[@]+"${resume_args[@]}"} "$@")" || exit 1
+  IFS=$'\t' read -r SOURCE_TREE SOURCE_REF RUN_IMAGE CENSUS_TAG SYPHILIS_TAG SEED SOURCE_DIGEST <<< "$details"
+  have="$(podman image inspect --format '{{.Id}}' "$RUN_IMAGE" 2>/dev/null || true)"
+  [[ "sha256:${have#sha256:}" == "$RUN_IMAGE" ]] \
+    || fail "the run's recorded image $RUN_IMAGE is not loaded; restore that exact image before continuing."
+  say "Using saved analysis code ${SOURCE_REF:0:8} (all requested stages and locations)."
+}
 
 say() { printf '%s\n' "$*"; }
 fail() { printf 'shield-run: %s\n' "$*" >&2; exit 1; }
@@ -39,12 +79,18 @@ records_dir() { printf '%s/run_records/shield/%s/%s' "$STATE_ROOT" "$1" "$2"; }
 label() { podman inspect --format "{{index .Config.Labels \"$2\"}}" "$1" 2>/dev/null; }
 
 check_prerequisites() {
+  command -v python3 >/dev/null || fail "python3 is required for source snapshots."
   command -v podman >/dev/null || fail "podman is not installed on this server."
   [[ "$(loginctl show-user "$(id -un)" -p Linger --value 2>/dev/null)" == yes ]] \
     || fail "lingering is off for $(id -un), so a run would stop when you log out.
 Ask the server administrator to run: sudo loginctl enable-linger $(id -un)"
   [[ -f "$SHIELD_HOME/image/IMAGE.txt" ]] || fail "missing $SHIELD_HOME/image/IMAGE.txt; the administrator setup isn't done."
   [[ -d "$SHIELD_HOME/cache/data-managers" ]] || fail "missing $SHIELD_HOME/cache; the administrator setup isn't done."
+  [[ "$STATE_ROOT" == /* ]] || fail "SHIELD_STATE_ROOT must be an absolute path."
+  if [[ "$STATE_ROOT" == /mnt/jheem_nas_share/* ]]; then
+    [[ "$(findmnt -n -o FSTYPE -T /mnt/jheem_nas_share 2>/dev/null)" == cifs ]] \
+      || fail "the NAS is not mounted; no pilot state was created."
+  fi
   mkdir -p "$STATE_ROOT" || fail "can't create $STATE_ROOT."
   [[ -w "$STATE_ROOT" ]] || fail "$STATE_ROOT isn't writable by you."
   if on_cifs "$STATE_ROOT" && [[ "$(getsebool virt_use_samba 2>/dev/null)" != *"--> on" ]]; then
@@ -83,9 +129,11 @@ cmd_setup() {
 # The container (running, or else the most recent) that runs this calibration
 # for this location, alone or as a pipeline stage.
 find_container() {
-  local location="$1" calibration="$2" name found=""
+  local location="$1" calibration="$2" name root found=""
   while read -r name; do
     [[ -n "$name" && "$(label "$name" shield.location)" == "$location" ]] || continue
+    root="$(label "$name" shield.state-root)"
+    [[ -z "$root" || "$root" == "$STATE_ROOT" ]] || continue
     [[ " $(label "$name" shield.calibrations) " == *" $calibration "* ]] || continue
     if [[ "$(podman container inspect --format '{{.State.Running}}' "$name")" == true ]]; then
       printf '%s' "$name"; return 0
@@ -110,12 +158,12 @@ check_not_running() {
 # Run the image detached. Arguments: container name, the calibrations it
 # covers, location, run mode (empty for a pipeline), then the container command.
 run_container() {
-  local name="$1" calibrations="$2" location="$3" mode="$4" state_opts smoke_env=() freq_env=() mode_env=() calibration
+  local name="$1" calibrations="$2" location="$3" mode="$4" state_opts source_opts smoke_env=() freq_env=() mode_env=() calibration
   shift 4
-  podman rm -f "$name" >/dev/null 2>&1 || true
-
   state_opts=""
   on_cifs "$STATE_ROOT" || state_opts=",relabel=shared"
+  source_opts=""
+  on_cifs "$SOURCE_TREE" || source_opts=",relabel=shared"
   if [[ " $calibrations" == *" container.smoke."* ]]; then
     for calibration in $calibrations; do
       [[ "$calibration" == container.smoke.* ]] \
@@ -126,26 +174,42 @@ run_container() {
   fi
   [[ -z "$mode" ]] || mode_env=(--env "SHIELD_RUN_MODE=$mode")
 
-  podman run -d --name "$name" \
-    --label shield.location="$location" --label shield.calibrations="$calibrations" \
+  local runtime_args=(
     --userns=keep-id --group-add keep-groups --network none \
     --user "$(id -u):$(id -g)" \
     --mount "type=bind,src=$SHIELD_HOME/cache,dst=/work/cache,readonly" \
     --mount "type=bind,src=$STATE_ROOT,dst=/work/state$state_opts" \
+    --mount "type=bind,src=$STATE_ROOT/run_sources,dst=/work/state/run_sources,readonly$source_opts" \
+    --mount "type=bind,src=$SOURCE_TREE,dst=/opt/run-source/jheem_analyses,readonly$source_opts" \
+    --mount "type=bind,src=$SCRIPT_DIR/check_source_compatibility.R,dst=/opt/shield/check_source_compatibility.R,readonly" \
+    --env JHEEM_ANALYSES_PATH=/opt/run-source/jheem_analyses \
+    --env "JHEEM_ANALYSES_REF=$SOURCE_REF" \
     --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG" \
     --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG" \
     --env "SHIELD_RANDOM_SEED=$SEED" \
-    --env "SHIELD_IMAGE_ID=$(expected_image_id)" \
+    --env "SHIELD_IMAGE_ID=$RUN_IMAGE" \
     --env "SHIELD_OPERATOR=$(id -un)" \
     --env "SHIELD_HOST=$(hostname -s)" \
-    "${smoke_env[@]}" "${freq_env[@]}" "${mode_env[@]}" \
-    "$IMAGE" "$@" >/dev/null
+    ${smoke_env[@]+"${smoke_env[@]}"} ${freq_env[@]+"${freq_env[@]}"} ${mode_env[@]+"${mode_env[@]}"}
+  )
+  say "Checking the selected code, inputs, and calibration definitions..."
+  podman run --rm "${runtime_args[@]}" "$RUN_IMAGE" shell -c \
+    'Rscript /opt/shield/preflight.R && Rscript /opt/shield/check_source_compatibility.R "$@"' \
+    shield-source-check $calibrations || fail "source compatibility check failed; no calibration was launched. Preserve the saved selection and logs."
+  # Do not remove old container diagnostics or race another launcher by force.
+  # Podman atomically reserves a unique attempt name; the running check above
+  # is still same-account only, not a general shared-writer lock.
+  name="$name-$(date -u +%Y%m%dT%H%M%S)-$$"
+  podman run -d --name "$name" \
+    --label shield.location="$location" --label shield.calibrations="$calibrations" \
+    --label shield.state-root="$STATE_ROOT" \
+    "${runtime_args[@]}" "$RUN_IMAGE" "$@" >/dev/null
 }
 
 cmd_stage() {
   local mode="$1" location="$2" calibration="$3" saved
   check_prerequisites
-  check_image || fail "the image isn't loaded; run: shield-run.sh setup"
+  lock_launch "$location" "$calibration"
   check_not_running "$location" "$calibration"
   saved="$(calibration_dir "$location" "$calibration")"
   if [[ "$mode" == fresh && ( -e "$saved" || -e "$(records_dir "$location" "$calibration")" ) ]]; then
@@ -163,6 +227,7 @@ administrator for a separate SHIELD_STATE_ROOT for a deliberate new attempt.
 Use start only for a run that has not already been started."
   fi
 
+  select_source "$mode" "$calibration"
   run_container "$(safe_name "shield-$calibration-$location")" "$calibration" "$location" "$mode" \
     calibrate "$location" "$calibration"
   say "Started ($mode): $calibration for $location."
@@ -176,7 +241,7 @@ cmd_pipeline() {
   local location="$1" calibration
   shift
   check_prerequisites
-  check_image || fail "the image isn't loaded; run: shield-run.sh setup"
+  lock_launch "$location" "$@"
   check_not_running "$location" "$@"
   # A stage with calibration state but no recorded start wasn't made by a
   # recorded run, and would stop the pipeline partway; refuse it up front.
@@ -189,6 +254,7 @@ SHIELD_STATE_ROOT for a deliberate new attempt; do not delete saved state."
     fi
   done
 
+  select_source pipeline "$@"
   run_container "$(safe_name "shield-pipeline-$1-$location")" "$*" "$location" "" \
     pipeline "$location" "$@"
   say "Started pipeline for $location: $*"
@@ -212,10 +278,12 @@ stage_progress() {
 }
 
 cmd_status() {
-  local names name location calibrations state last calibration
+  local names name location calibrations state last calibration root
   names="$(podman ps -a --filter name=^shield- --sort created --format '{{.Names}}')"
   if [[ -z "$names" ]]; then say "No SHIELD runs found."; return; fi
   while read -r name; do
+    root="$(label "$name" shield.state-root)"
+    [[ -z "$root" || "$root" == "$STATE_ROOT" ]] || continue
     location="$(label "$name" shield.location)"
     calibrations="$(label "$name" shield.calibrations)"
     state="$(podman inspect --format '{{.State.Status}} (exit {{.State.ExitCode}})' "$name")"
