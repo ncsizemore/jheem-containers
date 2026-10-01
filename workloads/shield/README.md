@@ -37,8 +37,9 @@ the `shield-run.sh` wrapper instead of the commands below.
   (`jheem_analyses@3f463e2a`, `jheem-containers@4b9f83db`). The hosted canary at
   [run 36815091235](https://github.com/ncsizemore/jheem-containers/actions/runs/36815091235)
   passed, including missing/modified outputs and changed requested inputs.
-- **Image retention:** the tested export is in that workflow's seven-day
-  artifact. Retention beyond Actions expiry is still pending.
+- **Image retention:** [shield-pilot-2026.10.01-r36815091235](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.01-r36815091235)
+  preserves that run's exact image and archive checksum beyond Actions expiry.
+  It is a non-latest pilot prerelease, not a production model promotion.
 - **Not yet done:** another team member running it from the runbook, a full
   stage with the fixed image, and multi-chain stage 3 or a tested native handoff.
 

@@ -148,12 +148,13 @@ a result.
 
 Per server, in the shared folder (`/home/jheem-shared/shield-container`):
 
-1. Download the tested image from a successful `shield-spike` workflow run with
-   image export on, and check it (Actions retains this artifact for seven days):
+1. Download the retained, tested pilot image and check it:
 
    ```bash
    cd /home/jheem-shared/shield-container
-   gh run download <run-id> --repo ncsizemore/jheem-containers --name shield-recorded-image --dir image
+   gh release download shield-pilot-2026.10.01-r36815091235 \
+     --repo ncsizemore/jheem-containers \
+     --pattern jheem-shield-recorded.tar.gz --pattern IMAGE.txt --dir image
    (cd image && grep ' jheem-shield-recorded.tar.gz$' IMAGE.txt | sha256sum -c -)
    ```
 
