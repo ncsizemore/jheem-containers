@@ -55,9 +55,17 @@ include its audited ten-line registry correction: removal of an early duplicate
 registration that referenced a predecessor before it was defined. Remaining
 calibration definitions and likelihood formulas are unchanged. The analyses
 candidate also hardens public manager loading after rejected credentials and
-adds numerical output inspection. Local checks pass; a new image build and
-real-engine canary are still required. The retained release and installed image
-above have not changed.
+adds numerical output inspection. The candidate passed the hosted build,
+checkpoint/resume, two-stage canary, numerical output inspection, and negative
+output-reuse checks in
+[run 37000162439](https://github.com/ncsizemore/jheem-containers/actions/runs/37000162439)
+(container source `9d0869d4`, analyses `eab6beb0`). Both downloaded numerical
+reports parse as JSON and contain two simulations with 173 finite stored
+parameters and finite selected outcomes. Only two transmission parameters vary
+in these tiny tests; this is not a full calibration or a native/container
+equivalence result. The tested image was exported as an Actions artifact, not
+published as a retained release or installed. The retained release and installed
+image above have not changed.
 
 Manual CI now accepts `input_profile=retained` (the default July 27 syphilis
 manager) or `input_profile=native-2026-10-01` (the May 5 manager identified by
