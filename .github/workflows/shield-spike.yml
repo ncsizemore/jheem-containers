@@ -65,7 +65,7 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '212fb0e7000ad683addd566a6bf44016c0738710' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || 'eab6beb0a3131607b978b8f42bc1c87b9592c1a2' }}
       SHIELD_INPUT_PROFILE: ${{ inputs.input_profile || 'retained' }}
     steps:
       - uses: actions/checkout@v7

@@ -144,9 +144,30 @@ EOF
 for stage in "$stage0" "$stage1"; do
   run_to_end "numeric-$stage" "$SHIELD_IMAGE" shell -c \
     'Rscript "$JHEEM_ANALYSES_PATH/applications/SHIELD/tests/inspect-recorded-outputs.R" \
-      /work/state "$1" "$2" > "/work/state/diagnostics/numeric-$2.json"' \
+      /work/state "$1" "$2" "/work/state/diagnostics/numeric-$2.json"' \
     inspect "$location" "$stage"
 done
+
+# Validate the delivered reports too: a successful inspector must not leave a
+# JSON-named file mixed with R startup messages or another stage's contents.
+python3 - "$diagnostics" "$location" "$stage0" "$stage1" <<'EOF' || fail "numerical reports are invalid"
+import json, sys
+from pathlib import Path
+
+diagnostics, location, *stages = sys.argv[1:]
+for stage in stages:
+    report = json.loads((Path(diagnostics) / f"numeric-{stage}.json").read_text())
+    assert report["schema_version"] == 1
+    assert report["location"] == location and report["calibration_code"] == stage
+    assert report["n_sim"] == 2 and report["sample_simulation_indices"] == [1, 2]
+    assert report["parameter_count"] == len(report["parameters"]) > 0
+    assert [o["outcome"] for o in report["outcomes"]] == [
+        "population", "incidence", "diagnosis.total", "diagnosis.ps"
+    ]
+    for outcome in report["outcomes"]:
+        assert [y["year"] for y in outcome["years"]] == ["2010", "2015", "2020", "2025", "2030"]
+    print(f"  {stage}: readable numerical report, {report['parameter_count']} parameters")
+EOF
 
 # Negative checks change only the disposable canary state.
 simset="$(python3 - "$SHIELD_STATE" "$location" "$stage0" <<'EOF'

@@ -86,7 +86,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current candidate defaults are:
 
-- `jheem_analyses`: `212fb0e7000ad683addd566a6bf44016c0738710`
+- `jheem_analyses`: `eab6beb0a3131607b978b8f42bc1c87b9592c1a2`
 - `jheem2`: `9578726b012a2ee380b380ef0203733d1bd81163` (October 1 `dev`, including spline fixes)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and

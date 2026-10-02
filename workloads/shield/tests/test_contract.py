@@ -18,6 +18,8 @@ def test_canary_inspects_completed_simset_values():
     assert "inspect-recorded-outputs.R" in script
     assert script.index("inspect-recorded-outputs.R") < script.index("# Negative checks")
     assert 'numeric-$2.json' in script
+    assert "report = json.loads(" in script
+    assert '"$2" > ' not in script
     assert "test-output-checks.R" in workflow
 
 
