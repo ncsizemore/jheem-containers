@@ -37,7 +37,7 @@ docker_args=(
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true
   --env SHIELD_CACHE_FREQUENCY=1
   --env SHIELD_UPDATE_FREQUENCY=1
-  --env SHIELD_RANDOM_SEED=20260916
+  --env "SHIELD_RANDOM_SEED=${SHIELD_RANDOM_SEED:-20260916}"
   --env "SHIELD_IMAGE_ID=$image_id"
   --env SHIELD_OPERATOR=canary
   --env "SHIELD_HOST=$(hostname -s 2>/dev/null || echo unknown)"
@@ -137,6 +137,16 @@ a1 = attempts(stage1)
 check([(a["run_mode"], a["status"]) for a in a1] == [("fresh", "succeeded")],
       f"{stage1} attempts: {[(a['run_mode'], a['status']) for a in a1]}")
 EOF
+
+# Read actual parameters and selected yearly outcomes, not only file digests.
+# The inspector verifies recorded identities before deserializing; these are
+# completed disposable canaries, never a live team's output files.
+for stage in "$stage0" "$stage1"; do
+  run_to_end "numeric-$stage" "$SHIELD_IMAGE" shell -c \
+    'Rscript "$JHEEM_ANALYSES_PATH/applications/SHIELD/tests/inspect-recorded-outputs.R" \
+      /work/state "$1" "$2" > "/work/state/diagnostics/numeric-$2.json"' \
+    inspect "$location" "$stage"
+done
 
 # Negative checks change only the disposable canary state.
 simset="$(python3 - "$SHIELD_STATE" "$location" "$stage0" <<'EOF'

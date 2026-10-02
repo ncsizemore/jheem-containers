@@ -48,6 +48,26 @@ The pilot does not yet support a full multi-chain calibration.
 - **Not yet done:** another team member running it from the runbook, a full
   stage with the fixed image, and multi-chain stage 3 or a tested native handoff.
 
+### Current-source candidate (2026-10-02; not installed)
+
+The candidate pins below follow the engine used by an October 1 native run and
+include its audited ten-line registry correction: removal of an early duplicate
+registration that referenced a predecessor before it was defined. Remaining
+calibration definitions and likelihood formulas are unchanged. The analyses
+candidate also hardens public manager loading after rejected credentials and
+adds numerical output inspection. Local checks pass; a new image build and
+real-engine canary are still required. The retained release and installed image
+above have not changed.
+
+Manual CI now accepts `input_profile=retained` (the default July 27 syphilis
+manager) or `input_profile=native-2026-10-01` (the May 5 manager identified by
+digest in that native run's cache, with seed 0). Both select the August 26 census
+manager. This is a comparison baseline, not a recommendation to use May data or
+a change to manager releases. Matching these inputs does not make the entire
+native R/compiler/package environment identical, and retrospective inspection
+is not an at-launch record. The canaries remain two-iteration tests, not the
+native run's full calibration schedule.
+
 ## Build from clean local worktrees
 
 The helper verifies that the five source trees are clean and passes their
@@ -64,10 +84,10 @@ workloads/shield/build-local.sh \
 ```
 
 This uses BuildKit named contexts, so the source repositories do not need to be
-published merely to perform a local spike. The current reviewed defaults are:
+published merely to perform a local spike. The current candidate defaults are:
 
-- `jheem_analyses`: `06505412ff4ad870ba0263361b791ba5d53737de` (integrated into `master` by `3f463e2a`; the image retains the tested source pin)
-- `jheem2`: `ccb1f9bfe40844143dbcec65ffd27829aa39d7ef` (`dev`)
+- `jheem_analyses`: `ffbfb7aa70cef62d5aa23d6918fd547f6f12bfcd`
+- `jheem2`: `9578726b012a2ee380b380ef0203733d1bd81163` (October 1 `dev`, including spline fixes)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
   `distributions`: `4d71d9644b4439a59210e804520ac8717ae8f079`, the team servers'
@@ -190,6 +210,21 @@ concurrency. Before the source-reference fix, building the summary exceeded the
 16 GB hosted runner's memory (run 36593697214); with the fix the full canary
 peaks at about 11 GB on shield2.
 
+The candidate also loads each completed canary simset and checks its identity,
+simulation count, finite named parameters, and selected yearly outcomes. It
+writes `diagnostics/numeric-container.smoke.stage*.json` with actual parameter
+and outcome values (up to five simulations) plus descriptive ranges. Missing or
+non-finite selected results fail; negative outcome counts remain visible. The
+inspector and its focused unit tests live in `jheem_analyses` alongside the
+recorded runtime. These reports are not convergence tests or native/container
+equivalence results.
+
+The next numerical comparison should evaluate the same saved parameter vector
+with matched scientific source and manager bytes in both environments, then
+compare trajectories and each likelihood contribution. Only after that should
+full calibration summaries be compared. Exact equality of independent MCMC
+traces or serialized simset bytes is not the current acceptance criterion.
+
 The server pilot covers the rest: the canary through summary and assembly,
 one realistic stage, and NAS mounts, ownership, and output locations (all done
 on shield2), and another team member operating it from the analyses operator guide
@@ -213,6 +248,18 @@ commit.
 gh workflow run shield-spike.yml --repo ncsizemore/jheem-containers \
   --ref <branch> -f export_image=true -f jheem_analyses_ref=<40-character SHA>
 ```
+
+Add `-f input_profile=native-2026-10-01` for the identified May-manager
+comparison. `IMAGE.txt` records the selected profile, tags, seed, and engine
+revision. The input-preparation helper accepts the same profile:
+
+```bash
+python3 workloads/shield/tests/prepare_inputs.py /path/to/comparison-cache \
+  --profile native-2026-10-01
+```
+
+Outside CI, set the corresponding tags and `SHIELD_RANDOM_SEED=0` explicitly
+when running that comparison; preparing a cache does not change runtime settings.
 
 Then:
 

@@ -43,7 +43,7 @@ docker_args=(
   --env SHIELD_ENABLE_CONTAINER_SMOKE=true
   --env SHIELD_CACHE_FREQUENCY=1
   --env SHIELD_UPDATE_FREQUENCY=1
-  --env SHIELD_RANDOM_SEED=20260916
+  --env "SHIELD_RANDOM_SEED=${SHIELD_RANDOM_SEED:-20260916}"
   --env "SHIELD_IMAGE_ID=$("$engine" image inspect --format '{{.Id}}' "$SHIELD_IMAGE")"
   --env SHIELD_OPERATOR=canary
 )

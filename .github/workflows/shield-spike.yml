@@ -25,6 +25,14 @@ on:
         required: false
         default: ''
         type: string
+      input_profile:
+        description: 'Immutable test inputs: retained July manager, or the audited October 1 native run (May manager). Neither changes installed defaults.'
+        required: false
+        default: retained
+        type: choice
+        options:
+          - retained
+          - native-2026-10-01
 
 permissions:
   contents: read
@@ -57,7 +65,8 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '06505412ff4ad870ba0263361b791ba5d53737de' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || 'ffbfb7aa70cef62d5aa23d6918fd547f6f12bfcd' }}
+      SHIELD_INPUT_PROFILE: ${{ inputs.input_profile || 'retained' }}
     steps:
       - uses: actions/checkout@v7
       - name: check the SHIELD source commit
@@ -80,7 +89,7 @@ jobs:
             JHEEM_ANALYSES_REF=${{ env.JHEEM_ANALYSES_REF }}
           build-contexts: |
             jheem_analyses=https://github.com/tfojo1/jheem_analyses.git#${{ env.JHEEM_ANALYSES_REF }}
-            jheem2=https://github.com/CIPHER-Epi/jheem2.git#ccb1f9bfe40844143dbcec65ffd27829aa39d7ef
+            jheem2=https://github.com/CIPHER-Epi/jheem2.git#9578726b012a2ee380b380ef0203733d1bd81163
             locations=https://github.com/tfojo1/locations.git#2481fc440cf1d981bb1005dd903708a88a528d13
             bayesian_simulations=https://github.com/tfojo1/bayesian.simulations.git#4e0d13e85857396bb0e6e2ac1d244775b2145f75
             distributions=https://github.com/tfojo1/distributions.git#4d71d9644b4439a59210e804520ac8717ae8f079
@@ -96,14 +105,12 @@ jobs:
             cd "$JHEEM_ANALYSES_PATH"
             Rscript applications/SHIELD/tests/test-recorded-runtime.R &&
             Rscript applications/SHIELD/tests/test-recorded-cache.R &&
+            Rscript applications/SHIELD/tests/test-output-checks.R &&
             Rscript commoncode/tests/test_data_manager_release_selection.R
           '
       - name: prepare pinned test inputs
-        run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache"
+        run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache" --profile "$SHIELD_INPUT_PROFILE" --github-env "$GITHUB_ENV"
       - name: preflight the recorded image offline
-        env:
-          CENSUS_TAG: data-managers-v2026.08.26
-          SYPHILIS_TAG: syphilis-manager-v2026.07.27
         run: |
           mkdir -p "$RUNNER_TEMP/shield-state"
           run_shield() {
@@ -113,22 +120,18 @@ jobs:
               --mount "type=bind,src=$RUNNER_TEMP/shield-state,dst=/work/state" \
               --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG" \
               --env "JHEEM_SYPHILIS_MANAGER_TAG=$SYPHILIS_TAG" \
-              --env SHIELD_RANDOM_SEED=20260916 \
+              --env "SHIELD_RANDOM_SEED=$SHIELD_RANDOM_SEED" \
               jheem-shield:ci "$@"
           }
           run_shield preflight
       - name: interrupt a real tiny calibration and resume to its next checkpoint
         env:
-          CENSUS_TAG: data-managers-v2026.08.26
-          SYPHILIS_TAG: syphilis-manager-v2026.07.27
           SHIELD_IMAGE: jheem-shield:ci
           SHIELD_CACHE: ${{ runner.temp }}/shield-cache
           SHIELD_STATE: ${{ runner.temp }}/shield-state
         run: bash workloads/shield/tests/test_checkpoint_resume.sh
       - name: complete the calibration, check run records, and run a two-stage pipeline
         env:
-          CENSUS_TAG: data-managers-v2026.08.26
-          SYPHILIS_TAG: syphilis-manager-v2026.07.27
           SHIELD_IMAGE: jheem-shield:ci
           SHIELD_CACHE: ${{ runner.temp }}/shield-cache
           SHIELD_STATE: ${{ runner.temp }}/shield-state
@@ -157,6 +160,11 @@ jobs:
             echo "workflow_run=$GITHUB_RUN_ID"
             echo "containers_commit=$GITHUB_SHA"
             echo "jheem_analyses_ref=$JHEEM_ANALYSES_REF"
+            echo "jheem2_ref=9578726b012a2ee380b380ef0203733d1bd81163"
+            echo "input_profile=$SHIELD_INPUT_PROFILE"
+            echo "census_tag=$CENSUS_TAG"
+            echo "syphilis_tag=$SYPHILIS_TAG"
+            echo "random_seed=$SHIELD_RANDOM_SEED"
             (cd "$RUNNER_TEMP/shield-image" && sha256sum jheem-shield-recorded.tar.gz)
           } >"$RUNNER_TEMP/shield-image/IMAGE.txt"
           cat "$RUNNER_TEMP/shield-image/IMAGE.txt"

@@ -12,6 +12,15 @@ REPOSITORY_ROOT = ROOT.parents[1]
 WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "shield-spike.yml"
 
 
+def test_canary_inspects_completed_simset_values():
+    script = (ROOT / "tests" / "test_records_and_pipeline.sh").read_text()
+    workflow = WORKFLOW.read_text()
+    assert "inspect-recorded-outputs.R" in script
+    assert script.index("inspect-recorded-outputs.R") < script.index("# Negative checks")
+    assert 'numeric-$2.json' in script
+    assert "test-output-checks.R" in workflow
+
+
 def test_recorded_image_pins_base_and_source_defaults():
     dockerfile = (ROOT / "Dockerfile").read_text()
     assert re.search(r"BASE_IMAGE=.*@sha256:[0-9a-f]{64}", dockerfile)
@@ -120,8 +129,27 @@ def test_ci_input_fixture_uses_immutable_release_assets():
     assert "-latest" not in preparer
     assert "data-managers-v2026.08.26" in preparer
     assert "syphilis-manager-v2026.07.27" in preparer
-    assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 2
+    assert "syphilis-manager-v2026.05.05" in preparer
+    assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 3
     assert "os.replace(temporary_path, artifact)" in preparer
+
+
+def test_ci_profile_controls_preparer_and_all_canary_steps():
+    workflow = yaml.load(WORKFLOW.read_text(), Loader=yaml.BaseLoader)
+    profile = workflow["on"]["workflow_dispatch"]["inputs"]["input_profile"]
+    assert profile["options"] == ["retained", "native-2026-10-01"]
+    assert profile["default"] == "retained"
+    build = workflow["jobs"]["build-recorded"]
+    assert build["env"]["SHIELD_INPUT_PROFILE"] == "${{ inputs.input_profile || 'retained' }}"
+    prepare = next(s for s in build["steps"] if s.get("name") == "prepare pinned test inputs")
+    assert '--profile "$SHIELD_INPUT_PROFILE" --github-env "$GITHUB_ENV"' in prepare["run"]
+    for step in build["steps"]:
+        # Test stages must use the tags emitted by the selected preparer profile.
+        assert "SYPHILIS_TAG" not in step.get("env", {})
+        assert "CENSUS_TAG" not in step.get("env", {})
+    for name in ("test_checkpoint_resume.sh", "test_records_and_pipeline.sh"):
+        script = (ROOT / "tests" / name).read_text()
+        assert '"SHIELD_RANDOM_SEED=${SHIELD_RANDOM_SEED:-20260916}"' in script
 
 
 def test_entrypoint_records_every_attempt():

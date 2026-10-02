@@ -7,6 +7,7 @@ the resulting cache read-only and run without network access.
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import os
@@ -32,6 +33,18 @@ INPUTS = (
         "published_at": "2026-07-27T19:57:12Z",
     },
 )
+
+# An identified comparison input, not a change to the installed pilot default.
+NATIVE_OCTOBER_INPUTS = (
+    INPUTS[0],
+    {
+        "manager": "syphilis.manager.rdata",
+        "tag": "syphilis-manager-v2026.05.05",
+        "sha256": "e8acbeb758ae4af4e149a62ef78c862a114a2d55f43a0c4695f49d9a8a9fa0e6",
+        "published_at": "2026-05-05T16:36:49Z",
+    },
+)
+PROFILES = {"retained": INPUTS, "native-2026-10-01": NATIVE_OCTOBER_INPUTS}
 
 
 def sha256(path: Path) -> str:
@@ -83,12 +96,24 @@ def materialize(cache: Path, specification: dict[str, str]) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        raise SystemExit(f"usage: {sys.argv[0]} CACHE_DIRECTORY")
-    cache = Path(sys.argv[1]).resolve()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("cache_directory", type=Path)
+    parser.add_argument("--profile", choices=PROFILES, default="retained")
+    parser.add_argument("--github-env", type=Path,
+                        help="Append the selected test tags and seed to this workflow environment file")
+    args = parser.parse_args()
+    cache = args.cache_directory.resolve()
     cache.mkdir(parents=True, exist_ok=True)
-    for specification in INPUTS:
+    selected = PROFILES[args.profile]
+    for specification in selected:
         materialize(cache, specification)
+    if args.github_env:
+        with args.github_env.open("a") as output:
+            output.write(f"CENSUS_TAG={selected[0]['tag']}\n")
+            output.write(f"SYPHILIS_TAG={selected[1]['tag']}\n")
+            seed = "0" if args.profile == "native-2026-10-01" else "20260916"
+            output.write(f"SHIELD_RANDOM_SEED={seed}\n")
+    print(f"Prepared profile: {args.profile}")
 
 
 if __name__ == "__main__":

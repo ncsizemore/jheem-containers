@@ -29,7 +29,7 @@ RUN rm -rf /opt/jheem/jheem_analyses/.git /opt/jheem/jheem2/.git \
 
 FROM ${BASE_IMAGE} AS runtime
 
-ARG JHEEM2_REF=ccb1f9bfe40844143dbcec65ffd27829aa39d7ef
+ARG JHEEM2_REF=9578726b012a2ee380b380ef0203733d1bd81163
 ARG LOCATIONS_REF=2481fc440cf1d981bb1005dd903708a88a528d13
 ARG BAYESIAN_SIMULATIONS_REF=4e0d13e85857396bb0e6e2ac1d244775b2145f75
 ARG DISTRIBUTIONS_REF=4d71d9644b4439a59210e804520ac8717ae8f079
@@ -89,7 +89,7 @@ RUN cd /app && R --slave -e "stopifnot( \
 RUN chmod o+x /root /root/.cache /root/.cache/R \
     && chmod -R a+rX /root/.cache/R/renv
 
-ARG JHEEM_ANALYSES_REF=06505412ff4ad870ba0263361b791ba5d53737de
+ARG JHEEM_ANALYSES_REF=ffbfb7aa70cef62d5aa23d6918fd547f6f12bfcd
 COPY --from=source-preparer /opt/jheem/jheem_analyses/ /opt/jheem/jheem_analyses/
 
 LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers" \
