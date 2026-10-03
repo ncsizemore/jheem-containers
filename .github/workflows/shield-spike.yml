@@ -39,6 +39,11 @@ on:
         required: false
         default: false
         type: boolean
+      compare_calibration_traces:
+        description: 'Compare two fresh runs, a twice-resumed run, and a changed seed (eight iterations each)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -71,7 +76,7 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '94ba72984737d71ea9ca8ed102a8add58b48e6f2' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '55ea81b5fbd8bc7228eee97ac6ecd7261ecb8d71' }}
       SHIELD_INPUT_PROFILE: ${{ inputs.input_profile || 'retained' }}
     steps:
       - uses: actions/checkout@v7
@@ -113,6 +118,7 @@ jobs:
             Rscript applications/SHIELD/tests/test-recorded-cache.R &&
             Rscript applications/SHIELD/tests/test-output-checks.R &&
             Rscript applications/SHIELD/tests/test-stage1-compatibility.R &&
+            Rscript applications/SHIELD/tests/test-trace-checks.R &&
             Rscript applications/SHIELD/tests/test-manager-selection.R &&
             Rscript commoncode/tests/test_data_manager_release_selection.R
           '
@@ -193,6 +199,24 @@ jobs:
             ${{ runner.temp }}/shield-state/diagnostics/
             ${{ runner.temp }}/shield-state/run_records/
           if-no-files-found: ignore
+          retention-days: 14
+      - name: compare seeded fresh and resumed calibration traces
+        if: inputs.compare_calibration_traces
+        env:
+          SHIELD_IMAGE: jheem-shield:ci
+          SHIELD_CACHE: ${{ runner.temp }}/shield-cache
+          SHIELD_REPLAY_OUTPUT: ${{ runner.temp }}/shield-repeatability
+        run: bash workloads/shield/tests/test_repeatability.sh
+      - name: upload calibration trace comparison evidence
+        if: always() && inputs.compare_calibration_traces
+        uses: actions/upload-artifact@v4
+        with:
+          name: shield-repeatability
+          path: |
+            ${{ runner.temp }}/shield-repeatability/*.json
+            ${{ runner.temp }}/shield-repeatability/*.log
+            ${{ runner.temp }}/shield-repeatability/*/run_records/
+          if-no-files-found: warn
           retention-days: 14
       # A server pilot loads exactly the image this run tested; nothing is pushed
       # to a registry. Opt-in (manual input, or the PR label export-image),

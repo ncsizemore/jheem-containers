@@ -89,7 +89,7 @@ RUN cd /app && R --slave -e "stopifnot( \
 RUN chmod o+x /root /root/.cache /root/.cache/R \
     && chmod -R a+rX /root/.cache/R/renv
 
-ARG JHEEM_ANALYSES_REF=94ba72984737d71ea9ca8ed102a8add58b48e6f2
+ARG JHEEM_ANALYSES_REF=55ea81b5fbd8bc7228eee97ac6ecd7261ecb8d71
 COPY --from=source-preparer /opt/jheem/jheem_analyses/ /opt/jheem/jheem_analyses/
 
 LABEL org.opencontainers.image.source="https://github.com/ncsizemore/jheem-containers" \

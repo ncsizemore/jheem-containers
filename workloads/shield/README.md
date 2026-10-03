@@ -146,6 +146,46 @@ The full records distinguish the BLAS/platform environments; individual causes
 of floating-point differences were not isolated. This run does not export an
 installable image or update the retained pilot.
 
+### Seed and checkpoint replay comparison
+
+The manual workflow input `compare_calibration_traces` runs four disposable
+calibrations in one identified image. Choose `september-2026` to use the current
+intended manager input. Each calibration uses Baltimore's real stage-0 likelihood,
+samples the two transmission rates, and runs eight iterations across four
+two-iteration checkpoints, with no burn-in or thinning.
+
+The experiment compares two fresh processes with the same seed, then a run
+interrupted after checkpoints one and two and resumed in separate processes.
+A fourth run changes the configured seed by one. The test pauses each interrupted
+container and deserializes its checkpoint in a separate read-only process before
+stopping it; completed chunk hashes must survive both interruption and resumption.
+
+The report compares original model parameters, initial sampled parameters,
+checkpoint seeds, sampled values, likelihood/prior traces, acceptance counts,
+and adaptive state at every checkpoint. Values retain full double precision.
+It reports the first differing checkpoint and coordinate, excluding timestamps,
+runtime durations, and serialized simulation identifiers. A successful changed-seed
+control requires different saved seeds and different samples or likelihoods.
+
+For a local built image and a prepared immutable manager cache:
+
+```bash
+SHIELD_IMAGE=IMAGE SHIELD_CACHE=/path/to/cache \
+  SHIELD_REPLAY_OUTPUT=/path/to/new-replay-output \
+  CENSUS_TAG=data-managers-v2026.08.26 \
+  SYPHILIS_TAG=syphilis-manager-v2026.09.09 SHIELD_RANDOM_SEED=0 \
+  bash workloads/shield/tests/test_repeatability.sh
+```
+
+The output path must be new. CI uploads JSON traces, comparison results, logs,
+checkpoint verification reports, and run receipts as `shield-repeatability`,
+retained for 14 days even if the check fails. Scientific cache/simulation files
+remain in the disposable runner state and are not uploaded. Preserve the reports
+before expiry. The comparison exits unsuccessfully if either same-seed pair
+differs or the changed-seed control has no effect. This experiment characterizes
+one short single-chain setup; it does not establish convergence, multi-chain
+behavior, cross-platform equality, or the sampler's explicit seed argument.
+
 The full run also passed checkpoint/resume, two-stage assembly, recorded-output
 inspection, and rejection of missing/modified outputs and changed requested
 seed. Both canary reports contain two simulations, 173 finite parameters, and
