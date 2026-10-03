@@ -44,7 +44,17 @@ NATIVE_OCTOBER_INPUTS = (
         "published_at": "2026-05-05T16:36:49Z",
     },
 )
-PROFILES = {"retained": INPUTS, "native-2026-10-01": NATIVE_OCTOBER_INPUTS}
+SEPTEMBER_INPUTS = (
+    INPUTS[0],
+    {
+        "manager": "syphilis.manager.rdata",
+        "tag": "syphilis-manager-v2026.09.09",
+        "sha256": "c3e3c983d6b4e9c961f735f9c59d45483bd63cfa715cf75c1fae874da2d129e6",
+        "published_at": "2026-09-09T19:22:51Z",
+    },
+)
+PROFILES = {"retained": INPUTS, "native-2026-10-01": NATIVE_OCTOBER_INPUTS,
+            "september-2026": SEPTEMBER_INPUTS}
 
 
 def sha256(path: Path) -> str:
@@ -111,7 +121,7 @@ def main() -> None:
         with args.github_env.open("a") as output:
             output.write(f"CENSUS_TAG={selected[0]['tag']}\n")
             output.write(f"SYPHILIS_TAG={selected[1]['tag']}\n")
-            seed = "0" if args.profile == "native-2026-10-01" else "20260916"
+            seed = "20260916" if args.profile == "retained" else "0"
             output.write(f"SHIELD_RANDOM_SEED={seed}\n")
     print(f"Prepared profile: {args.profile}")
 

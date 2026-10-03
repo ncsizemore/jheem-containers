@@ -50,7 +50,7 @@ The pilot does not yet support a full multi-chain calibration.
 
 ### Current-source candidate (2026-10-02; not installed)
 
-The candidate pins below follow the engine used by an October 1 native run and
+The October 2 candidate followed the engine used by an October 1 native run and
 include its audited ten-line registry correction: removal of an early duplicate
 registration that referenced a predecessor before it was defined. Remaining
 calibration definitions and likelihood formulas are unchanged. The analyses
@@ -67,14 +67,70 @@ equivalence result. The tested image was exported as an Actions artifact, not
 published as a retained release or installed. The retained release and installed
 image above have not changed.
 
-Manual CI now accepts `input_profile=retained` (the default July 27 syphilis
+Manual CI accepts `input_profile=retained` (the default July 27 syphilis
 manager) or `input_profile=native-2026-10-01` (the May 5 manager identified by
 digest in that native run's cache, with seed 0). Both select the August 26 census
 manager. This is a comparison baseline, not a recommendation to use May data or
 a change to manager releases. Matching these inputs does not make the entire
 native R/compiler/package environment identical, and retrospective inspection
 is not an at-launch record. The canaries remain two-iteration tests, not the
-native run's full calibration schedule.
+native run's full calibration schedule. The newer `september-2026` profile selects
+the intended September 9 manager and seed 0; it leaves the retained default alone.
+
+### Reconciled comparison candidate (2026-10-03; not installed)
+
+The analyses selection now starts from master `4264842c`, which already contains
+the registry correction and loader hardening. Only the remaining output inspector
+and bounded diagnostic tests were added. No production specification, likelihood,
+calibration registration, or loader behavior differs from that master baseline.
+The October 2 canary result above does not validate this newer candidate.
+
+Manual validation can opt into `compare_fixed_parameters=true`. This adds two
+fresh processes using the **same image**: installed-package engine loading and
+the engine's existing hand-sourced loading script. It selects September's manager
+for this comparison independently of the canary input profile. No MCMC is started
+by this diagnostic; the workflow's separate checkpoint/pipeline canaries still run.
+
+The paired runner mounts identified Git checkouts read-only and checks their
+revisions against the image labels. Its native-engine side uses a disposable
+analysis copy with one recorded bootstrap substitution: the `pkgload::load_all`
+call becomes the existing hand-sourced engine loader. All scientific source stays
+identical. The comparator verifies the hashes of that substitution and rejects
+any other source difference. This is diagnostic instrumentation, not a new
+production loading option or a test of the ordinary native bootstrap in full.
+
+Both processes consume exactly the same parameter doubles through a retained RDS
+fixture. For Baltimore, three vectors are scored with the real stage-1 likelihood;
+four outcomes are captured annually over 2010–2030 with age/race/sex strata.
+Reports preserve 17-significant-digit values, manager digests, source hashes,
+runtime information, and the image ID. The comparison describes exact agreement
+or absolute/relative differences, including where the largest differences occur.
+It does not impose an arbitrary scientific tolerance or claim MCMC replay.
+
+Run the paired diagnostic locally with a built image, clean standalone Git
+checkouts at the image's exact refs, and a prepared September cache:
+
+```bash
+bash workloads/shield/tests/run_fixed_comparison.sh IMAGE \
+  /path/to/jheem_analyses /path/to/jheem2 /path/to/cache /path/to/new-comparison
+```
+
+The output path must be new. Reports and logs survive a failed check. CI retains
+them in `shield-fixed-comparison` for 14 days; durable evidence must be preserved
+before expiry. A passing same-image comparison isolates source/package loading,
+not agreement with a team server's native R/compiler/library environment. A
+matched native-host comparison and fresh/resumed calibration traces remain later
+checks. No release, installed runtime, or running calibration is updated here.
+
+**Local verification, October 3:** the same diagnostic also ran in two fresh
+macOS/R 4.4.2 processes, with the engine installed into an isolated library from
+the exact source ref above. Installed-package and hand-sourced execution agreed
+at full double precision for all 24,948 stratified outcome values, 36 likelihood
+components, and three totals. Both used the same September/census bytes and exact
+parameter fixture; the scientific-output root remained empty. This validates
+the local loading comparison and reporter, not the still-unrun Linux image pair
+or a team server's native environment. The Python tests also confirm that a
+single-ULP difference is reported rather than rounded away.
 
 ## Build from clean local worktrees
 
@@ -94,7 +150,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current candidate defaults are:
 
-- `jheem_analyses`: `eab6beb0a3131607b978b8f42bc1c87b9592c1a2`
+- `jheem_analyses`: `94ba72984737d71ea9ca8ed102a8add58b48e6f2`
 - `jheem2`: `9578726b012a2ee380b380ef0203733d1bd81163` (October 1 `dev`, including spline fixes)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and

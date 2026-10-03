@@ -26,13 +26,19 @@ on:
         default: ''
         type: string
       input_profile:
-        description: 'Immutable test inputs: retained July manager, or the audited October 1 native run (May manager). Neither changes installed defaults.'
+        description: 'Immutable test inputs: retained July, historical May, or intended September manager. Does not change installed defaults.'
         required: false
         default: retained
         type: choice
         options:
           - retained
           - native-2026-10-01
+          - september-2026
+      compare_fixed_parameters:
+        description: 'Compare installed and hand-sourced engines in the same image using September inputs (no MCMC in this check)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -65,7 +71,7 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || 'eab6beb0a3131607b978b8f42bc1c87b9592c1a2' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '94ba72984737d71ea9ca8ed102a8add58b48e6f2' }}
       SHIELD_INPUT_PROFILE: ${{ inputs.input_profile || 'retained' }}
     steps:
       - uses: actions/checkout@v7
@@ -106,10 +112,52 @@ jobs:
             Rscript applications/SHIELD/tests/test-recorded-runtime.R &&
             Rscript applications/SHIELD/tests/test-recorded-cache.R &&
             Rscript applications/SHIELD/tests/test-output-checks.R &&
+            Rscript applications/SHIELD/tests/test-stage1-compatibility.R &&
+            Rscript applications/SHIELD/tests/test-manager-selection.R &&
             Rscript commoncode/tests/test_data_manager_release_selection.R
           '
       - name: prepare pinned test inputs
         run: python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache" --profile "$SHIELD_INPUT_PROFILE" --github-env "$GITHUB_ENV"
+      - name: checkout the exact analysis source for comparison
+        if: inputs.compare_fixed_parameters
+        uses: actions/checkout@v7
+        with:
+          repository: tfojo1/jheem_analyses
+          ref: ${{ env.JHEEM_ANALYSES_REF }}
+          path: comparison-sources/jheem_analyses
+          persist-credentials: false
+          sparse-checkout: |
+            applications/SHIELD
+            commoncode
+      - name: checkout the exact engine source for comparison
+        if: inputs.compare_fixed_parameters
+        uses: actions/checkout@v7
+        with:
+          repository: CIPHER-Epi/jheem2
+          ref: 9578726b012a2ee380b380ef0203733d1bd81163
+          path: comparison-sources/jheem2
+          persist-credentials: false
+      - name: compare fixed parameters through both engine loaders
+        if: inputs.compare_fixed_parameters
+        run: |
+          python3 workloads/shield/tests/prepare_inputs.py "$RUNNER_TEMP/shield-cache" --profile september-2026
+          bash workloads/shield/tests/run_fixed_comparison.sh jheem-shield:ci \
+            "$GITHUB_WORKSPACE/comparison-sources/jheem_analyses" \
+            "$GITHUB_WORKSPACE/comparison-sources/jheem2" \
+            "$RUNNER_TEMP/shield-cache" "$RUNNER_TEMP/shield-fixed-comparison"
+      - name: upload fixed-parameter comparison evidence
+        if: always() && inputs.compare_fixed_parameters
+        uses: actions/upload-artifact@v4
+        with:
+          name: shield-fixed-comparison
+          path: |
+            ${{ runner.temp }}/shield-fixed-comparison/*-report/
+            ${{ runner.temp }}/shield-fixed-comparison/*.log
+            ${{ runner.temp }}/shield-fixed-comparison/*.json
+            ${{ runner.temp }}/shield-fixed-comparison/*.txt
+            ${{ runner.temp }}/shield-fixed-comparison/parameters.rds
+          if-no-files-found: warn
+          retention-days: 14
       - name: preflight the recorded image offline
         run: |
           mkdir -p "$RUNNER_TEMP/shield-state"

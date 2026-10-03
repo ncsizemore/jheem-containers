@@ -21,9 +21,13 @@ def test_comparison_profile_preserves_retained_default():
     assert retained[1]["tag"] == "syphilis-manager-v2026.07.27"
     assert comparison[1]["tag"] == "syphilis-manager-v2026.05.05"
     assert comparison[1]["sha256"] == "e8acbeb758ae4af4e149a62ef78c862a114a2d55f43a0c4695f49d9a8a9fa0e6"
+    september = preparer.PROFILES["september-2026"]
+    assert september[0] == retained[0]
+    assert september[1]["tag"] == "syphilis-manager-v2026.09.09"
+    assert september[1]["sha256"] == "c3e3c983d6b4e9c961f735f9c59d45483bd63cfa715cf75c1fae874da2d129e6"
 
 
-@pytest.mark.parametrize("profile,seed", [("retained", "20260916"), ("native-2026-10-01", "0")])
+@pytest.mark.parametrize("profile,seed", [("retained", "20260916"), ("native-2026-10-01", "0"), ("september-2026", "0")])
 def test_cli_exports_only_selected_verified_inputs(tmp_path, monkeypatch, profile, seed):
     materialized = []
     monkeypatch.setattr(preparer, "materialize", lambda cache, entry: materialized.append(entry))
