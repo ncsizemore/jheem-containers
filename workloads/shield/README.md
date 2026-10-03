@@ -128,9 +128,30 @@ the exact source ref above. Installed-package and hand-sourced execution agreed
 at full double precision for all 24,948 stratified outcome values, 36 likelihood
 components, and three totals. Both used the same September/census bytes and exact
 parameter fixture; the scientific-output root remained empty. This validates
-the local loading comparison and reporter, not the still-unrun Linux image pair
+the local loading comparison and reporter, not by itself a Linux image pair
 or a team server's native environment. The Python tests also confirm that a
 single-ULP difference is reported rather than rounded away.
+
+**Hosted comparison, October 3:**
+[run 37153878619](https://github.com/ncsizemore/jheem-containers/actions/runs/37153878619)
+tested source `eff598ab` with analyses `94ba7298`. The downloaded paired reports
+also show exact agreement within the Ubuntu 24.04.1/R 4.4.2 image
+`sha256:2819cc3ec51ff7ffaf8804ec82212bcc2fe6248ff02748feb76711830ba924a2`.
+The parameter fixture matches the local one byte-for-byte. Linux package versus
+Mac hand-sourced execution differs slightly: maximum absolute differences are
+about 1.9e-8 per population cell (relative maximum 1.6e-13), 2.1e-10 across the
+other three outcomes, and 1.6e-9 in the total log likelihood. These are measured
+differences, not an adopted tolerance or a guarantee of identical MCMC traces.
+The full records distinguish the BLAS/platform environments; individual causes
+of floating-point differences were not isolated. This run does not export an
+installable image or update the retained pilot.
+
+The full run also passed checkpoint/resume, two-stage assembly, recorded-output
+inspection, and rejection of missing/modified outputs and changed requested
+seed. Both canary reports contain two simulations, 173 finite parameters, and
+finite selected outcomes with September's recorded digest. The second canary
+stage still uses the stage-0 likelihood. Successful continuation is not evidence
+of uninterrupted/resumed trace equality, which remains a separate test.
 
 ## Build from clean local worktrees
 
