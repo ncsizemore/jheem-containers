@@ -76,7 +76,7 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || '55ea81b5fbd8bc7228eee97ac6ecd7261ecb8d71' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || 'cd53da8e9613bb11f3fdefe868ccc90cee1749ed' }}
       SHIELD_INPUT_PROFILE: ${{ inputs.input_profile || 'retained' }}
     steps:
       - uses: actions/checkout@v7
@@ -119,6 +119,7 @@ jobs:
             Rscript applications/SHIELD/tests/test-output-checks.R &&
             Rscript applications/SHIELD/tests/test-stage1-compatibility.R &&
             Rscript applications/SHIELD/tests/test-trace-checks.R &&
+            Rscript applications/SHIELD/tests/test-container-smoke-register.R &&
             Rscript applications/SHIELD/tests/test-manager-selection.R &&
             Rscript commoncode/tests/test_data_manager_release_selection.R
           '

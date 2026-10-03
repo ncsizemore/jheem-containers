@@ -16,7 +16,7 @@ image_id="$("$engine" image inspect --format '{{.Id}}' "$SHIELD_IMAGE")"
 seed="${SHIELD_RANDOM_SEED:-0}"
 changed_seed=$((seed + 1))
 location=C.12580
-calibration=container.smoke.repeatability
+calibration=container.smoke.replay
 run_id="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}-$$"
 containers=()
 cleanup() {

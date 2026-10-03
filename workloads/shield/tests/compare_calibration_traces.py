@@ -47,7 +47,7 @@ def validate(report):
     require(setup["variables"] == ["global.transmission.rate.msm", "global.transmission.rate.het"],
             "Unexpected sampled variables")
     require(report["location"] == "C.12580" and
-            report["calibration_code"] == "container.smoke.repeatability", "Unexpected test calibration")
+            report["calibration_code"] == "container.smoke.replay", "Unexpected test calibration")
     require(report["inputs"]["preceding"] == [], "Replay fixture must not use predecessor output")
     attempts = report["attempts"]
     require(attempts and attempts[-1]["status"] == "succeeded", "No successful final attempt")

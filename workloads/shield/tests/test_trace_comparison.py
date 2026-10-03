@@ -42,7 +42,7 @@ def fixture(seed="0", resumed=False):
                           "n.accepted": numeric([1, 1]), "first.step.for.iter": numeric([1, 1])},
                "ending_state": copy.deepcopy(state)} for i in range(1, 5)]
     return {"schema_version": 1, "status": "completed", "location": "C.12580",
-            "calibration_code": "container.smoke.repeatability", "inspector_sha256": "script",
+            "calibration_code": "container.smoke.replay", "inspector_sha256": "script",
             "environment": {"r_version": "4.4.2"}, "inputs": inputs, "attempts": attempts,
             "setup": {"n_chains": 1, "n_chunks": 4, "n_iterations": 8, "chunk_sizes": [2]*4,
                       "thin": 1, "burn": 0, "variables": variables},
