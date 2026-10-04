@@ -23,6 +23,29 @@ def test_canary_inspects_completed_simset_values():
     assert "test-output-checks.R" in workflow
 
 
+def test_actual_stage1_handoff_is_isolated_and_verified_before_image_export():
+    workflow = yaml.safe_load(WORKFLOW.read_text())
+    # PyYAML's YAML 1.1 parser reads the workflow's on key as True.
+    events = workflow.get("on", workflow.get(True))
+    inputs = events["workflow_dispatch"]["inputs"]
+    assert inputs["check_stage1_handoff"]["default"] is False
+    steps = workflow["jobs"]["build-recorded"]["steps"]
+    check = next(s for s in steps if "test_stage1_handoff.sh" in s.get("run", ""))
+    export = next(s for s in steps if s.get("name") == "export the tested image")
+    assert check["if"] == "inputs.check_stage1_handoff"
+    assert steps.index(check) < steps.index(export)
+    upload = next(s for s in steps if s.get("with", {}).get("name") == "shield-stage1-handoff")
+    assert "always()" in upload["if"]
+    script = (ROOT / "tests" / "test_stage1_handoff.sh").read_text()
+    assert "Handoff state must be a new directory" in script
+    assert "--network none" in script and "readonly" in script
+    assert "container.actual.stage0 container.actual.stage1" in script
+    assert "inspect-stage1-handoff.R" in script
+    assert "inspect-recorded-outputs.R" in script
+    assert "predecessor_parameters_copied" in script
+    assert "already complete; skipping" in script
+
+
 def test_recorded_image_pins_base_and_source_defaults():
     dockerfile = (ROOT / "Dockerfile").read_text()
     assert re.search(r"BASE_IMAGE=.*@sha256:[0-9a-f]{64}", dockerfile)

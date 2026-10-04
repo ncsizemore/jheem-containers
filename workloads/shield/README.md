@@ -197,6 +197,28 @@ The [short report and sampler-only reproducer](https://github.com/tfojo1/jheem_a
 explain the evidence and extra starting-simulation RNG draw. Neither package,
 the installed image, nor active calibrations were changed.
 
+### Actual stage-1 predecessor handoff
+
+The manual input `check_stage1_handoff` runs test-only two-iteration copies of
+`calib.10.1.stage0` and `calib.10.1.stage1`. Choose `september-2026` inputs.
+Scientific registration fields remain unchanged; test names, predecessor name,
+iteration count, burn-in, thinning, and descriptions differ. Both stages use
+their actual likelihoods and sampled parameter sets, unlike the older
+stage-chaining canary's two uses of stage 0.
+
+The isolated run verifies completed output digests and lineage, the presence of
+stage 1's MSM diagnosis likelihood term, exact copying of model parameters from
+the predecessor summary, and finite stored samples/likelihoods/priors. It also
+inspects the actual simsets and verifies that a completed pipeline is skipped
+on a second invocation. Reports and logs are uploaded as `shield-stage1-handoff`
+for 14 days, including on failure. Raw science/cache files are not uploaded.
+
+Enable this check when preparing a current-source image for an operator trial.
+It runs before image export, so a failed handoff cannot export that candidate.
+The result is operational handoff evidence, not convergence, full-stage
+performance, stage-2/3 coverage, or exact stochastic replay. No installed image
+is replaced by this workflow.
+
 The full run also passed checkpoint/resume, two-stage assembly, recorded-output
 inspection, and rejection of missing/modified outputs and changed requested
 seed. Both canary reports contain two simulations, 173 finite parameters, and
