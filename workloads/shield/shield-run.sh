@@ -11,20 +11,46 @@
 #   shield-run.sh resume   <location> <calibration>    continue from the last checkpoint
 #
 # Settings (normally left at their defaults):
-#   SHIELD_HOME        shared image and input folder (/home/jheem-shared/shield-container)
+#   SHIELD_HOME        shared image and input folder (the installed wrapper directory)
 #   SHIELD_STATE_ROOT  where calibration state and outputs go
 #                      (/mnt/jheem_nas_share/tmp/shield-container/<you>)
 #   SHIELD_RANDOM_SEED random seed (0, as the team's launcher uses)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-SHIELD_HOME="${SHIELD_HOME:-/home/jheem-shared/shield-container}"
-STATE_ROOT="${SHIELD_STATE_ROOT:-/mnt/jheem_nas_share/tmp/shield-container/$(id -un)}"
-IMAGE="${SHIELD_IMAGE:-docker.io/library/jheem-shield:ci}"
-CENSUS_TAG="${CENSUS_TAG:-data-managers-v2026.08.26}"
-SYPHILIS_TAG="${SYPHILIS_TAG:-syphilis-manager-v2026.07.27}"
+SHIELD_HOME="${SHIELD_HOME:-$SCRIPT_DIR}"
+if [[ -e "$SHIELD_HOME/installation.json" || -L "$SHIELD_HOME/installation.json" ]]; then
+  profile="$(python3 "$SCRIPT_DIR/installation_profile.py" show "$SHIELD_HOME")" || exit 1
+  IFS=$'\t' read -r profile_image state_namespace profile_census profile_syphilis profile_seed <<< "$profile"
+  for selection in SHIELD_IMAGE CENSUS_TAG SYPHILIS_TAG; do
+    case "$selection" in
+      SHIELD_IMAGE) wanted="$profile_image" ;;
+      CENSUS_TAG) wanted="$profile_census" ;;
+      SYPHILIS_TAG) wanted="$profile_syphilis" ;;
+    esac
+    [[ -z "${!selection:-}" || "${!selection}" == "$wanted" ]] || {
+      echo "shield-run: $selection differs from this installation's verified profile; use a separate prepared installation for different inputs/runtime." >&2
+      exit 1
+    }
+  done
+  IMAGE="$profile_image"
+  CENSUS_TAG="$profile_census"
+  SYPHILIS_TAG="$profile_syphilis"
+  SEED="${SHIELD_RANDOM_SEED:-$profile_seed}"
+else
+  # Preserve the original pilot's defaults, but never apply them to a new export.
+  if [[ -f "$SHIELD_HOME/image/IMAGE.txt" ]] && grep -q '^input_profile=' "$SHIELD_HOME/image/IMAGE.txt"; then
+    echo 'shield-run: this image needs a prepared installation.json; no calibration was launched.' >&2
+    exit 1
+  fi
+  state_namespace=shield-container
+  IMAGE="${SHIELD_IMAGE:-docker.io/library/jheem-shield:ci}"
+  CENSUS_TAG="${CENSUS_TAG:-data-managers-v2026.08.26}"
+  SYPHILIS_TAG="${SYPHILIS_TAG:-syphilis-manager-v2026.07.27}"
+  SEED="${SHIELD_RANDOM_SEED:-0}"
+fi
+STATE_ROOT="${SHIELD_STATE_ROOT:-/mnt/jheem_nas_share/tmp/$state_namespace/$(id -un)}"
 # The team's launcher runs set.seed(00000); use the same seed by default.
-SEED="${SHIELD_RANDOM_SEED:-0}"
 LAUNCH_LOCKS=()
 
 release_launch_locks() {
@@ -110,6 +136,9 @@ check_image() {
 
 cmd_setup() {
   check_prerequisites
+  if [[ -f "$SHIELD_HOME/installation.json" ]]; then
+    python3 "$SCRIPT_DIR/installation_profile.py" verify "$SHIELD_HOME" >/dev/null || exit 1
+  fi
   if check_image; then
     say "Image is loaded and matches $SHIELD_HOME/image/IMAGE.txt."
   else
@@ -122,6 +151,7 @@ cmd_setup() {
     check_image || fail "the loaded image doesn't match IMAGE.txt."
     say "Image loaded."
   fi
+  say "Inputs: $CENSUS_TAG / $SYPHILIS_TAG; seed: $SEED"
   say "Outputs will go to: $STATE_ROOT"
   say "Setup is complete."
 }

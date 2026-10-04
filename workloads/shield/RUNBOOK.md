@@ -30,7 +30,52 @@ Image ID:
 `IMAGE.txt` records both and the source revisions. The archive is about 1.9 GB;
 each user's rootless loaded image takes roughly 4 GB of local storage.
 
-## Prepare a new installation
+## Prepare a current-runtime installation
+
+Keep the October 1 installation above unchanged. A new dated pilot release is
+a separately tested runtime, not an in-place update or automatic scientific
+selection. Select its exact release tag from the acceptance record, and check
+that its hosted canary and actual-stage-1 handoff both passed. New exports use a
+unique image tag so rootless loading cannot take over the older pilot's tag.
+
+From the clean container checkout used for the wrapper, set
+`SHIELD_PILOT_RELEASE` to that dated release tag, then prepare fresh staging:
+
+```bash
+SHIELD_STAGE=$(mktemp -d)
+mkdir -p "$SHIELD_STAGE/image"
+gh release download "$SHIELD_PILOT_RELEASE" --repo ncsizemore/jheem-containers \
+  --pattern jheem-shield-recorded.tar.gz --pattern IMAGE.txt \
+  --dir "$SHIELD_STAGE/image"
+python3 workloads/shield/tests/prepare_inputs.py "$SHIELD_STAGE/cache" --profile september-2026
+python3 workloads/shield/installation_profile.py prepare "$SHIELD_STAGE"
+cp workloads/shield/shield-run.sh workloads/shield/source_snapshot.py \
+  workloads/shield/installation_profile.py workloads/shield/check_source_compatibility.R "$SHIELD_STAGE/"
+git rev-parse HEAD
+```
+
+`prepare` checks the archive checksum and its unique tag, verifies both managers
+against their resolution records, and writes an exclusive `installation.json`.
+It refuses an existing profile. Confirm its image ID, source refs, input tags and
+digests against the hosted reports and release record, not merely a successful
+download. This profile selects September 9 syphilis and August 26 census inputs;
+it is not a decision that they suit every scientific analysis.
+
+Install these files into a **new** root-owned `root:jheem` directory, never over
+`/home/jheem-shared/shield-container`. Preserve the permissions, ACL checks,
+SELinux labeling, and account checks below. Copy `installation.json` and all
+three Python/R helpers with the wrapper. Record wrapper and image-build refs
+separately. The wrapper defaults to its own directory and the profile's
+`/mnt/jheem_nas_share/tmp/shield-container-r<workflow-run>/<username>/` output
+root; operators need no manager/image overrides. A different output root or seed
+is an explicit run choice, not an edit to the installed profile.
+
+After installation, use that directory's wrapper for setup and an isolated
+administrator smoke before inviting an operator. Continue an older run through
+its original installation and output root. No symlink, alias, default, package,
+manager cache, or active calibration is switched automatically.
+
+## Original October 1 installation (reference)
 
 Target shield2 first. Check current jobs, memory, disk space, Podman, and the
 actual NAS mount (`findmnt -T /mnt/jheem_nas_share`). Do not create state under
@@ -59,7 +104,7 @@ Check the archive/image identities against the values above as well as
 and syphilis (`syphilis-manager-v2026.07.27`) inputs, without modifying ordinary
 caches or promoting managers.
 
-Install the verified `image/`, `cache/`, wrapper, and its two helpers into the new shared
+Install the verified `image/`, `cache/`, wrapper, and its helpers into the new shared
 directory `/home/jheem-shared/shield-container`. Use administrator/root ownership
 and group `jheem`: directories `0750`, data `0640`, wrapper `0750`. Check inherited
 ACLs from the shared parent: operators should read/execute these files, not

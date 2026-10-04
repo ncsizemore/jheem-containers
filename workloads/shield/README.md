@@ -271,6 +271,22 @@ the canary fails if its first chunk exceeds `SHIELD_MAX_CHUNK_MB` (100 MB).
 
 ## Check the image (preflight)
 
+### Separate pilot installations
+
+New hosted exports retain only a unique `jheem-shield:pilot-r<workflow-run>` tag,
+without changing the tested image ID. They must not retag an existing user's
+`jheem-shield:ci` pilot during loading. Before installation, prepare
+`installation.json` with `installation_profile.py`; it verifies the exported
+archive, its tag, and both manager artifacts and binds their identities to a
+separate per-user output namespace. See the [administrator procedure](RUNBOOK.md#prepare-a-current-runtime-installation).
+
+The installed wrapper reads this JSON as data, resolves its own installation
+directory, selects the image by ID, and prints the selected inputs at setup.
+Conflicting image/manager environment overrides and an unprepared new export
+stop before launch. Explicit seed and output-root choices remain available and
+are recorded. Legacy metadata without a profile retains the original pilot's
+defaults; this does not update any installed wrapper automatically.
+
 Create a disposable state directory and use an existing manager cache. The
 manager tags must identify releases already present in that cache. Preflight
 checks the recorded settings and the cached managers' digests without running
