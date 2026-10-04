@@ -151,7 +151,8 @@ fresh isolated state root. For the October 4 installation:
 
 ```bash
 SHIELD_INSTALL=/home/jheem-shared/shield-container-20261004
-export SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37210907071/ADMIN-HANDOFF-TEST.XXXXXX)
+SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37210907071/ADMIN-HANDOFF-TEST.XXXXXX) || exit 1
+export SHIELD_STATE_ROOT
 cd /path/to/clean/committed/jheem_analyses
 "$SHIELD_INSTALL/shield-run.sh" setup
 "$SHIELD_INSTALL/shield-run.sh" start C.12580 container.smoke.stage0
