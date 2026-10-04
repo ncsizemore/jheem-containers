@@ -173,3 +173,49 @@ def test_workflow_exports_only_a_unique_alias_of_the_tested_image():
     assert 'docker tag jheem-shield:ci "$pilot_tag"' in workflow
     assert 'docker save "$pilot_tag"' in workflow
     assert 'echo "image_tag=docker.io/library/$pilot_tag"' in workflow
+
+
+def test_profile_flows_through_real_source_selection_and_detached_wrapper_launch(home, tmp_path):
+    installation.prepare(home)
+    env, log = install_wrapper(home, tmp_path)
+    shutil.copyfile(ROOT / "source_snapshot.py", home / "source_snapshot.py")
+    source = tmp_path / "source"
+    source.mkdir()
+    for name in ("applications/SHIELD/R/shield_recorded_runtime.R",
+                 "applications/SHIELD/shield_calib_setup_and_run.R",
+                 "applications/SHIELD/check_recorded_completion.R"):
+        path = source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# synthetic source-selection fixture\n")
+    for args in (("init", "-q"), ("config", "user.email", "test@example.invalid"),
+                 ("config", "user.name", "Fixture"), ("add", "."), ("commit", "-qm", "fixture")):
+        subprocess.run(["git", "-C", str(source), *args], check=True, capture_output=True)
+    env["SHIELD_SOURCE_DIR"] = str(source)
+    binary = tmp_path / "bin/podman"
+    binary.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
+args = sys.argv[1:]
+with open(os.environ["FAKE_LOG"], "a") as output:
+    output.write(json.dumps(args) + "\\n")
+if args[:2] == ["image", "inspect"]:
+    print("sha256:" + "a" * 64)
+elif args[0] == "run":
+    print("fake-container")
+elif args[0] != "ps":
+    sys.exit(97)
+''')
+    for name, body in (("tac", "cat"),):
+        path = tmp_path / "bin" / name
+        path.write_text("#!/bin/sh\n" + body + "\n")
+        path.chmod(0o755)
+    result = subprocess.run(["bash", str(home / "shield-run.sh"), "start", "C.12580", "test.stage0"],
+                            env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    runs = [args for args in calls if args[0] == "run"]
+    assert len(runs) == 2 and "--rm" in runs[0] and "-d" in runs[1]
+    for args in runs:
+        assert IMAGE in args
+        assert "JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-v2026.09.09" in args
+        assert "SHIELD_RANDOM_SEED=0" in args
+        assert any("dst=/opt/run-source/jheem_analyses,readonly" in value for value in args)
+    assert all("jheem-shield:ci" not in arg for call in calls for arg in call)
