@@ -186,6 +186,17 @@ differs or the changed-seed control has no effect. This experiment characterizes
 one short single-chain setup; it does not establish convergence, multi-chain
 behavior, cross-platform equality, or the sampler's explicit seed argument.
 
+The [October 3 experiment](https://github.com/ncsizemore/jheem-containers/actions/runs/37161484559)
+found exact fresh/fresh agreement and an effective changed-seed control, but
+the resumed trajectory first differed at iteration 4. All four runs completed,
+and the completed checkpoint files survived both restarts unchanged. The
+workflow failed specifically on trace equality, not on operational resumption.
+With engine `9578726b` and sampler `4e0d13e`, this optional experiment is therefore
+expected to fail on the measured difference; it remains disabled by default.
+The [short report and sampler-only reproducer](https://github.com/tfojo1/jheem_analyses/blob/bb93142ecc069e4094e3b130c23109babfb98730/applications/SHIELD/tests/REPLAY-COMPARISON.md)
+explain the evidence and extra starting-simulation RNG draw. Neither package,
+the installed image, nor active calibrations were changed.
+
 The full run also passed checkpoint/resume, two-stage assembly, recorded-output
 inspection, and rejection of missing/modified outputs and changed requested
 seed. Both canary reports contain two simulations, 173 finite parameters, and
