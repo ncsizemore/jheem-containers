@@ -219,6 +219,14 @@ The result is operational handoff evidence, not convergence, full-stage
 performance, stage-2/3 coverage, or exact stochastic replay. No installed image
 is replaced by this workflow.
 
+The [October 4 hosted result](https://github.com/ncsizemore/jheem-containers/actions/runs/37203984715)
+passed. Stage 0 sampled 88 variables and stage 1 sampled 87; stage 1 used its
+twelve registered likelihood terms and copied all 173 predecessor model
+parameters exactly. Both stages produced two simulations with verified output
+records; repeating the pipeline verified and skipped them. This run did not
+export an image. The retained installation is unchanged; a representative
+server/operator trial and multi-chain execution remain separate follow-ups.
+
 The full run also passed checkpoint/resume, two-stage assembly, recorded-output
 inspection, and rejection of missing/modified outputs and changed requested
 seed. Both canary reports contain two simulations, 173 finite parameters, and
