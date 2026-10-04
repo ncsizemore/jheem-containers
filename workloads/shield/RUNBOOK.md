@@ -43,8 +43,12 @@ retains the exact exported image from successful run 37210907071, with analyses
 `0de5aa3e65bd057ac92aa6f00dee57f03c092828`, engine
 `9578726b012a2ee380b380ef0203733d1bd81163`, September 9 syphilis, August 26 census,
 and seed 0. Both the canaries and actual-stage-1 handoff passed. It is a non-latest
-prerelease, not a full-calibration recommendation. A separate verified payload
-is staged on shield2; root installation and account checks are pending.
+prerelease, not a full-calibration recommendation. The separate installation at
+`/home/jheem-shared/shield-container-20261004` passed both account access checks
+and an isolated administrator two-stage NAS smoke on shield2. Simset contents,
+output hashes, lineage, source/runtime/input identities and unchanged receipts
+on repeated verify/skip were checked. The smoke uses stage-0 likelihoods twice;
+another operator's exercise and a representative full stage remain pending.
 
 Image ID: `sha256:27adfb17e60740c188cdd1808ae21d065020e1b0b8e699897813f3e0d6f79ec4`.
 Archive SHA-256: `3367d3c135f166ad977bb4a1973eb735501d94b23015e573b91afadc6907ae8b`.
@@ -142,19 +146,24 @@ Do not disable lingering or the NAS boolean while other containers depend on the
 
 ## Verify before inviting operators
 
-Use the installed wrapper as a non-root administrator, with a unique isolated
-state root. These examples require a fresh directory chosen for this exercise:
+Use the selected installation's wrapper as a non-root administrator, with a
+fresh isolated state root. For the October 4 installation:
 
 ```bash
-export SHIELD_STATE_ROOT=/mnt/jheem_nas_share/tmp/shield-container/ADMIN-HANDOFF-TEST
+SHIELD_INSTALL=/home/jheem-shared/shield-container-20261004
+export SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37210907071/ADMIN-HANDOFF-TEST.XXXXXX)
 cd /path/to/clean/committed/jheem_analyses
-/home/jheem-shared/shield-container/shield-run.sh setup
-/home/jheem-shared/shield-container/shield-run.sh start C.12580 container.smoke.stage0
-/home/jheem-shared/shield-container/shield-run.sh status
-/home/jheem-shared/shield-container/shield-run.sh logs C.12580 container.smoke.stage0
+"$SHIELD_INSTALL/shield-run.sh" setup
+"$SHIELD_INSTALL/shield-run.sh" start C.12580 container.smoke.stage0
+"$SHIELD_INSTALL/shield-run.sh" status
+"$SHIELD_INSTALL/shield-run.sh" logs C.12580 container.smoke.stage0
 # After completion, verify its recorded outputs without rerunning the stage:
-/home/jheem-shared/shield-container/shield-run.sh pipeline C.12580 container.smoke.stage0
+"$SHIELD_INSTALL/shield-run.sh" pipeline C.12580 container.smoke.stage0
 ```
+
+For a different prepared installation, select its wrapper and output namespace
+explicitly. To continue an existing run, keep its original installation/root;
+do not create a new root or use a newer image merely to inspect or resume it.
 
 Inspect the summary, simset, and input/output/attempt records. Confirm a detached
 container survives logout. `status` says `outputs recorded (not rechecked)`;

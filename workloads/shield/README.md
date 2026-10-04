@@ -20,7 +20,7 @@ in the analyses repository. No container-repository checkout is needed.
 [RUNBOOK.md](RUNBOOK.md) covers administrator installation and maintenance.
 The pilot does not yet support a full multi-chain calibration.
 
-## Current retained runtime (2026-10-04; installation pending)
+## Current retained runtime (2026-10-04; installed on shield2)
 
 The non-latest prerelease
 [shield-pilot-2026.10.04-r37210907071](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.04-r37210907071)
@@ -35,9 +35,13 @@ remains open. Handoff and numeric reports are retained with the release.
 The archive was verified on shield2, with the exact input digests and an
 exclusive installation profile. New exports use a unique pilot tag rather than
 the older CI alias; profiles bind the image and selected managers to a separate
-output namespace. Root installation/account checks, an administrator canary,
-and a representative operator trial remain pending. The older installation
-and scientific runs are unchanged. See [RUNBOOK.md](RUNBOOK.md#prepare-a-current-runtime-installation)
+output namespace. The separate installation and both account/NAS checks passed
+on shield2. Its isolated administrator smoke completed both stages, with two
+simulations and 173 finite parameters each, verified source/input/runtime and
+predecessor identities, and unchanged receipts after verify/skip on repetition.
+It uses stage-0 likelihoods twice, not the actual-stage-1 diagnostic. A
+representative operator trial remains pending. The older installation and
+scientific runs are unchanged. See [RUNBOOK.md](RUNBOOK.md#prepare-a-current-runtime-installation)
 for exact identities and procedure. Main CI and the local focused suite passed
 all 84 tests for wrapper/profile source `ce418612`; image-build source was
 `688cad38`. No scientific engine, likelihood, registry or sampler change was
