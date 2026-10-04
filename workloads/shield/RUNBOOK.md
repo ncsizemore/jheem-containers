@@ -6,13 +6,13 @@ in the analyses repository. They need only that guide and the installed
 `shield-run.sh`, not a checkout of this repository. This page covers installation
 and maintenance; the [technical README](README.md) describes builds and tests.
 
-## Scope and selected image
+## Scope
 
 This is a single-chain pilot, not a replacement for a full calibration. Stage 3
 is refused, and handing pilot outputs to native stage 3 is not validated. Do not
 delay ordinary calibrations or change users' R installations/source checkouts.
 
-Use the retained
+The original installation uses the retained
 [`shield-pilot-2026.10.01-r36815091235` release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.01-r36815091235).
 It contains analyses `06505412ff4ad870ba0263361b791ba5d53737de`, integrated via
 `3f463e2a`. It excludes the later screening-modifier change `3f9e2019` and
@@ -38,10 +38,25 @@ selection. Select its exact release tag from the acceptance record, and check
 that its hosted canary and actual-stage-1 handoff both passed. New exports use a
 unique image tag so rootless loading cannot take over the older pilot's tag.
 
+The [October 4 release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.04-r37210907071)
+retains the exact exported image from successful run 37210907071, with analyses
+`0de5aa3e65bd057ac92aa6f00dee57f03c092828`, engine
+`9578726b012a2ee380b380ef0203733d1bd81163`, September 9 syphilis, August 26 census,
+and seed 0. Both the canaries and actual-stage-1 handoff passed. It is a non-latest
+prerelease, not a full-calibration recommendation. A separate verified payload
+is staged on shield2; root installation and account checks are pending.
+
+Image ID: `sha256:27adfb17e60740c188cdd1808ae21d065020e1b0b8e699897813f3e0d6f79ec4`.
+Archive SHA-256: `3367d3c135f166ad977bb4a1973eb735501d94b23015e573b91afadc6907ae8b`.
+Saved tag: `jheem-shield:pilot-r37210907071`. The release also retains the
+handoff/numeric reports. Wrapper/profile source is `ce418612`; image-build source
+is `688cad38`. These refs are separate from operator-selected analysis snapshots.
+
 From the clean container checkout used for the wrapper, set
 `SHIELD_PILOT_RELEASE` to that dated release tag, then prepare fresh staging:
 
 ```bash
+export SHIELD_PILOT_RELEASE=shield-pilot-2026.10.04-r37210907071
 SHIELD_STAGE=$(mktemp -d)
 mkdir -p "$SHIELD_STAGE/image"
 gh release download "$SHIELD_PILOT_RELEASE" --repo ncsizemore/jheem-containers \

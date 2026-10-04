@@ -20,7 +20,30 @@ in the analyses repository. No container-repository checkout is needed.
 [RUNBOOK.md](RUNBOOK.md) covers administrator installation and maintenance.
 The pilot does not yet support a full multi-chain calibration.
 
-## Status (2026-10-01)
+## Current retained runtime (2026-10-04; installation pending)
+
+The non-latest prerelease
+[shield-pilot-2026.10.04-r37210907071](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.04-r37210907071)
+retains the exact archive exported after the successful
+[hosted run](https://github.com/ncsizemore/jheem-containers/actions/runs/37210907071).
+It tested analyses `0de5aa3e`, engine `9578726b`, September 9 syphilis/August 26
+census inputs, and seed 0. The checkpoint/resume, assembly, negative canaries,
+and real stage-1 predecessor handoff passed. Separate fixed-parameter and
+exact-restart comparison options were off; the measured restart divergence
+remains open. Handoff and numeric reports are retained with the release.
+
+The archive was verified on shield2, with the exact input digests and an
+exclusive installation profile. New exports use a unique pilot tag rather than
+the older CI alias; profiles bind the image and selected managers to a separate
+output namespace. Root installation/account checks, an administrator canary,
+and a representative operator trial remain pending. The older installation
+and scientific runs are unchanged. See [RUNBOOK.md](RUNBOOK.md#prepare-a-current-runtime-installation)
+for exact identities and procedure. Main CI and the local focused suite passed
+all 84 tests for wrapper/profile source `ce418612`; image-build source was
+`688cad38`. No scientific engine, likelihood, registry or sampler change was
+introduced by this packaging increment.
+
+## Original pilot checkpoint (2026-10-01)
 
 - **CI** (`.github/workflows/shield-spike.yml`, validation only): builds the
   recorded image from exact source commits, checks that no team package keeps
@@ -252,7 +275,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current candidate defaults are:
 
-- `jheem_analyses`: `94ba72984737d71ea9ca8ed102a8add58b48e6f2`
+- `jheem_analyses`: `d23deca51b33f18bcbf3c726bf7b9264141caab0` (the retained October 4 run explicitly selected `0de5aa3e65bd057ac92aa6f00dee57f03c092828`)
 - `jheem2`: `9578726b012a2ee380b380ef0203733d1bd81163` (October 1 `dev`, including spline fixes)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
