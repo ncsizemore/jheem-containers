@@ -16,5 +16,11 @@ if (identical(Sys.getenv("SHIELD_ENABLE_CONTAINER_SMOKE"), "true")) {
 }
 codes <- commandArgs(trailingOnly = TRUE)
 if (!length(codes)) stop("No calibration requested", call. = FALSE)
-for (code in codes) shield.recorded.calibration.info(code)
+# Code that runs stages in phases (setup, each chain, assembly) takes
+# multi-chain stages; older code runs single-chain stages only.
+phased <- "allow.multiple.chains" %in% names(formals(shield.recorded.calibration.info))
+for (code in codes) {
+    if (phased) shield.recorded.calibration.info(code, allow.multiple.chains = TRUE)
+    else shield.recorded.calibration.info(code)
+}
 cat("SHIELD source compatibility passed for:", paste(codes, collapse = ", "), "\n")

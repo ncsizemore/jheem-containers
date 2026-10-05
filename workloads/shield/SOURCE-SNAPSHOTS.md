@@ -91,7 +91,8 @@ source files on the NAS adds startup time; it does not run on each MCMC iteratio
 
 Before detached sampling, the wrapper loads the selected specification,
 likelihood definitions, and calibration registry against the image's installed
-packages, and verifies the requested calibrations are single-chain. Failure
+packages, and verifies each requested calibration's chain count is supported:
+any, for analysis code with recorded phases; one, for older code. Failure
 stops without launching MCMC. This checks startup compatibility, not all possible
 model execution, scientific correctness, or deterministic replay. Model code may
 require a new runtime when its package/API requirements change.
@@ -106,6 +107,5 @@ and refusal to launch after a failed compatibility check.
 
 The wrapper retains stopped containers for diagnostics. Its launch lock covers
 the startup window; the running-container check sees only the same account.
-Cross-account writers to one run tree are still unsupported. Multi-chain stage 3
-remains outside this pilot. The mounted source path must remain named
+Cross-account writers to one run tree are still unsupported. The mounted source path must remain named
 `jheem_analyses` because existing source calls use that relative layout.
