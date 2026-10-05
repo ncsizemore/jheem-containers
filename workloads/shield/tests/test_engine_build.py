@@ -158,7 +158,8 @@ def test_wrapper_builds_and_mounts_the_captured_engine(tmp_path, checkouts, fake
     (shared / "image/IMAGE.txt").write_text("image_id=" + IMAGE + "\n")
     state = tmp_path / "runs"
     env = dict(os.environ, SHIELD_HOME=str(shared), SHIELD_STATE_ROOT=str(state),
-               SHIELD_SOURCE_DIR=str(analyses), FAKE_COMPATIBLE="true")
+               SHIELD_SOURCE_DIR=str(analyses), FAKE_COMPATIBLE="true",
+               SHIELD_MAX_PARALLEL_CHAINS="2")
     for location in ("C.12580", "C.35620"):
         result = subprocess.run(["bash", str(SHIELD / "shield-run.sh"), "start", location, "stage0"],
                                 env=env, capture_output=True, text=True)
@@ -176,6 +177,10 @@ def test_wrapper_builds_and_mounts_the_captured_engine(tmp_path, checkouts, fake
         assert any("dst=/opt/run-engine/jheem2,readonly" in a for a in args)
         assert any("dst=/opt/run-engine/library,readonly" in a for a in args)
         assert str(engine) + "," not in " ".join(args)
+        # The wrapper's own entrypoint orchestrates stage phases and chains.
+        assert any(a.endswith("/container-entrypoint.sh,dst=/opt/shield/container-entrypoint.sh,readonly")
+                   for a in args)
+        assert "SHIELD_MAX_PARALLEL_CHAINS=2" in args
 
 
 def test_wrapper_can_explicitly_use_the_image_engine(tmp_path, checkouts, fake_tools):

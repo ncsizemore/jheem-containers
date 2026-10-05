@@ -17,6 +17,7 @@
 #   SHIELD_RANDOM_SEED random seed (0, as the team's launcher uses)
 #   SHIELD_JHEEM2_DIR  jheem2 checkout for new runs (default: next to jheem_analyses)
 #   SHIELD_ENGINE      set to "image" to use the runtime image's built-in jheem2
+#   SHIELD_MAX_PARALLEL_CHAINS  chains of one stage to run at once (default: all)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -218,6 +219,9 @@ run_container() {
     freq_env=(--env SHIELD_CACHE_FREQUENCY=1 --env SHIELD_UPDATE_FREQUENCY=1)
   fi
   [[ -z "$mode" ]] || mode_env=(--env "SHIELD_RUN_MODE=$mode")
+  local parallel_env=()
+  [[ -z "${SHIELD_MAX_PARALLEL_CHAINS:-}" ]] \
+    || parallel_env=(--env "SHIELD_MAX_PARALLEL_CHAINS=$SHIELD_MAX_PARALLEL_CHAINS")
   # A captured engine replaces the image's jheem2 in every R process of the run.
   local engine_args=()
   if [[ -n "$ENGINE_LIBRARY" ]]; then
@@ -240,6 +244,7 @@ run_container() {
     --mount "type=bind,src=$STATE_ROOT/run_sources,dst=/work/state/run_sources,readonly$source_opts" \
     --mount "type=bind,src=$SOURCE_TREE,dst=/opt/run-source/jheem_analyses,readonly$source_opts" \
     --mount "type=bind,src=$SCRIPT_DIR/check_source_compatibility.R,dst=/opt/shield/check_source_compatibility.R,readonly" \
+    --mount "type=bind,src=$SCRIPT_DIR/container-entrypoint.sh,dst=/opt/shield/container-entrypoint.sh,readonly" \
     --env JHEEM_ANALYSES_PATH=/opt/run-source/jheem_analyses \
     --env "JHEEM_ANALYSES_REF=$SOURCE_REF" \
     --env "JHEEM_CENSUS_MANAGER_TAG=$CENSUS_TAG" \
@@ -249,7 +254,7 @@ run_container() {
     --env "SHIELD_OPERATOR=$(id -un)" \
     --env "SHIELD_HOST=$(hostname -s)" \
     ${smoke_env[@]+"${smoke_env[@]}"} ${freq_env[@]+"${freq_env[@]}"} ${mode_env[@]+"${mode_env[@]}"}
-    ${engine_args[@]+"${engine_args[@]}"}
+    ${engine_args[@]+"${engine_args[@]}"} ${parallel_env[@]+"${parallel_env[@]}"}
   )
   say "Checking the selected code, inputs, and calibration definitions..."
   podman run --rm "${runtime_args[@]}" "$RUN_IMAGE" shell -c \
@@ -324,13 +329,25 @@ SHIELD_STATE_ROOT for a deliberate new attempt; do not delete saved state."
   say "It keeps running if you log out."
 }
 
+chunk_count() {
+  ( (find "$(calibration_dir "$1" "$2")/cache/chain_$3" -maxdepth 1 -name "chain$3_chunk*.Rdata" 2>/dev/null || true) | wc -l | tr -d ' ')
+}
+
 stage_progress() {
-  local location="$1" calibration="$2" chunks
+  local location="$1" calibration="$2" chains chain counts=()
   if [[ -f "$(records_dir "$location" "$calibration")/outputs.json" ]]; then
     printf 'outputs recorded (not rechecked)'
   elif [[ -e "$(calibration_dir "$location" "$calibration")" ]]; then
-    chunks="$( (find "$(calibration_dir "$location" "$calibration")/cache/chain_1" -maxdepth 1 -name 'chain1_chunk*.Rdata' 2>/dev/null || true) | wc -l | tr -d ' ')"
-    printf 'checkpoints saved: %s' "$chunks"
+    chains="$(cat "$(records_dir "$location" "$calibration")/chains.txt" 2>/dev/null || echo 1)"
+    [[ "$chains" =~ ^[1-9][0-9]*$ ]] || chains=1
+    if (( chains == 1 )); then
+      printf 'checkpoints saved: %s' "$(chunk_count "$location" "$calibration" 1)"
+    else
+      for (( chain = 1; chain <= chains; chain++ )); do
+        counts+=("chain $chain: $(chunk_count "$location" "$calibration" "$chain")")
+      done
+      printf 'checkpoints saved (%s)' "$(IFS=,; echo "${counts[*]}" | sed 's/,/, /g')"
+    fi
   else
     printf 'not started'
   fi
@@ -390,5 +407,5 @@ case "${1:-}" in
   stop)     [[ $# -eq 3 ]] || fail "usage: shield-run.sh stop <location> <calibration>"; cmd_stop "$2" "$3" ;;
   logs)     [[ $# -eq 3 ]] || fail "usage: shield-run.sh logs <location> <calibration>"; cmd_logs "$2" "$3" ;;
   status)   cmd_status ;;
-  *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
+  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
 esac
