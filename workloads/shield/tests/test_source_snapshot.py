@@ -37,9 +37,26 @@ def repo(tmp_path):
     return repo
 
 
-def select(root, repo, codes=("stage0",), **kwargs):
+def select(root, repo, codes=("stage0",), engine_source="image", **kwargs):
     return snap.select(root, repo, codes, IMAGE, "data-managers-v2026.08.26",
-                       "syphilis-manager-v2026.07.27", "0", **kwargs)
+                       "syphilis-manager-v2026.07.27", "0", engine_source=engine_source, **kwargs)
+
+
+@pytest.fixture
+def engine(tmp_path):
+    # A jheem2 checkout beside the analysis checkout, as on the team servers.
+    engine = tmp_path / "jheem2"
+    engine.mkdir()
+    git(engine, "init", "-q")
+    git(engine, "config", "user.email", "test@example.invalid")
+    git(engine, "config", "user.name", "Snapshot test")
+    (engine / "DESCRIPTION").write_text("Package: jheem2\nVersion: 1.12.3.9000\n")
+    (engine / "NAMESPACE").write_text("export(run)\n")
+    (engine / "R").mkdir()
+    (engine / "R/engine.R").write_text("run <- function() 1\n")
+    git(engine, "add", ".")
+    git(engine, "commit", "-qm", "engine")
+    return engine
 
 
 def test_new_definition_without_rebuild_and_old_selection_after_checkout_moves(tmp_path, repo):
@@ -202,3 +219,63 @@ elif args[0] != "ps":
         assert f"type=bind,src={state}/run_sources,dst=/work/state/run_sources,readonly,relabel=shared" in args
         assert str(repo) not in " ".join(args)
     assert not list((state / "run_locks").iterdir())
+
+
+def test_engine_is_captured_from_the_sibling_and_reused_after_it_moves(tmp_path, repo, engine):
+    root = tmp_path / "runs"
+    first = select(root, repo, ("stage0", "stage1"), engine_source=None)
+    assert first["engine"] != "image"
+    assert first["engine_commit"] == git(engine, "rev-parse", "HEAD")
+    (engine / "R/engine.R").write_text("run <- function() 2\n")
+    git(engine, "commit", "-qam", "engine change")
+    same = select(root, repo, ("stage0", "stage1"), engine_source=None, resume=True)
+    assert same == first
+    assert (Path(same["engine_path"]) / "R/engine.R").read_text() == "run <- function() 1\n"
+    newer = select(root, repo, ("new.stage0",), engine_source=None)
+    assert newer["engine_commit"] == git(engine, "rev-parse", "HEAD")
+    assert (Path(newer["engine_path"]) / "R/engine.R").read_text() == "run <- function() 2\n"
+
+
+def test_missing_engine_checkout_names_both_choices(tmp_path, repo):
+    with pytest.raises(ValueError, match="SHIELD_JHEEM2_DIR.*SHIELD_ENGINE=image"):
+        select(tmp_path / "runs", repo, engine_source=None)
+
+
+def test_dirty_or_wrong_engine_is_refused(tmp_path, repo, engine):
+    (engine / "scratch.R").write_text("x <- 1\n")
+    with pytest.raises(ValueError, match="jheem2 checkout has uncommitted"):
+        select(tmp_path / "runs", repo, engine_source=None)
+    (engine / "scratch.R").unlink()
+    (engine / "DESCRIPTION").write_text("Package: other\n")
+    git(engine, "commit", "-qam", "not jheem2")
+    with pytest.raises(ValueError, match="not the jheem2 package"):
+        select(tmp_path / "runs", repo, ("other.stage0",), engine_source=None)
+
+
+def test_damaged_engine_snapshot_is_rejected(tmp_path, repo, engine):
+    root = tmp_path / "runs"
+    chosen = select(root, repo, engine_source=None)
+    target = Path(chosen["engine_path"]) / "R/engine.R"
+    target.chmod(0o644)
+    target.write_text("changed\n")
+    with pytest.raises(ValueError, match="jheem2 snapshot files changed"):
+        select(root, repo, resume=True, engine_source=None)
+
+
+def test_selection_without_engine_keeps_the_image_engine(tmp_path, repo, engine):
+    root = tmp_path / "runs"
+    select(root, repo, engine_source=None)
+    registry_path = root / "run_sources/selections.json"
+    registry = json.loads(registry_path.read_text())
+    # Selections saved before engine snapshots used the image's built-in engine.
+    del registry["calibrations"]["stage0"]["engine"]
+    registry_path.write_text(json.dumps(registry))
+    legacy = select(root, repo, resume=True, engine_source=None)
+    assert (legacy["engine"], legacy["engine_path"], legacy["engine_commit"]) == ("image", "-", "-")
+
+
+def test_requesting_the_image_engine_for_a_captured_run_is_refused(tmp_path, repo, engine):
+    root = tmp_path / "runs"
+    select(root, repo, engine_source=None)
+    with pytest.raises(ValueError, match="requested engine differs"):
+        select(root, repo, resume=True, engine_source="image")

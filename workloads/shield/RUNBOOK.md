@@ -69,7 +69,9 @@ gh release download "$SHIELD_PILOT_RELEASE" --repo ncsizemore/jheem-containers \
 python3 workloads/shield/tests/prepare_inputs.py "$SHIELD_STAGE/cache" --profile september-2026
 python3 workloads/shield/installation_profile.py prepare "$SHIELD_STAGE"
 cp workloads/shield/shield-run.sh workloads/shield/source_snapshot.py \
-  workloads/shield/installation_profile.py workloads/shield/check_source_compatibility.R "$SHIELD_STAGE/"
+  workloads/shield/installation_profile.py workloads/shield/check_source_compatibility.R \
+  workloads/shield/engine_build.py workloads/shield/build_engine.sh \
+  workloads/shield/engine-profile.R "$SHIELD_STAGE/"
 git rev-parse HEAD
 ```
 
@@ -131,7 +133,8 @@ replace the wrapper, cache, or `IMAGE.txt`. Record the wrapper's commit separate
 from the image build. Outputs belong in the separate, per-user state root
 `/mnt/jheem_nas_share/tmp/shield-container/<username>/`.
 
-Label the installed local cache and `check_source_compatibility.R`
+Label the installed local cache and the helpers mounted into containers
+(`check_source_compatibility.R`, `build_engine.sh`, `engine-profile.R`)
 `container_file_t`, using persistent host
 file-context policy where available. Never relabel CIFS. NAS access requires
 `virt_use_samba` enabled on the host (`sudo setsebool -P virt_use_samba on`);

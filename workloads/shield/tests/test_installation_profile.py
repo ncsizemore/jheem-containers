@@ -191,6 +191,8 @@ def test_profile_flows_through_real_source_selection_and_detached_wrapper_launch
                  ("config", "user.name", "Fixture"), ("add", "."), ("commit", "-qm", "fixture")):
         subprocess.run(["git", "-C", str(source), *args], check=True, capture_output=True)
     env["SHIELD_SOURCE_DIR"] = str(source)
+    # This fixture has no jheem2 checkout; engine capture is covered in test_engine_build.py.
+    env["SHIELD_ENGINE"] = "image"
     binary = tmp_path / "bin/podman"
     binary.write_text(f"#!{sys.executable}\n" + '''import json, os, sys
 args = sys.argv[1:]

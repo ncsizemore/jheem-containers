@@ -24,10 +24,39 @@ existing selection. The saved image ID must still be loaded; a new shared image
 does not replace it. Existing pre-snapshot runs must use their original wrapper
 and runtime; the new wrapper refuses to invent their missing source history.
 
+## The jheem2 engine
+
+The team loads jheem2 from source, so a new selection also captures the clean
+committed jheem2 checkout beside the analysis checkout (`../jheem2`), or
+`SHIELD_JHEEM2_DIR` if supplied, under the same rules: no pulls, no edits, no
+silently ignored changes, local commits supported. It is saved under
+`run_sources/engines/` and reused with the selection.
+
+A captured engine is built once per engine snapshot and runtime image
+(`engine_build.py`): a throwaway container of the selected image installs it
+from a private copy with `--without-keep.source`, checks that no source references
+were kept, and writes the library to `run_sources/engine-builds/<key>/` with a
+per-file inventory and an engine-commit marker. Later launches verify the build
+before reuse; a damaged build is refused, not rebuilt. Concurrent launches wait
+for one build. The first build takes a few minutes.
+
+At run time the build and its source are mounted read-only, and a startup profile
+(`engine-profile.R`, via `R_PROFILE_USER`) activates the image's renv library and
+puts the build first, because renv ignores `R_LIBS`. Every R process stops if the
+build's marker doesn't match the declared `JHEEM2_REF` or jheem2 resolves
+elsewhere. Run records name the captured commit. A jheem2 change that needs a new
+R package or system library still needs a new image; its build fails before any
+calibration starts.
+
+`SHIELD_ENGINE=image` selects the image's built-in jheem2 instead. Selections
+saved before engine capture keep using the image's engine, and an explicit
+`image` request is refused for a selection that captured one.
+
 ## Stored evidence
 
 `run_sources/selections.json` records each calibration's source-bundle identity,
-image ID, dated managers, and seed. Each content-identified bundle contains:
+engine snapshot (or `image`), image ID, dated managers, and seed. Each
+content-identified analysis bundle contains:
 
 - `source.tar`: Git's archive of the entire selected commit, without `.git` or
   ignored local caches. Git archive attributes apply.
