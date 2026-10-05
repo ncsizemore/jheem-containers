@@ -15,6 +15,8 @@
 #   SHIELD_STATE_ROOT  where calibration state and outputs go
 #                      (/mnt/jheem_nas_share/tmp/shield-container/<you>)
 #   SHIELD_RANDOM_SEED random seed (0, as the team's launcher uses)
+#   SHIELD_JHEEM2_DIR  jheem2 checkout for new runs (default: next to jheem_analyses)
+#   SHIELD_ENGINE      set to "image" to use the runtime image's built-in jheem2
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -75,20 +77,33 @@ lock_launch() {
 }
 
 # Source selections are shared by all locations of a calibration code within
-# this state root. A pipeline binds all requested stages to one selection.
+# this state root. A pipeline binds all requested stages to one selection: the
+# analysis code and, unless SHIELD_ENGINE=image, the jheem2 checkout.
 select_source() {
-  local mode="$1" details have resume_args=()
+  local mode="$1" details have engine_source resume_args=()
   shift
   [[ "$mode" != resume ]] || resume_args=(--resume)
+  engine_source="${SHIELD_JHEEM2_DIR:-}"
+  [[ "${SHIELD_ENGINE:-}" != image ]] || engine_source=image
   details="$(python3 "$SCRIPT_DIR/source_snapshot.py" \
     --root "$STATE_ROOT" --source "${SHIELD_SOURCE_DIR:-$PWD}" \
     --image "$(expected_image_id)" --census "$CENSUS_TAG" \
-    --syphilis "$SYPHILIS_TAG" --seed "$SEED" ${resume_args[@]+"${resume_args[@]}"} "$@")" || exit 1
-  IFS=$'\t' read -r SOURCE_TREE SOURCE_REF RUN_IMAGE CENSUS_TAG SYPHILIS_TAG SEED SOURCE_DIGEST <<< "$details"
+    --syphilis "$SYPHILIS_TAG" --seed "$SEED" --engine-source "$engine_source" \
+    ${resume_args[@]+"${resume_args[@]}"} "$@")" || exit 1
+  IFS=$'\t' read -r SOURCE_TREE SOURCE_REF RUN_IMAGE CENSUS_TAG SYPHILIS_TAG SEED SOURCE_DIGEST \
+    ENGINE_KEY ENGINE_TREE ENGINE_REF <<< "$details"
   have="$(podman image inspect --format '{{.Id}}' "$RUN_IMAGE" 2>/dev/null || true)"
   [[ "sha256:${have#sha256:}" == "$RUN_IMAGE" ]] \
     || fail "the run's recorded image $RUN_IMAGE is not loaded; restore that exact image before continuing."
   say "Using saved analysis code ${SOURCE_REF:0:8} (all requested stages and locations)."
+  if [[ "$ENGINE_KEY" == image ]]; then
+    ENGINE_LIBRARY=""
+    say "Using the runtime image's built-in jheem2."
+  else
+    ENGINE_LIBRARY="$(python3 "$SCRIPT_DIR/engine_build.py" --root "$STATE_ROOT" \
+      --engine "$ENGINE_KEY" --image "$RUN_IMAGE" --script-dir "$SCRIPT_DIR")" || exit 1
+    say "Using saved jheem2 ${ENGINE_REF:0:8}, built for this runtime."
+  fi
 }
 
 say() { printf '%s\n' "$*"; }
@@ -203,6 +218,19 @@ run_container() {
     freq_env=(--env SHIELD_CACHE_FREQUENCY=1 --env SHIELD_UPDATE_FREQUENCY=1)
   fi
   [[ -z "$mode" ]] || mode_env=(--env "SHIELD_RUN_MODE=$mode")
+  # A captured engine replaces the image's jheem2 in every R process of the run.
+  local engine_args=()
+  if [[ -n "$ENGINE_LIBRARY" ]]; then
+    engine_args=(
+      --mount "type=bind,src=$ENGINE_TREE,dst=/opt/run-engine/jheem2,readonly$source_opts"
+      --mount "type=bind,src=$ENGINE_LIBRARY,dst=/opt/run-engine/library,readonly$source_opts"
+      --mount "type=bind,src=$SCRIPT_DIR/engine-profile.R,dst=/opt/shield/engine-profile.R,readonly"
+      --env JHEEM2_PATH=/opt/run-engine/jheem2
+      --env "JHEEM2_REF=$ENGINE_REF"
+      --env SHIELD_ENGINE_LIBRARY=/opt/run-engine/library
+      --env R_PROFILE_USER=/opt/shield/engine-profile.R
+    )
+  fi
 
   local runtime_args=(
     --userns=keep-id --group-add keep-groups --network none \
@@ -221,6 +249,7 @@ run_container() {
     --env "SHIELD_OPERATOR=$(id -un)" \
     --env "SHIELD_HOST=$(hostname -s)" \
     ${smoke_env[@]+"${smoke_env[@]}"} ${freq_env[@]+"${freq_env[@]}"} ${mode_env[@]+"${mode_env[@]}"}
+    ${engine_args[@]+"${engine_args[@]}"}
   )
   say "Checking the selected code, inputs, and calibration definitions..."
   podman run --rm "${runtime_args[@]}" "$RUN_IMAGE" shell -c \
@@ -361,5 +390,5 @@ case "${1:-}" in
   stop)     [[ $# -eq 3 ]] || fail "usage: shield-run.sh stop <location> <calibration>"; cmd_stop "$2" "$3" ;;
   logs)     [[ $# -eq 3 ]] || fail "usage: shield-run.sh logs <location> <calibration>"; cmd_logs "$2" "$3" ;;
   status)   cmd_status ;;
-  *) sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
+  *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
 esac

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Preserve committed analysis code and select it once per calibration code.
+"""Preserve committed analysis and engine code and select it once per calibration code.
 
 The registry lives beside run records, not in the mutable input cache. Its
 selection applies across locations; a pipeline selects all its codes together.
-No network, Git checkout, scientific state repair, or package installation.
+The team loads jheem2 from source, so a selection also captures the jheem2
+checkout (by default the sibling of the analysis checkout); `image` instead
+selects the runtime image's built-in engine. No network, Git checkout,
+scientific state repair, or package installation.
 """
 
 import argparse
@@ -23,6 +26,8 @@ REQUIRED = (
     "applications/SHIELD/shield_calib_setup_and_run.R",
     "applications/SHIELD/check_recorded_completion.R",
 )
+ENGINE_REQUIRED = ("DESCRIPTION", "NAMESPACE")
+IMAGE_ENGINE = "image"
 
 
 def digest(path):
@@ -78,6 +83,32 @@ def inventory(tree):
     return files
 
 
+def verify_bundle(store, key, name):
+    if not re.fullmatch(r"[a-f0-9]{64}", key):
+        raise ValueError("invalid " + name + " snapshot identity")
+    bundle = store / key
+    if bundle.is_symlink():
+        raise ValueError(name + " snapshot directory is a symlink")
+    metadata_path = bundle / "source.json"
+    archive = bundle / "source.tar"
+    tree = bundle / name
+    if metadata_path.is_symlink() or archive.is_symlink() or tree.is_symlink():
+        raise ValueError(name + " snapshot metadata/archive/tree is a symlink")
+    metadata = read_json(metadata_path)
+    if identity(metadata) != key or metadata["schema_version"] != 1:
+        raise ValueError(name + " snapshot metadata changed")
+    if digest(archive) != metadata["archive_sha256"]:
+        raise ValueError(name + " snapshot archive changed")
+    if inventory(tree) != metadata["files"]:
+        raise ValueError(name + " snapshot files changed or are missing")
+    return tree, metadata["commit"]
+
+
+def engine_of(selection):
+    # Selections saved before engine snapshots used the image's built-in engine.
+    return selection.get("engine", IMAGE_ENGINE)
+
+
 def verify(store, selection):
     if not re.fullmatch(r"sha256:[a-f0-9]{64}", selection["image"]):
         raise ValueError("invalid saved image ID")
@@ -86,31 +117,25 @@ def verify(store, selection):
             raise ValueError("invalid saved manager release")
     if not re.fullmatch(r"[0-9]+", str(selection["seed"])):
         raise ValueError("invalid saved seed")
-    key = selection["snapshot"]
-    if not re.fullmatch(r"[a-f0-9]{64}", key):
-        raise ValueError("invalid source snapshot identity")
-    bundle = store / key
-    if bundle.is_symlink():
-        raise ValueError("source snapshot directory is a symlink")
-    metadata_path = bundle / "source.json"
-    archive = bundle / "source.tar"
-    tree = bundle / "jheem_analyses"
-    if metadata_path.is_symlink() or archive.is_symlink() or tree.is_symlink():
-        raise ValueError("source snapshot metadata/archive/tree is a symlink")
-    metadata = read_json(metadata_path)
-    if identity(metadata) != key or metadata["schema_version"] != 1:
-        raise ValueError("source snapshot metadata changed")
-    if digest(archive) != metadata["archive_sha256"]:
-        raise ValueError("source snapshot archive changed")
-    if inventory(tree) != metadata["files"]:
-        raise ValueError("source snapshot files changed or are missing")
-    return tree, metadata["commit"]
+    tree, revision = verify_bundle(store, selection["snapshot"], "jheem_analyses")
+    engine = engine_of(selection)
+    if engine == IMAGE_ENGINE:
+        return tree, revision, None, None
+    engine_tree, engine_revision = verify_bundle(store / "engines", engine, "jheem2")
+    if not is_jheem2(engine_tree):
+        raise ValueError("engine snapshot is not the jheem2 package")
+    return tree, revision, engine_tree, engine_revision
 
 
-def capture(store, source):
+def is_jheem2(tree):
+    description = tree / "DESCRIPTION"
+    return description.is_file() and re.search(r"(?m)^Package:\s*jheem2\s*$", description.read_text()) is not None
+
+
+def capture(store, source, name="jheem_analyses", required=REQUIRED, label="analysis"):
     repo = Path(git(source, "rev-parse", "--show-toplevel"))
     if git(repo, "status", "--porcelain", "--untracked-files=all"):
-        raise ValueError("analysis checkout has uncommitted changes; commit them before a new run")
+        raise ValueError(label + " checkout has uncommitted changes; commit them before a new run")
     revision = git(repo, "rev-parse", "HEAD")
     entries = git(repo, "ls-tree", "-r", revision).splitlines()
     if any(entry.startswith(("120000 ", "160000 ")) for entry in entries):
@@ -122,7 +147,7 @@ def capture(store, source):
         with archive.open("wb") as output:
             subprocess.run(["git", "-C", str(repo), "archive", "--format=tar", revision],
                            stdout=output, check=True)
-        tree = bundle / "jheem_analyses"
+        tree = bundle / name
         tree.mkdir()
         # Extract regular files only; never follow links or accept archive paths
         # outside this new directory. Do not inherit tar ownership or modes.
@@ -149,10 +174,14 @@ def capture(store, source):
                             raise
                 else:
                     raise ValueError("unsupported entry in source archive")
-        if any(not (tree / path).is_file() for path in REQUIRED):
+        if any(not (tree / path).is_file() for path in required):
+            if name == "jheem2":
+                raise ValueError("jheem2 checkout lacks DESCRIPTION/NAMESPACE")
             raise ValueError("checkout lacks the recorded SHIELD runtime; no ordinary-mode fallback")
+        if name == "jheem2" and not is_jheem2(tree):
+            raise ValueError("engine checkout is not the jheem2 package")
         if git(repo, "rev-parse", "HEAD") != revision or git(repo, "status", "--porcelain", "--untracked-files=all"):
-            raise ValueError("checkout changed during source capture; retry after committing")
+            raise ValueError(label + " checkout changed during source capture; retry after committing")
         metadata = {"schema_version": 1, "commit": revision,
                     "archive_sha256": digest(archive), "files": inventory(tree)}
         key = identity(metadata)
@@ -162,7 +191,19 @@ def capture(store, source):
         return key
 
 
-def select(root, source, codes, image, census, syphilis, seed, resume=False, expected=None):
+def engine_checkout(source, engine_source):
+    if engine_source:
+        return Path(engine_source)
+    sibling = Path(git(source, "rev-parse", "--show-toplevel")).parent / "jheem2"
+    if not sibling.is_dir():
+        raise ValueError("no jheem2 checkout next to the analysis checkout (" + str(sibling) + "); "
+                         "set SHIELD_JHEEM2_DIR to your jheem2 checkout, or SHIELD_ENGINE=image "
+                         "to use the runtime image's built-in jheem2")
+    return sibling
+
+
+def select(root, source, codes, image, census, syphilis, seed, resume=False, expected=None,
+           engine_source=None):
     root = Path(root).resolve()
     if any(c in str(root) for c in ("\n", "\t", ",")):
         raise ValueError("state path cannot contain tabs, newlines or commas")
@@ -197,17 +238,29 @@ def select(root, source, codes, image, census, syphilis, seed, resume=False, exp
             for field, value in (expected or {}).items():
                 if str(selection[field]) != str(value):
                     raise ValueError("requested " + field + " differs from the saved run selection")
+            if engine_source == IMAGE_ENGINE and engine_of(selection) != IMAGE_ENGINE:
+                raise ValueError("requested engine differs from the saved run selection")
         else:
             if resume:
                 raise ValueError("resume requires the original saved source selection")
-            selection = {"snapshot": capture(store, source), "image": image,
+            snapshot = capture(store, source)
+            if engine_source == IMAGE_ENGINE:
+                engine = IMAGE_ENGINE
+            else:
+                engines = store / "engines"
+                engines.mkdir(exist_ok=True)
+                engine = capture(engines, engine_checkout(source, engine_source), "jheem2",
+                                 ENGINE_REQUIRED, "jheem2")
+            selection = {"snapshot": snapshot, "engine": engine, "image": image,
                          "census": census, "syphilis": syphilis, "seed": str(seed)}
-        tree, revision = verify(store, selection)
+        tree, revision, engine_tree, engine_revision = verify(store, selection)
         if any(code not in saved for code in codes):
             for code in codes:
                 saved[code] = selection
             write_json(path, registry)
-        return dict(selection, path=str(tree), commit=revision)
+        return dict(selection, engine=engine_of(selection), path=str(tree), commit=revision,
+                    engine_path=str(engine_tree) if engine_tree else "-",
+                    engine_commit=engine_revision or "-")
     finally:
         lock.rmdir()
 
@@ -221,6 +274,9 @@ def main():
     parser.add_argument("--syphilis", required=True)
     parser.add_argument("--seed", default="0")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--engine-source", default="",
+                        help="jheem2 checkout to capture (default: sibling of the analysis "
+                             "checkout), or 'image' for the runtime image's built-in engine")
     parser.add_argument("codes", nargs="+")
     args = parser.parse_args()
     expected = {field: os.environ[env] for field, env in
@@ -228,9 +284,12 @@ def main():
                 if env in os.environ}
     try:
         result = select(args.root, args.source, args.codes, args.image, args.census,
-                        args.syphilis, args.seed, args.resume, expected)
+                        args.syphilis, args.seed, args.resume, expected,
+                        args.engine_source or None)
+        # Tab is IFS whitespace in the wrapper, so absent values print as "-".
         print("\t".join(result[key] for key in
-                        ("path", "commit", "image", "census", "syphilis", "seed", "snapshot")))
+                        ("path", "commit", "image", "census", "syphilis", "seed", "snapshot",
+                         "engine", "engine_path", "engine_commit")))
     except (ValueError, OSError, KeyError, TypeError, subprocess.CalledProcessError) as error:
         parser.exit(1, "shield-run source: " + str(error) + "\n")
 

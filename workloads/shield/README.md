@@ -8,7 +8,9 @@ schema is extended.
 The image provides two targets from the same dependency layer:
 
 - `recorded`: baked clean sources, installed exact `jheem2`, offline immutable
-  inputs, non-destructive fresh/resume checks, and verified completed outputs;
+  inputs, non-destructive fresh/resume checks, and verified completed outputs.
+  Wrapper runs replace the baked analysis code and, by default, jheem2 with
+  snapshots of the operator's committed checkouts ([SOURCE-SNAPSHOTS.md](SOURCE-SNAPSHOTS.md));
 - `development`: the same dependencies with source-mode `jheem2`; source paths
   can be replaced by bind-mounted worktrees for active development.
 
