@@ -55,7 +55,7 @@ def mount(source, target, readonly=False, relabel=True):
     return ["--mount", options]
 
 
-def run_build(engine_tree, library, image, script_dir):
+def run_build(engine_tree, library, image, script_dir, log):
     command = ["podman", "run", "--rm", "--userns=keep-id", "--group-add", "keep-groups",
                "--network", "none", "--user", str(os.getuid()) + ":" + str(os.getgid())]
     command += mount(engine_tree, "/opt/run-engine/jheem2", readonly=True)
@@ -64,7 +64,8 @@ def run_build(engine_tree, library, image, script_dir):
     command += mount(Path(script_dir) / "build_engine.sh", "/opt/shield/build_engine.sh",
                      readonly=True, relabel=False)
     command += [image, "shell", "/opt/shield/build_engine.sh"]
-    subprocess.run(command, check=True, stdout=sys.stderr)
+    with log.open("w") as output:
+        return subprocess.run(command, stdout=output, stderr=subprocess.STDOUT).returncode
 
 
 def ensure(root, engine, image, script_dir, wait_seconds=1800, poll_seconds=10):
@@ -95,13 +96,20 @@ def ensure(root, engine, image, script_dir, wait_seconds=1800, poll_seconds=10):
     try:
         if final.exists():
             return verify_build(final, engine, image, commit)
-        print("Building jheem2 " + commit[:8] + " for this runtime (a few minutes, once per engine version)...",
+        print("Building jheem2 " + commit[:8] + " for this runtime (about two minutes, once per engine version)...",
               file=sys.stderr)
         with tempfile.TemporaryDirectory(prefix=".building-", dir=builds) as temporary:
             staging = Path(temporary) / "build"
             library = staging / "library"
             library.mkdir(parents=True)
-            run_build(engine_tree, library, image, script_dir)
+            # Compiler output goes to a log kept with the build, or kept beside
+            # the builds and shown when the build fails.
+            log = staging / "build.log"
+            if run_build(engine_tree, library, image, script_dir, log) != 0:
+                kept = builds / ("failed-" + final.name[:16] + "-" + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime()) + ".log")
+                os.replace(log, kept)
+                print("".join(kept.read_text().splitlines(keepends=True)[-30:]), file=sys.stderr)
+                raise ValueError("the jheem2 build failed; no calibration was launched. Full log: " + str(kept))
             package = library / "jheem2"
             if not (package / "DESCRIPTION").is_file():
                 raise ValueError("engine build produced no jheem2 package")

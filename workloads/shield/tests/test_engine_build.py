@@ -104,6 +104,7 @@ def captured(tmp_path, checkouts, code="stage0"):
 def test_builds_once_per_engine_and_image(tmp_path, checkouts, fake_tools):
     chosen = captured(tmp_path, checkouts)
     library = build.ensure(tmp_path / "runs", chosen["engine"], IMAGE, SHIELD)
+    assert (library.parent / "build.log").is_file()
     marker = (library / "jheem2" / build.MARKER).read_text()
     assert "engine_commit: " + chosen["engine_commit"] in marker
     assert build.ensure(tmp_path / "runs", chosen["engine"], IMAGE, SHIELD) == library
@@ -129,10 +130,11 @@ def test_damaged_build_is_refused_not_rebuilt(tmp_path, checkouts, fake_tools):
 def test_failed_build_leaves_nothing_to_reuse(tmp_path, checkouts, fake_tools, monkeypatch):
     chosen = captured(tmp_path, checkouts)
     monkeypatch.setenv("FAKE_BUILD_FAIL", "true")
-    with pytest.raises(subprocess.CalledProcessError):
+    with pytest.raises(ValueError, match="jheem2 build failed.*Full log"):
         build.ensure(tmp_path / "runs", chosen["engine"], IMAGE, SHIELD)
     builds = tmp_path / "runs/run_sources/engine-builds"
-    assert list(builds.iterdir()) == []
+    # Only the failure log remains: no build to reuse and no lock.
+    assert [p.name.startswith("failed-") and p.suffix == ".log" for p in builds.iterdir()] == [True]
     monkeypatch.setenv("FAKE_BUILD_FAIL", "false")
     assert build.ensure(tmp_path / "runs", chosen["engine"], IMAGE, SHIELD).is_dir()
 

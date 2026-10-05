@@ -38,7 +38,8 @@ from a private copy with `--without-keep.source`, checks that no source referenc
 were kept, and writes the library to `run_sources/engine-builds/<key>/` with a
 per-file inventory and an engine-commit marker. Later launches verify the build
 before reuse; a damaged build is refused, not rebuilt. Concurrent launches wait
-for one build. The first build takes a few minutes.
+for one build. A build took 75–90 seconds on shield2; its compiler output is kept
+in `build.log` beside the library, or in a `failed-*.log` when it fails.
 
 At run time the build and its source are mounted read-only, and a startup profile
 (`engine-profile.R`, via `R_PROFILE_USER`) activates the image's renv library and
