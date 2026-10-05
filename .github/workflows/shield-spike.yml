@@ -81,7 +81,7 @@ jobs:
     env:
       # A manual run can build another SHIELD commit, such as the one a team
       # calibration is about to use; otherwise the reviewed Dockerfile default.
-      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || 'd23deca51b33f18bcbf3c726bf7b9264141caab0' }}
+      JHEEM_ANALYSES_REF: ${{ inputs.jheem_analyses_ref || 'da1af79202cfd4d6f4fd91386fbf6aed06c21ce0' }}
       SHIELD_INPUT_PROFILE: ${{ inputs.input_profile || 'retained' }}
     steps:
       - uses: actions/checkout@v7
@@ -197,6 +197,12 @@ jobs:
           SHIELD_CACHE: ${{ runner.temp }}/shield-cache
           SHIELD_STATE: ${{ runner.temp }}/shield-state
         run: bash workloads/shield/tests/test_records_and_pipeline.sh
+      - name: run a four-chain stage in phases
+        env:
+          SHIELD_IMAGE: jheem-shield:ci
+          SHIELD_CACHE: ${{ runner.temp }}/shield-cache
+          SHIELD_STATE: ${{ runner.temp }}/shield-state
+        run: bash workloads/shield/tests/test_multichain.sh
       - name: upload canary diagnostics and run records
         if: always()
         uses: actions/upload-artifact@v4

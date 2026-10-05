@@ -20,7 +20,8 @@ Neither target stores input managers or calibration state in the image.
 [Trying the SHIELD container](https://github.com/tfojo1/jheem_analyses/blob/master/applications/SHIELD/CONTAINER-PILOT.md)
 in the analyses repository. No container-repository checkout is needed.
 [RUNBOOK.md](RUNBOOK.md) covers administrator installation and maintenance.
-The pilot does not yet support a full multi-chain calibration.
+Multi-chain stages (stage 3) run through the wrapper in phases; they are
+validated on small fixtures, not yet on a full calibration.
 
 ## Current retained runtime (2026-10-04; installed on shield2)
 
@@ -281,7 +282,7 @@ workloads/shield/build-local.sh \
 This uses BuildKit named contexts, so the source repositories do not need to be
 published merely to perform a local spike. The current candidate defaults are:
 
-- `jheem_analyses`: `d23deca51b33f18bcbf3c726bf7b9264141caab0` (the retained October 4 run explicitly selected `0de5aa3e65bd057ac92aa6f00dee57f03c092828`)
+- `jheem_analyses`: `da1af79202cfd4d6f4fd91386fbf6aed06c21ce0` (branch `shield-multichain`, with recorded phases; the retained October 4 run explicitly selected `0de5aa3e65bd057ac92aa6f00dee57f03c092828`)
 - `jheem2`: `9578726b012a2ee380b380ef0203733d1bd81163` (October 1 `dev`, including spline fixes)
 - `locations`: `2481fc440cf1d981bb1005dd903708a88a528d13`
 - `bayesian.simulations`: `4e0d13e85857396bb0e6e2ac1d244775b2145f75` and
@@ -363,13 +364,22 @@ For continuation, use the same state mount and identifiers with
 `SHIELD_RUN_MODE=resume`. The entrypoint refuses root by default so NAS files
 are not silently created under the wrong ownership.
 
-`pipeline <location> <calibration-code>...` runs single-chain stages in order
-(for example stages 0 to 2), each after the previous one completes, in one
-container. It ignores `SHIELD_RUN_MODE`: a stage with verified recorded outputs is
-skipped, a stage with a recorded start is resumed, and the rest start fresh, so
-running the same pipeline again continues it. It stops at the first failed
-stage. Recorded mode refuses multi-chain calibrations (stage 3), because the
-monolithic launcher samples chain 1 only.
+`pipeline <location> <calibration-code>...` runs stages in order (for example
+stages 0 to 3), each after the previous one completes, in one container. It
+ignores `SHIELD_RUN_MODE`: a stage with verified recorded outputs is skipped, a
+stage with a recorded start is resumed, and the rest start fresh, so running the
+same pipeline again continues it. It stops at the first failed stage.
+
+With analysis code that supports recorded phases, each stage runs as one setup
+process, one process per chain, and one assembly
+(`applications/SHIELD/RECORDED-RUN-PILOT.md` in `jheem_analyses`). Chains run in
+parallel, at most `SHIELD_MAX_PARALLEL_CHAINS` at a time (default: all); each logs
+to `run_records/shield/<location>/<code>/logs/`. A failed chain stops the stage
+before assembly, and running it again continues each chain from its last
+checkpoint. Every process writes its own attempt record, with its phase and
+chain. Older analysis code keeps the single-process, single-chain path. The
+wrapper mounts its own entrypoint over the image's, so this orchestration
+follows the installed wrapper rather than the image.
 
 Before skipping a completed stage, the pipeline verifies both records, actual
 output sizes and SHA-256 digests, preceding-stage lineage, and the requested
@@ -553,7 +563,9 @@ source and inputs are not identified or checked.
   a second run of a calibration that one of your own containers is running;
   across accounts, operators must still prevent duplicate writers for the same
   location, calibration code, and chain.
-- Stage 3 (four parallel chains and assembly) isn't supported in recorded mode.
+- Multi-chain stages are validated on four-chain smoke fixtures, not yet on a
+  full stage 3. Chains of one stage share a run tree by design; separate
+  launches of the same stage are still the operator's to prevent.
 - The image bakes one `jheem_analyses` commit, so a calibration registered after
   that commit is unavailable through the bare image entrypoint. The operator
   wrapper can instead capture a clean committed analysis checkout and mount

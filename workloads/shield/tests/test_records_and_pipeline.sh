@@ -102,13 +102,25 @@ def check(condition, message):
     if not condition:
         sys.exit(f"  {message}")
 
-# Stage 0: killed fresh, killed resume, completed resume.
+# Analysis code with recorded phases runs a stage as setup, chain, and assembly
+# processes, each with its own attempt; older code runs one process per attempt.
+def shape(stage):
+    a = attempts(stage)
+    if any(x.get("phase", "all") != "all" for x in a):
+        return [(x["phase"], x["chain"], x["status"]) for x in a]
+    return [(x["run_mode"], x["status"]) for x in a]
+
 a0 = attempts(stage0)
-check([(a["run_mode"], a["status"]) for a in a0] ==
-      [("fresh", "started"), ("resume", "started"), ("resume", "succeeded")],
-      f"{stage0} attempts: {[(a['run_mode'], a['status']) for a in a0]}")
+phased = any(x.get("phase", "all") != "all" for x in a0)
+# Stage 0: killed fresh, killed resume, completed resume.
+expected0 = ([("setup", None, "succeeded"), ("run", 1, "started"), ("run", 1, "started"),
+              ("run", 1, "succeeded"), ("assemble", None, "succeeded")] if phased
+             else [("fresh", "started"), ("resume", "started"), ("resume", "succeeded")])
+check(shape(stage0) == expected0, f"{stage0} attempts: {shape(stage0)}")
 check(all(a["image"]["id"] == image_id for a in a0), "attempt image id differs from the tested image")
-check(a0[-1]["exit_code"] == 0 and a0[0]["exit_code"] is None, "attempt exit codes")
+killed = [a for a in a0 if a["status"] == "started"]
+check(a0[-1]["exit_code"] == 0 and len(killed) == 2 and all(a["exit_code"] is None for a in killed),
+      "attempt exit codes")
 
 for stage in (stage0, stage1):
     outputs_file = records / stage / "outputs.json"
@@ -133,9 +145,9 @@ check(stage1_inputs["preceding"] == [{"calibration_code": stage0,
       f"{stage1} preceding: {stage1_inputs['preceding']}")
 check(json.loads((records / stage0 / "inputs.json").read_text())["inputs"]["preceding"] == [],
       f"{stage0} should have no preceding stage")
-a1 = attempts(stage1)
-check([(a["run_mode"], a["status"]) for a in a1] == [("fresh", "succeeded")],
-      f"{stage1} attempts: {[(a['run_mode'], a['status']) for a in a1]}")
+expected1 = ([("setup", None, "succeeded"), ("run", 1, "succeeded"), ("assemble", None, "succeeded")]
+             if phased else [("fresh", "succeeded")])
+check(shape(stage1) == expected1, f"{stage1} attempts: {shape(stage1)}")
 EOF
 
 # Read actual parameters and selected yearly outcomes, not only file digests.

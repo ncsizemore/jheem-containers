@@ -8,9 +8,10 @@ and maintenance; the [technical README](README.md) describes builds and tests.
 
 ## Scope
 
-This is a single-chain pilot, not a replacement for a full calibration. Stage 3
-is refused, and handing pilot outputs to native stage 3 is not validated. Do not
-delay ordinary calibrations or change users' R installations/source checkouts.
+This is a pilot, not yet a replacement for a full calibration. Multi-chain
+stages (stage 3) run in phases with parallel chains, validated on small fixtures
+only. Do not delay ordinary calibrations or change users' R installations/source
+checkouts.
 
 The original installation uses the retained
 [`shield-pilot-2026.10.01-r36815091235` release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.01-r36815091235).
@@ -71,7 +72,7 @@ python3 workloads/shield/installation_profile.py prepare "$SHIELD_STAGE"
 cp workloads/shield/shield-run.sh workloads/shield/source_snapshot.py \
   workloads/shield/installation_profile.py workloads/shield/check_source_compatibility.R \
   workloads/shield/engine_build.py workloads/shield/build_engine.sh \
-  workloads/shield/engine-profile.R "$SHIELD_STAGE/"
+  workloads/shield/engine-profile.R workloads/shield/container-entrypoint.sh "$SHIELD_STAGE/"
 git rev-parse HEAD
 ```
 
@@ -134,7 +135,8 @@ from the image build. Outputs belong in the separate, per-user state root
 `/mnt/jheem_nas_share/tmp/shield-container/<username>/`.
 
 Label the installed local cache and the helpers mounted into containers
-(`check_source_compatibility.R`, `build_engine.sh`, `engine-profile.R`)
+(`check_source_compatibility.R`, `build_engine.sh`, `engine-profile.R`,
+`container-entrypoint.sh`)
 `container_file_t`, using persistent host
 file-context policy where available. Never relabel CIFS. NAS access requires
 `virt_use_samba` enabled on the host (`sudo setsebool -P virt_use_samba on`);
@@ -208,5 +210,5 @@ separate from this short installation check.
   delete stopped containers or outputs: they may hold diagnostic evidence.
 
 Retaining the runtime does not archive its scientific outputs or run records.
-Automatic archival, full-stage validation with this image, multi-chain support,
-and deterministic replay remain separate work.
+Automatic archival, full-stage validation with this image (including a full
+multi-chain stage 3), and deterministic replay remain separate work.
