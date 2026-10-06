@@ -234,7 +234,9 @@ esac''',
         env=env, capture_output=True, text=True,
     )
     assert result.returncode == 1, result.stderr
-    assert "SHIELD_STATE_ROOT" in result.stderr
+    # Safe routes only: a new calibration code (reusing completed earlier stages)
+    # or a separate state root; never deleting saved state.
+    assert "new calibration code" in result.stderr or "SHIELD_STATE_ROOT" in result.stderr
     assert "preserve" in result.stderr.lower()
     assert "remove that folder" not in result.stderr.lower()
     assert not log.exists(), log.read_text() if log.exists() else ""

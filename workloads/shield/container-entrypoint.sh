@@ -156,7 +156,7 @@ run_stage() {
   fi
   chains="$(cat "$records/chains.txt" 2>/dev/null || true)"
   case "$chains" in
-    '' | *[!0-9]* | 0) fail "$calibration for $location has no recorded chain count; its setup did not finish. Preserve the run and start over in a new state root." ;;
+    '' | *[!0-9]* | 0) fail "$calibration for $location has no recorded chain count: its setup did not finish (see its setup attempt and log). Preserve this run. To try again, register and run a new calibration code; completed earlier stages in this output folder are reused." ;;
   esac
   if [ "$chains" -eq 1 ]; then
     run_phase "$location" "$calibration" resume run 1 "" || return
