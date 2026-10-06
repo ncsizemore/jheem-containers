@@ -395,6 +395,14 @@ recent batches and `stop-batch <id>` stops the scheduler and its running
 locations. Running the same batch command again continues it. Plan memory around
 about 10 GB per running chain: a location's four-chain stage peaked near 35 GB.
 
+Container results use jheem2's usual layout under the state root, so the team's
+analysis scripts can read them unchanged by pointing the root that
+`commoncode/file_paths.R` uses at it: set `JHEEM_ROOT_DIR` before sourcing the
+SHIELD code. `shield-run.sh where` prints the folder and the setting for a server,
+a Mac (`/Volumes/jheem$/...`), and Windows (`Q:/...`). Native R 4.5.2 with
+source-loaded jheem2 read a container simulation set this way on shield2
+(2026-10-06). Figures and tables the scripts write then also go under that folder.
+
 Before skipping a completed stage, the pipeline verifies both records, actual
 output sizes and SHA-256 digests, preceding-stage lineage, and the requested
 code, manager identities, and seed. Missing, changed, or stale outputs stop the

@@ -9,6 +9,7 @@
 #                                                      run that pipeline for each location, a few at a time
 #   shield-run.sh stop-batch <batch-id>                stop a batch and its running locations
 #   shield-run.sh status                               show your SHIELD runs
+#   shield-run.sh where                                where outputs go, and how analyses read them
 #   shield-run.sh logs     <location> <calibration>    show the latest output
 #   shield-run.sh stop     <location> <calibration>    interrupt a running calibration or pipeline
 #   shield-run.sh resume   <location> <calibration>    continue from the last checkpoint
@@ -584,6 +585,28 @@ container_for() {
   printf '%s' "$name"
 }
 
+# The team's analysis scripts find results through ROOT.DIR in
+# commoncode/file_paths.R, which JHEEM_ROOT_DIR overrides. Pointing it at this
+# folder lets those scripts read container results unchanged. The NAS share is
+# /mnt/jheem_nas_share on the servers, /Volumes/jheem$ on a Mac, and Q: on the
+# desktop, as in file_paths.R.
+cmd_where() {
+  local relative
+  say "Your container results (calibration state, summaries, simulation sets, run records):"
+  say "  $STATE_ROOT"
+  [[ "$STATE_ROOT" == /mnt/jheem_nas_share/* ]] || return 0
+  relative="${STATE_ROOT#/mnt/jheem_nas_share/}"
+  say ""
+  say "To read them with your usual SHIELD analysis scripts, set JHEEM_ROOT_DIR at the top"
+  say "of the script, before it sources the SHIELD code:"
+  say "  on a server:  Sys.setenv(JHEEM_ROOT_DIR = \"$STATE_ROOT\")"
+  say "  on a Mac:     Sys.setenv(JHEEM_ROOT_DIR = \"/Volumes/jheem\$/$relative\")"
+  say "  on Windows:   Sys.setenv(JHEEM_ROOT_DIR = \"Q:/$relative\")"
+  say "In a session that already sourced it, use set.jheem.root.directory() with the same path."
+  say "Figures and tables the scripts write then also go under this folder. Remove the line"
+  say "(or Sys.unsetenv(\"JHEEM_ROOT_DIR\")) to go back to the usual results."
+}
+
 cmd_logs() { podman logs --tail 40 "$(container_for "$1" "$2")"; }
 
 cmd_stop() {
@@ -610,5 +633,6 @@ case "${1:-}" in
   stop-batch) [[ $# -eq 2 ]] || fail "usage: shield-run.sh stop-batch <batch-id>"; cmd_stop_batch "$2" ;;
   _batch-worker) [[ $# -eq 2 ]] || fail "usage: shield-run.sh _batch-worker <batch-id>"; batch_worker "$2" ;;
   status)   cmd_status ;;
-  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
+  where)    cmd_where ;;
+  *) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
 esac
