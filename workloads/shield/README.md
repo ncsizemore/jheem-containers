@@ -381,6 +381,20 @@ chain. Older analysis code keeps the single-process, single-chain path. The
 wrapper mounts its own entrypoint over the image's, so this orchestration
 follows the installed wrapper rather than the image.
 
+`shield-run.sh batch <location,location,...> <calibration-code>...` runs that
+pipeline for each location, as the team's launchers do for a city list. It checks
+the selection, engine build, and source compatibility once, then a background
+scheduler starts one pipeline container per location, at most `SHIELD_MAX_CITIES`
+at a time (default 5), as earlier ones finish. Locations already running, or
+holding calibration state that no recorded run started, are skipped. The
+scheduler is a `nohup`/`setsid` process, like the team's launchers, rather than a
+systemd user service: podman's per-container monitor would otherwise sit in the
+service's control group and be stopped with it. Batch files (`locations.txt`,
+`status.txt`, `batch.log`) live under `run_batches/<id>/`; `status` summarizes
+recent batches and `stop-batch <id>` stops the scheduler and its running
+locations. Running the same batch command again continues it. Plan memory around
+about 10 GB per running chain: a location's four-chain stage peaked near 35 GB.
+
 Before skipping a completed stage, the pipeline verifies both records, actual
 output sizes and SHA-256 digests, preceding-stage lineage, and the requested
 code, manager identities, and seed. Missing, changed, or stale outputs stop the
