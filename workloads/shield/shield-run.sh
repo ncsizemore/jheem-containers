@@ -5,6 +5,9 @@
 #   shield-run.sh setup                                check prerequisites, load the image
 #   shield-run.sh start    <location> <calibration>    begin a new calibration
 #   shield-run.sh pipeline <location> <calibration>... run stages in order (runs again to continue)
+#   shield-run.sh batch <location,location,...> <calibration>...
+#                                                      run that pipeline for each location, a few at a time
+#   shield-run.sh stop-batch <batch-id>                stop a batch and its running locations
 #   shield-run.sh status                               show your SHIELD runs
 #   shield-run.sh logs     <location> <calibration>    show the latest output
 #   shield-run.sh stop     <location> <calibration>    interrupt a running calibration or pipeline
@@ -18,6 +21,7 @@
 #   SHIELD_JHEEM2_DIR  jheem2 checkout for new runs (default: next to jheem_analyses)
 #   SHIELD_ENGINE      set to "image" to use the runtime image's built-in jheem2
 #   SHIELD_MAX_PARALLEL_CHAINS  chains of one stage to run at once (default: all)
+#   SHIELD_MAX_CITIES  locations of a batch to run at once (default: 5)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -201,11 +205,10 @@ check_not_running() {
   done
 }
 
-# Run the image detached. Arguments: container name, the calibrations it
-# covers, location, run mode (empty for a pipeline), then the container command.
-run_container() {
-  local name="$1" calibrations="$2" location="$3" mode="$4" state_opts source_opts smoke_env=() freq_env=() mode_env=() calibration
-  shift 4
+# Container settings for these calibrations and run mode (empty for a
+# pipeline), shared by the compatibility check and every launch: sets RUNTIME_ARGS.
+prepare_runtime() {
+  local calibrations="$1" mode="$2" state_opts source_opts smoke_env=() freq_env=() mode_env=() calibration
   state_opts=""
   on_cifs "$STATE_ROOT" || state_opts=",relabel=shared"
   source_opts=""
@@ -236,7 +239,7 @@ run_container() {
     )
   fi
 
-  local runtime_args=(
+  RUNTIME_ARGS=(
     --userns=keep-id --group-add keep-groups --network none \
     --user "$(id -u):$(id -g)" \
     --mount "type=bind,src=$SHIELD_HOME/cache,dst=/work/cache,readonly" \
@@ -256,18 +259,42 @@ run_container() {
     ${smoke_env[@]+"${smoke_env[@]}"} ${freq_env[@]+"${freq_env[@]}"} ${mode_env[@]+"${mode_env[@]}"}
     ${engine_args[@]+"${engine_args[@]}"} ${parallel_env[@]+"${parallel_env[@]}"}
   )
+}
+
+# Load the selected specification and calibration definitions read-only before
+# any sampling; one check covers every location of these calibrations.
+check_compatibility() {
   say "Checking the selected code, inputs, and calibration definitions..."
-  podman run --rm "${runtime_args[@]}" "$RUN_IMAGE" shell -c \
+  podman run --rm "${RUNTIME_ARGS[@]}" "$RUN_IMAGE" shell -c \
     'Rscript /opt/shield/preflight.R && Rscript /opt/shield/check_source_compatibility.R "$@"' \
-    shield-source-check $calibrations || fail "source compatibility check failed; no calibration was launched. Preserve the saved selection and logs."
+    shield-source-check $1 || fail "source compatibility check failed; no calibration was launched. Preserve the saved selection and logs."
+}
+
+# Start one detached container. Arguments: name prefix, location, calibrations,
+# batch ID (or empty), then the container command. Prints the container name.
+launch_detached() {
+  local name="$1" location="$2" calibrations="$3" batch="$4" batch_label=()
+  shift 4
+  [[ -z "$batch" ]] || batch_label=(--label "shield.batch=$batch")
   # Do not remove old container diagnostics or race another launcher by force.
-  # Podman atomically reserves a unique attempt name; the running check above
-  # is still same-account only, not a general shared-writer lock.
+  # Podman atomically reserves a unique attempt name; the running check is
+  # still same-account only, not a general shared-writer lock.
   name="$name-$(date -u +%Y%m%dT%H%M%S)-$$"
   podman run -d --name "$name" \
     --label shield.location="$location" --label shield.calibrations="$calibrations" \
-    --label shield.state-root="$STATE_ROOT" \
-    "${runtime_args[@]}" "$RUN_IMAGE" "$@" >/dev/null
+    --label shield.state-root="$STATE_ROOT" ${batch_label[@]+"${batch_label[@]}"} \
+    "${RUNTIME_ARGS[@]}" "$RUN_IMAGE" "$@" >/dev/null || return 1
+  printf '%s' "$name"
+}
+
+# Check, then launch. Arguments: name prefix, calibrations, location, run mode
+# (empty for a pipeline), then the container command.
+run_container() {
+  local name="$1" calibrations="$2" location="$3" mode="$4"
+  shift 4
+  prepare_runtime "$calibrations" "$mode"
+  check_compatibility "$calibrations"
+  launch_detached "$name" "$location" "$calibrations" "" "$@" >/dev/null || fail "could not start the container."
 }
 
 cmd_stage() {
@@ -281,14 +308,15 @@ cmd_stage() {
   $saved
   $(records_dir "$location" "$calibration")
 If a checkpoint was saved, continue with: shield-run.sh resume $location $calibration
-Preserve this run for diagnosis. For a deliberate new attempt, ask the administrator
-to choose a separate SHIELD_STATE_ROOT; do not delete saved state or records."
+Preserve this run for diagnosis; do not delete saved state or records. For a new
+attempt, register and run a new calibration code: completed earlier stages in this
+output folder are reused. (A separate SHIELD_STATE_ROOT also works, without them.)"
   fi
   if [[ "$mode" == resume && ! -s "$saved/cache/chain1_control.Rdata" ]]; then
     fail "there's nothing to resume for $calibration $location (no saved checkpoint in $saved).
-If setup already started, preserve its state and records for diagnosis. Ask the
-administrator for a separate SHIELD_STATE_ROOT for a deliberate new attempt.
-Use start only for a run that has not already been started."
+If setup already started, preserve its state and records for diagnosis. For a new
+attempt, register and run a new calibration code: completed earlier stages in this
+output folder are reused. Use start only for a run that has not already been started."
   fi
 
   select_source "$mode" "$calibration"
@@ -329,6 +357,175 @@ SHIELD_STATE_ROOT for a deliberate new attempt; do not delete saved state."
   say "It keeps running if you log out."
 }
 
+# Calibration state that no recorded run started would stop a pipeline partway.
+# Prints the first such calibration for this location.
+unrecorded_state() {
+  local location="$1" calibration
+  shift
+  for calibration in "$@"; do
+    if [[ -e "$(calibration_dir "$location" "$calibration")" && ! -f "$(records_dir "$location" "$calibration")/inputs.json" ]]; then
+      printf '%s' "$calibration"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Prints a running container that covers any of these calibrations here.
+running_container() {
+  local location="$1" calibration name
+  shift
+  for calibration in "$@"; do
+    name="$(find_container "$location" "$calibration")"
+    if [[ -n "$name" && "$(podman container inspect --format '{{.State.Running}}' "$name")" == true ]]; then
+      printf '%s' "$name"
+      return 0
+    fi
+  done
+  return 1
+}
+
+batch_dir() { printf '%s/run_batches/%s' "$STATE_ROOT" "$1"; }
+batch_worker_alive() {
+  local pid
+  pid="$(cat "$(batch_dir "$1")/worker.pid" 2>/dev/null || true)"
+  [[ -n "$pid" ]] && ps -p "$pid" -o command= 2>/dev/null | grep -q "_batch-worker $1"
+}
+
+# A batch runs one pipeline container per location, at most SHIELD_MAX_CITIES at
+# a time. Selection, engine build, and the compatibility check happen once, here;
+# a background scheduler then starts locations as earlier ones finish. Like the
+# team's nohup launchers, it continues after logout.
+cmd_batch() {
+  local list="$1" city cities=() code max="${SHIELD_MAX_CITIES:-5}" id dir launcher=()
+  shift
+  [[ "$max" =~ ^[1-9][0-9]*$ ]] || fail "SHIELD_MAX_CITIES must be a positive integer."
+  IFS=',' read -r -a cities <<< "$list"
+  (( ${#cities[@]} > 0 )) || fail "no locations given."
+  for city in "${cities[@]}"; do
+    [[ "$city" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "invalid location: '$city'"
+  done
+  [[ -z "$(printf '%s\n' "${cities[@]}" | sort | uniq -d)" ]] || fail "a location is listed twice."
+  for code in "$@"; do
+    [[ "$code" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "invalid calibration code: '$code'"
+  done
+  check_prerequisites
+  for city in "${cities[@]}"; do
+    if code="$(unrecorded_state "$city" "$@")"; then
+      fail "$code for $city has saved results that weren't started by this container:
+  $(calibration_dir "$city" "$code")
+Leave that location out of the batch, or use a separate SHIELD_STATE_ROOT; do not delete saved state."
+    fi
+  done
+
+  select_source pipeline "$@"
+  prepare_runtime "$*" ""
+  check_compatibility "$*"
+
+  id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  dir="$(batch_dir "$id")"
+  mkdir -p "$dir" || fail "can't create $dir."
+  printf '%s\n' "${cities[@]}" > "$dir/locations.txt"
+  printf '%s\n' "$@" > "$dir/calibrations.txt"
+  printf '%s\n' "$max" > "$dir/max_cities.txt"
+  ! command -v setsid >/dev/null || launcher=(setsid)
+  SHIELD_HOME="$SHIELD_HOME" SHIELD_STATE_ROOT="$STATE_ROOT" SHIELD_SOURCE_DIR="${SHIELD_SOURCE_DIR:-$PWD}" \
+    nohup ${launcher[@]+"${launcher[@]}"} bash "$SCRIPT_DIR/shield-run.sh" _batch-worker "$id" \
+    </dev/null >>"$dir/batch.log" 2>&1 &
+  say "Started batch $id: ${#cities[@]} locations, at most $max at a time."
+  say "  Stages:          $*"
+  say "  Check progress:  shield-run.sh status"
+  say "  Batch log:       $dir/batch.log"
+  say "  Stop it:         shield-run.sh stop-batch $id"
+  say "Running the same batch command again continues it. It keeps running if you log out."
+}
+
+batch_worker() {
+  local id="$1" dir line city name state code i running waiting max poll
+  local locations=() codes=() states=()
+  dir="$(batch_dir "$id")"
+  [[ -f "$dir/locations.txt" ]] || fail "no batch $id in $STATE_ROOT."
+  printf '%s\n' "$$" > "$dir/worker.pid"
+  while IFS= read -r line; do [[ -z "$line" ]] || locations+=("$line"); done < "$dir/locations.txt"
+  while IFS= read -r line; do [[ -z "$line" ]] || codes+=("$line"); done < "$dir/calibrations.txt"
+  max="$(cat "$dir/max_cities.txt")"
+  poll="${SHIELD_BATCH_POLL_SECONDS:-60}"
+  note() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
+  note "batch $id: ${#locations[@]} locations, at most $max at a time: ${codes[*]}"
+  select_source pipeline "${codes[@]}"
+  prepare_runtime "${codes[*]}" ""
+  for city in "${locations[@]}"; do states+=(waiting); done
+  while :; do
+    running=0
+    for i in "${!locations[@]}"; do
+      state="${states[$i]}"
+      [[ "$state" == running\ * ]] || continue
+      name="${state#running }"
+      if [[ "$(podman container inspect --format '{{.State.Running}}' "$name" 2>/dev/null)" == true ]]; then
+        running=$((running + 1))
+      else
+        code="$(podman container inspect --format '{{.State.ExitCode}}' "$name" 2>/dev/null || echo unknown)"
+        states[$i]="finished (exit $code)"
+        note "${locations[$i]} finished (exit $code)"
+      fi
+    done
+    for i in "${!locations[@]}"; do
+      (( running < max )) || break
+      [[ "${states[$i]}" == waiting ]] || continue
+      city="${locations[$i]}"
+      if name="$(running_container "$city" "${codes[@]}")"; then
+        states[$i]="skipped (already running: $name)"
+        note "$city skipped: already running in $name"
+      elif code="$(unrecorded_state "$city" "${codes[@]}")"; then
+        states[$i]="skipped ($code has state not started by this container)"
+        note "$city skipped: $code has state not started by this container"
+      elif name="$(launch_detached "$(safe_name "shield-pipeline-${codes[0]}-$city")" "$city" \
+          "${codes[*]}" "$id" pipeline "$city" "${codes[@]}")"; then
+        states[$i]="running $name"
+        running=$((running + 1))
+        note "$city started ($name)"
+      else
+        states[$i]="skipped (could not start)"
+        note "$city could not start"
+      fi
+    done
+    for i in "${!locations[@]}"; do printf '%s %s\n' "${locations[$i]}" "${states[$i]}"; done \
+      > "$dir/status.txt.tmp" && mv "$dir/status.txt.tmp" "$dir/status.txt"
+    waiting=0
+    for state in "${states[@]}"; do [[ "$state" != waiting ]] || waiting=$((waiting + 1)); done
+    (( running > 0 || waiting > 0 )) || break
+    sleep "$poll"
+  done
+  note "batch $id finished"
+}
+
+batch_summary() {
+  local id="$1" status counts
+  status="$(batch_dir "$id")/status.txt"
+  counts="$(awk '{ if ($2 == "finished" && $0 !~ /\(exit 0\)$/) print "failed"; else print $2 }' "$status" 2>/dev/null \
+    | sort | uniq -c | awk '{printf "%s%s %s", (NR>1 ? ", " : ""), $1, $2}')"
+  if batch_worker_alive "$id"; then
+    say "batch $id: scheduling (${counts:-starting})"
+  else
+    say "batch $id: done (${counts:-no locations started})"
+  fi
+}
+
+cmd_stop_batch() {
+  local id="$1" name pid
+  [[ -d "$(batch_dir "$id")" ]] || fail "no batch $id in $STATE_ROOT."
+  if batch_worker_alive "$id"; then
+    pid="$(cat "$(batch_dir "$id")/worker.pid")"
+    kill "$pid" 2>/dev/null || true
+  fi
+  for name in $(podman ps --filter "label=shield.batch=$id" --format '{{.Names}}'); do
+    # R ignores the polite stop signal, so podman forces it after 5 seconds.
+    podman stop -t 5 "$name" >/dev/null 2>&1 || true
+    say "Stopped $name"
+  done
+  say "Stopped batch $id. Run the same batch command again to continue it."
+}
+
 chunk_count() {
   ( (find "$(calibration_dir "$1" "$2")/cache/chain_$3" -maxdepth 1 -name "chain$3_chunk*.Rdata" 2>/dev/null || true) | wc -l | tr -d ' ')
 }
@@ -354,7 +551,10 @@ stage_progress() {
 }
 
 cmd_status() {
-  local names name location calibrations state last calibration root
+  local names name location calibrations state last calibration root batch
+  if [[ -d "$STATE_ROOT/run_batches" ]]; then
+    for batch in $(ls -1 "$STATE_ROOT/run_batches" | tail -5); do batch_summary "$batch"; done
+  fi
   names="$(podman ps -a --filter name=^shield- --sort created --format '{{.Names}}')"
   if [[ -z "$names" ]]; then say "No SHIELD runs found."; return; fi
   while read -r name; do
@@ -406,6 +606,9 @@ case "${1:-}" in
   pipeline) [[ $# -ge 3 ]] || fail "usage: shield-run.sh pipeline <location> <calibration>..."; shift; cmd_pipeline "$@" ;;
   stop)     [[ $# -eq 3 ]] || fail "usage: shield-run.sh stop <location> <calibration>"; cmd_stop "$2" "$3" ;;
   logs)     [[ $# -eq 3 ]] || fail "usage: shield-run.sh logs <location> <calibration>"; cmd_logs "$2" "$3" ;;
+  batch)    [[ $# -ge 3 ]] || fail "usage: shield-run.sh batch <location,location,...> <calibration>..."; shift; cmd_batch "$@" ;;
+  stop-batch) [[ $# -eq 2 ]] || fail "usage: shield-run.sh stop-batch <batch-id>"; cmd_stop_batch "$2" ;;
+  _batch-worker) [[ $# -eq 2 ]] || fail "usage: shield-run.sh _batch-worker <batch-id>"; batch_worker "$2" ;;
   status)   cmd_status ;;
-  *) sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
+  *) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 64 ;;
 esac
