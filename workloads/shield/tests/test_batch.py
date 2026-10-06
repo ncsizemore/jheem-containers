@@ -198,3 +198,16 @@ def test_stop_batch_stops_the_scheduler_and_its_running_locations(env):
     assert "scheduling" not in shield_run(env, "status").stdout
     # Only the first location ever started.
     assert (Path(env["FAKE_STATE"]) / "launches.log").read_text().split()[0::2] == ["C.12580"]
+
+
+def test_where_points_analyses_at_container_results(env):
+    nas = "/mnt/jheem_nas_share/tmp/shield-container-r1/someone"
+    result = shield_run(env, "where", SHIELD_STATE_ROOT=nas)
+    assert result.returncode == 0, result.stderr
+    assert f'Sys.setenv(JHEEM_ROOT_DIR = "{nas}")' in result.stdout
+    assert 'Sys.setenv(JHEEM_ROOT_DIR = "/Volumes/jheem$/tmp/shield-container-r1/someone")' in result.stdout
+    assert 'Sys.setenv(JHEEM_ROOT_DIR = "Q:/tmp/shield-container-r1/someone")' in result.stdout
+    # A root outside the NAS has no Mac or Windows equivalent to suggest.
+    local = shield_run(env, "where")
+    assert local.returncode == 0 and "JHEEM_ROOT_DIR" not in local.stdout
+    assert env["SHIELD_STATE_ROOT"] in local.stdout
