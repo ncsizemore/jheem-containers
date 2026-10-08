@@ -8,10 +8,12 @@ and maintenance; the [technical README](README.md) describes builds and tests.
 
 ## Scope
 
-This is a pilot, not yet a replacement for a full calibration. Multi-chain
-stages (stage 3) run in phases with parallel chains, validated on small fixtures
-only. Do not delay ordinary calibrations or change users' R installations/source
-checkouts.
+This is a pilot. It runs the team's stage pipelines for a city list, including
+four-chain stage 3, from the operator's committed `jheem_analyses` and `jheem2`.
+A real stage (`calib.10.5.stage0.1x`, two cities) produced results identical to
+native runs on shield2 (2026-10-08); four-chain stage 3 has been exercised on
+small fixtures only. Do not delay ordinary calibrations or change users' R
+installations/source checkouts.
 
 The original installation uses the retained
 [`shield-pilot-2026.10.01-r36815091235` release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.01-r36815091235).
@@ -92,6 +94,23 @@ separately. The wrapper defaults to its own directory and the profile's
 root; operators need no manager/image overrides. A different output root or seed
 is an explicit run choice, not an edit to the installed profile.
 
+The current installation is `/home/jheem-shared/shield-container-20261008`
+(installed 2026-10-08). It uses the same October 4 image, inputs, and profile,
+with the wrapper and helpers from this repository at
+`87eae47d62e584e89292af0f6e7af00319a09704`: captured `jheem2` builds, phased
+multi-chain stages, city batches, and `where`. It writes to the same
+`shield-container-r37210907071/<username>/` output namespace as the October 4
+installation, which had no operator runs. Its payload manifest
+(`CHECKSUMS.sha256`) digest is
+`1ec0460a35f2c42dfbbe3934ac023317564e308ee49d10a735f08247534eb185`, and
+`INSTALLATION.txt` records the release, wrapper commit, image, namespace, and
+accounts checked. Both operator accounts passed the access checks. An isolated
+administrator batch from a clean checkout (analyses `a10b2a67`, `jheem2`
+`008897e8`) ran two cities through the three smoke stages below, including
+four-chain stage 3, in 10 minutes. Records show the captured engine, seed,
+manager digests, and stage lineage. A repeated pipeline verified and skipped
+every stage without changing any record or output.
+
 After installation, use that directory's wrapper for setup and an isolated
 administrator smoke before inviting an operator. Continue an older run through
 its original installation and output root. No symlink, alias, default, package,
@@ -152,19 +171,23 @@ Do not disable lingering or the NAS boolean while other containers depend on the
 ## Verify before inviting operators
 
 Use the selected installation's wrapper as a non-root administrator, with a
-fresh isolated state root. For the October 4 installation:
+fresh isolated state root. For the October 8 installation, from a clean
+committed `jheem_analyses` checkout with a clean committed `jheem2` beside it:
 
 ```bash
-SHIELD_INSTALL=/home/jheem-shared/shield-container-20261004
+SHIELD_INSTALL=/home/jheem-shared/shield-container-20261008
 SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37210907071/ADMIN-HANDOFF-TEST.XXXXXX) || exit 1
 export SHIELD_STATE_ROOT
 cd /path/to/clean/committed/jheem_analyses
 "$SHIELD_INSTALL/shield-run.sh" setup
-"$SHIELD_INSTALL/shield-run.sh" start C.12580 container.smoke.stage0
+"$SHIELD_INSTALL/shield-run.sh" batch C.12580,C.35620 \
+  container.smoke.stage0 container.smoke.pre3 container.smoke.stage3
 "$SHIELD_INSTALL/shield-run.sh" status
-"$SHIELD_INSTALL/shield-run.sh" logs C.12580 container.smoke.stage0
-# After completion, verify its recorded outputs without rerunning the stage:
-"$SHIELD_INSTALL/shield-run.sh" pipeline C.12580 container.smoke.stage0
+"$SHIELD_INSTALL/shield-run.sh" logs C.12580 container.smoke.stage3
+"$SHIELD_INSTALL/shield-run.sh" where
+# After completion, verify its recorded outputs without rerunning any stage:
+"$SHIELD_INSTALL/shield-run.sh" pipeline C.12580 \
+  container.smoke.stage0 container.smoke.pre3 container.smoke.stage3
 ```
 
 For a different prepared installation, select its wrapper and output namespace
@@ -186,8 +209,9 @@ separate from this short installation check.
 ## Recovery and updates
 
 - Preserve failed state and records. Resume requires a checkpoint and matching
-  inputs. If setup stopped earlier, investigate and choose a new
-  `SHIELD_STATE_ROOT`; do not delete receipts to force a restart.
+  inputs. If setup stopped earlier, investigate, then register and run a new
+  calibration code (or choose a new `SHIELD_STATE_ROOT`); do not delete receipts
+  to force a restart.
 - Keep that state-root setting for subsequent commands. `status` lists the
   account's containers in that root, not other accounts' jobs. Startup locks
   serialize launches of the same location/code, but are not lifetime locks
