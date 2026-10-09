@@ -63,13 +63,13 @@ From the clean container checkout used for the wrapper, set
 `SHIELD_PILOT_RELEASE` to that dated release tag, then prepare fresh staging:
 
 ```bash
-export SHIELD_PILOT_RELEASE=shield-pilot-2026.10.04-r37210907071
+export SHIELD_PILOT_RELEASE=shield-pilot-2026.10.09-r37958480247
 SHIELD_STAGE=$(mktemp -d)
 mkdir -p "$SHIELD_STAGE/image"
 gh release download "$SHIELD_PILOT_RELEASE" --repo ncsizemore/jheem-containers \
   --pattern jheem-shield-recorded.tar.gz --pattern IMAGE.txt \
   --dir "$SHIELD_STAGE/image"
-python3 workloads/shield/tests/prepare_inputs.py "$SHIELD_STAGE/cache" --profile september-2026
+python3 workloads/shield/tests/prepare_inputs.py "$SHIELD_STAGE/cache" --profile october-2026
 python3 workloads/shield/installation_profile.py prepare "$SHIELD_STAGE"
 cp workloads/shield/shield-run.sh workloads/shield/source_snapshot.py \
   workloads/shield/installation_profile.py workloads/shield/check_source_compatibility.R \
@@ -82,8 +82,9 @@ git rev-parse HEAD
 against their resolution records, and writes an exclusive `installation.json`.
 It refuses an existing profile. Confirm its image ID, source refs, input tags and
 digests against the hosted reports and release record, not merely a successful
-download. This profile selects September 9 syphilis and August 26 census inputs;
-it is not a decision that they suit every scientific analysis.
+download. The `october-2026` profile selects the September 9 syphilis and October 8
+census inputs (`september-2026` paired the same syphilis manager with the August 26
+census); neither is a decision that they suit every scientific analysis.
 
 Install these files into a **new** root-owned `root:jheem` directory, never over
 `/home/jheem-shared/shield-container`. Preserve the permissions, ACL checks,
@@ -94,8 +95,28 @@ separately. The wrapper defaults to its own directory and the profile's
 root; operators need no manager/image overrides. A different output root or seed
 is an explicit run choice, not an edit to the installed profile.
 
-The current installation is `/home/jheem-shared/shield-container-20261008`
-(installed 2026-10-08). It uses the same October 4 image, inputs, and profile,
+The current installation is `/home/jheem-shared/shield-container-20261009`
+(installed 2026-10-09). It uses the
+[October 9 release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.09-r37958480247)
+(image `sha256:e48097ab021bca06a4a41056295f563e00dfa3eeed1d6dcda53fede0a8341156`,
+built from this repository at `ae9a9d9f` and tested with analyses `ec1e8213`) with
+the `october-2026` inputs: census `census-manager-v2026.10.08` (the census made
+current by jheem_analyses `8d28541f`, SHA-256 `fc45487d…`) and syphilis
+`syphilis-manager-v2026.09.09`. Its compiled libraries are byte-identical to the
+October 4 image's (869 `.so` files, R 4.4.2). It writes to its own
+`shield-container-r37958480247/<username>/` namespace. The wrapper and helpers
+are from `ae9a9d9f`, except `source_snapshot.py`, replaced on 2026-10-09 from
+`def30d80` before any operator run because it still refused `census-manager-v*`
+tags; `INSTALLATION.txt` records the update and `CHECKSUMS.sha256` covers the
+replacement. Both operator accounts passed the access checks. An isolated
+administrator batch from a clean checkout (analyses `2537b6b6`, `jheem2`
+`008897e8`) ran two cities through the three smoke stages below, including
+four-chain stage 3, in 10 minutes; records show the October census digest, engine,
+seed, and stage lineage, and a repeated pipeline verified and skipped every stage
+without changing any file.
+
+The previous installation, `/home/jheem-shared/shield-container-20261008`
+(installed 2026-10-08), uses the October 4 image, inputs, and profile,
 with the wrapper and helpers from this repository at
 `87eae47d62e584e89292af0f6e7af00319a09704`: captured `jheem2` builds, phased
 multi-chain stages, city batches, and `where`. It writes to the same
@@ -171,12 +192,12 @@ Do not disable lingering or the NAS boolean while other containers depend on the
 ## Verify before inviting operators
 
 Use the selected installation's wrapper as a non-root administrator, with a
-fresh isolated state root. For the October 8 installation, from a clean
+fresh isolated state root. For the October 9 installation, from a clean
 committed `jheem_analyses` checkout with a clean committed `jheem2` beside it:
 
 ```bash
-SHIELD_INSTALL=/home/jheem-shared/shield-container-20261008
-SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37210907071/ADMIN-HANDOFF-TEST.XXXXXX) || exit 1
+SHIELD_INSTALL=/home/jheem-shared/shield-container-20261009
+SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37958480247/ADMIN-HANDOFF-TEST.XXXXXX) || exit 1
 export SHIELD_STATE_ROOT
 cd /path/to/clean/committed/jheem_analyses
 "$SHIELD_INSTALL/shield-run.sh" setup
