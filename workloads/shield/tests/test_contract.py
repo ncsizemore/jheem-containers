@@ -155,14 +155,15 @@ def test_ci_input_fixture_uses_immutable_release_assets():
     assert "data-managers-v2026.08.26" in preparer
     assert "syphilis-manager-v2026.07.27" in preparer
     assert "syphilis-manager-v2026.05.05" in preparer
-    assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 4
+    assert "census-manager-v2026.10.08" in preparer
+    assert len(re.findall(r'"sha256": "[0-9a-f]{64}"', preparer)) == 5
     assert "os.replace(temporary_path, artifact)" in preparer
 
 
 def test_ci_profile_controls_preparer_and_all_canary_steps():
     workflow = yaml.load(WORKFLOW.read_text(), Loader=yaml.BaseLoader)
     profile = workflow["on"]["workflow_dispatch"]["inputs"]["input_profile"]
-    assert profile["options"] == ["retained", "native-2026-10-01", "september-2026"]
+    assert profile["options"] == ["retained", "native-2026-10-01", "september-2026", "october-2026"]
     assert profile["default"] == "retained"
     build = workflow["jobs"]["build-recorded"]
     assert build["env"]["SHIELD_INPUT_PROFILE"] == "${{ inputs.input_profile || 'retained' }}"

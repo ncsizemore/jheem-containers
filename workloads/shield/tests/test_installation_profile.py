@@ -94,6 +94,27 @@ def test_invalid_payload_cannot_create_an_installation_profile(home, damage):
     assert not (home / "installation.json").exists()
 
 
+@pytest.mark.parametrize("census_tag,valid", [("census-manager-v2026.10.08", True),
+                                               ("census-manager-latest", False),
+                                               ("syphilis-manager-v2026.09.09", False),
+                                               ("data-managers-latest", False)])
+def test_census_may_come_from_a_census_only_release(home, census_tag, valid):
+    old = "data-managers-v2026.08.26"
+    metadata = home / "image/IMAGE.txt"
+    metadata.write_text(metadata.read_text().replace(old, census_tag))
+    cache = home / "cache/data-managers/census.manager.rdata"
+    (cache / old).rename(cache / census_tag)
+    resolution = json.loads((cache / census_tag / "resolution.json").read_text())
+    resolution["resolved_tag"] = census_tag
+    (cache / census_tag / "resolution.json").write_text(json.dumps(resolution))
+    if valid:
+        assert installation.prepare(home)["inputs"][0]["tag"] == census_tag
+    else:
+        with pytest.raises(ValueError, match="immutable manager release"):
+            installation.prepare(home)
+        assert not (home / "installation.json").exists()
+
+
 @pytest.mark.parametrize("namespace", ["../old", "shield-container/old", "", "/mnt/other"])
 def test_namespace_cannot_escape_the_per_user_pilot_root(home, namespace):
     if namespace == "":

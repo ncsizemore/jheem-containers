@@ -60,9 +60,10 @@ def metadata(home):
     for key in ("containers_commit", "jheem_analyses_ref", "jheem2_ref"):
         if not re.fullmatch(r"[0-9a-f]{40}", values[key]):
             raise ValueError(f"invalid source commit: {key}")
-    for key, prefix in (("census_tag", "data-managers-v"),
+    # Census: the manager-build dependency bundle or a census-only release.
+    for key, prefix in (("census_tag", "(?:data-managers|census-manager)-v"),
                         ("syphilis_tag", "syphilis-manager-v")):
-        if not re.fullmatch(re.escape(prefix) + r"[0-9]{4}\.[0-9]{2}\.[0-9]{2}", values[key]):
+        if not re.fullmatch(prefix + r"[0-9]{4}\.[0-9]{2}\.[0-9]{2}", values[key]):
             raise ValueError(f"not an immutable manager release: {key}")
     if not re.fullmatch(r"[0-9]+", values["random_seed"]):
         raise ValueError("invalid random seed")

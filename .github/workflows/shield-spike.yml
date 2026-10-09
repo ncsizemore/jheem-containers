@@ -26,7 +26,7 @@ on:
         default: ''
         type: string
       input_profile:
-        description: 'Immutable test inputs: retained July, historical May, or intended September manager. Does not change installed defaults.'
+        description: 'Immutable test inputs: retained July, historical May, or September syphilis manager; october-2026 adds the October 8 census. Does not change installed defaults.'
         required: false
         default: retained
         type: choice
@@ -34,6 +34,7 @@ on:
           - retained
           - native-2026-10-01
           - september-2026
+          - october-2026
       compare_fixed_parameters:
         description: 'Compare installed and hand-sourced engines in the same image using September inputs (no MCMC in this check)'
         required: false
