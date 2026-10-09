@@ -37,9 +37,23 @@ def repo(tmp_path):
     return repo
 
 
-def select(root, repo, codes=("stage0",), engine_source="image", **kwargs):
-    return snap.select(root, repo, codes, IMAGE, "data-managers-v2026.08.26",
+def select(root, repo, codes=("stage0",), engine_source="image", census="data-managers-v2026.08.26",
+           **kwargs):
+    return snap.select(root, repo, codes, IMAGE, census,
                        "syphilis-manager-v2026.07.27", "0", engine_source=engine_source, **kwargs)
+
+
+@pytest.mark.parametrize("census,valid", [("census-manager-v2026.10.08", True),
+                                          ("census-manager-latest", False),
+                                          ("syphilis-manager-v2026.09.09", False)])
+def test_census_may_come_from_a_census_only_release(tmp_path, repo, census, valid):
+    if valid:
+        select(tmp_path / "runs", repo, census=census)
+        registry = json.loads((tmp_path / "runs/run_sources/selections.json").read_text())
+        assert registry["calibrations"]["stage0"]["census"] == census
+    else:
+        with pytest.raises(ValueError, match="manager release"):
+            select(tmp_path / "runs", repo, census=census)
 
 
 @pytest.fixture
