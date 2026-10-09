@@ -53,8 +53,19 @@ SEPTEMBER_INPUTS = (
         "published_at": "2026-09-09T19:22:51Z",
     },
 )
+# The census made current on 2026-10-08 (jheem_analyses 8d28541f), as an immutable
+# census-only release, with the September syphilis manager.
+OCTOBER_INPUTS = (
+    {
+        "manager": "census.manager.rdata",
+        "tag": "census-manager-v2026.10.08",
+        "sha256": "fc45487d38f87c8692ab0bc615d8f4b049d8da363956d7bf02d733c9aa9dee64",
+        "published_at": "2026-10-09T15:45:35Z",
+    },
+    SEPTEMBER_INPUTS[1],
+)
 PROFILES = {"retained": INPUTS, "native-2026-10-01": NATIVE_OCTOBER_INPUTS,
-            "september-2026": SEPTEMBER_INPUTS}
+            "september-2026": SEPTEMBER_INPUTS, "october-2026": OCTOBER_INPUTS}
 
 
 def sha256(path: Path) -> str:

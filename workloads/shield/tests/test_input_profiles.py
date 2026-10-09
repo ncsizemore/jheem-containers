@@ -25,9 +25,15 @@ def test_comparison_profile_preserves_retained_default():
     assert september[0] == retained[0]
     assert september[1]["tag"] == "syphilis-manager-v2026.09.09"
     assert september[1]["sha256"] == "c3e3c983d6b4e9c961f735f9c59d45483bd63cfa715cf75c1fae874da2d129e6"
+    october = preparer.PROFILES["october-2026"]
+    assert october[1] == september[1]
+    assert october[0]["manager"] == "census.manager.rdata"
+    assert october[0]["tag"] == "census-manager-v2026.10.08"
+    assert october[0]["sha256"] == "fc45487d38f87c8692ab0bc615d8f4b049d8da363956d7bf02d733c9aa9dee64"
 
 
-@pytest.mark.parametrize("profile,seed", [("retained", "20260916"), ("native-2026-10-01", "0"), ("september-2026", "0")])
+@pytest.mark.parametrize("profile,seed", [("retained", "20260916"), ("native-2026-10-01", "0"),
+                                          ("september-2026", "0"), ("october-2026", "0")])
 def test_cli_exports_only_selected_verified_inputs(tmp_path, monkeypatch, profile, seed):
     materialized = []
     monkeypatch.setattr(preparer, "materialize", lambda cache, entry: materialized.append(entry))
@@ -37,7 +43,7 @@ def test_cli_exports_only_selected_verified_inputs(tmp_path, monkeypatch, profil
     preparer.main()
     assert tuple(materialized) == preparer.PROFILES[profile]
     assert env.read_text().splitlines() == [
-        "CENSUS_TAG=data-managers-v2026.08.26",
+        "CENSUS_TAG=" + materialized[0]["tag"],
         "SYPHILIS_TAG=" + materialized[1]["tag"], "SHIELD_RANDOM_SEED=" + seed,
     ]
 
