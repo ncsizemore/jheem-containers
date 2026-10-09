@@ -112,7 +112,8 @@ def engine_of(selection):
 def verify(store, selection):
     if not re.fullmatch(r"sha256:[a-f0-9]{64}", selection["image"]):
         raise ValueError("invalid saved image ID")
-    for field, prefix in (("census", "data-managers"), ("syphilis", "syphilis-manager")):
+    # Census: the manager-build dependency bundle or a census-only release.
+    for field, prefix in (("census", "(?:data-managers|census-manager)"), ("syphilis", "syphilis-manager")):
         if not re.fullmatch(prefix + r"-v[0-9]{4}\.[0-9]{2}\.[0-9]{2}([.-][0-9A-Za-z]+)*", selection[field]):
             raise ValueError("invalid saved manager release")
     if not re.fullmatch(r"[0-9]+", str(selection["seed"])):
