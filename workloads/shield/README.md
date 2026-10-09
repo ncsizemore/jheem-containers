@@ -26,9 +26,12 @@ variant matched native runs exactly on shield2 (2026-10-08).
 
 ## Current retained runtime (2026-10-04; installed on shield2)
 
-The current shield2 installation, `/home/jheem-shared/shield-container-20261008`,
-pairs this image with wrapper `87eae47d` (captured `jheem2`, multi-chain stages,
-city batches); see [RUNBOOK.md](RUNBOOK.md#prepare-a-current-runtime-installation).
+The current shield2 installation, `/home/jheem-shared/shield-container-20261009`,
+uses the [October 9 release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.09-r37958480247):
+the same compiled runtime with the October 8 census (`census-manager-v2026.10.08`)
+and September 9 syphilis manager (input profile `october-2026`); see
+[RUNBOOK.md](RUNBOOK.md#prepare-a-current-runtime-installation). The October 8
+installation pairs the image below with wrapper `87eae47d`.
 
 The non-latest prerelease
 [shield-pilot-2026.10.04-r37210907071](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.04-r37210907071)
