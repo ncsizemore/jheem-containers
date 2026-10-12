@@ -74,7 +74,8 @@ python3 workloads/shield/installation_profile.py prepare "$SHIELD_STAGE"
 cp workloads/shield/shield-run.sh workloads/shield/source_snapshot.py \
   workloads/shield/installation_profile.py workloads/shield/check_source_compatibility.R \
   workloads/shield/engine_build.py workloads/shield/build_engine.sh \
-  workloads/shield/engine-profile.R workloads/shield/container-entrypoint.sh "$SHIELD_STAGE/"
+  workloads/shield/engine-profile.R workloads/shield/container-entrypoint.sh \
+  workloads/shield/manager_store.py "$SHIELD_STAGE/"
 git rev-parse HEAD
 ```
 
@@ -136,6 +137,33 @@ After installation, use that directory's wrapper for setup and an isolated
 administrator smoke before inviting an operator. Continue an older run through
 its original installation and output root. No symlink, alias, default, package,
 manager cache, or active calibration is switched automatically.
+
+## Data-manager store
+
+Installations with a profile do not fix the syphilis manager. A new run uses the
+release named by `SYPHILIS.MANAGER.RELEASE.TAG` in its committed
+`applications/SHIELD/shield_source_code.R`. The selection saved for its
+calibration codes keeps that release, so continuations and later stages of the
+same pipeline use it even after the checkout moves. The setting must name a dated
+release; `NULL` (the promoted release) is refused. Census is the installation
+profile's release.
+
+Both releases come from a shared store, by default
+`/mnt/jheem_nas_share/data_manager_releases/<manager>/<release>/` (override with
+`SHIELD_MANAGER_STORE`), holding the file and a `resolution.json` with its
+repository, tag, and SHA-256. The run mounts only its two release directories,
+read-only, at the cache layout the runtime reads. `manager_store.py` adds a missing
+release by copying it from the installation's bundled cache when it has it,
+otherwise by downloading it on the host from the GitHub release and checking it
+against the digest GitHub publishes for the asset. The container still has no
+network, and its preflight verifies each file's SHA-256 again when it loads it.
+
+The store is append-only. A stored release is never replaced: if it fails
+verification, the launch stops; inspect it rather than deleting it to force a
+new download. Remove releases only deliberately, after checking that no records
+you keep refer to them, and exempt the store from bulk NAS cleanup. The first run
+that uses a release not yet stored needs GitHub access from the server; a failed
+download launches nothing and never substitutes another release.
 
 ## Original October 1 installation (reference)
 

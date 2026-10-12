@@ -23,6 +23,12 @@
 #   SHIELD_ENGINE      set to "image" to use the runtime image's built-in jheem2
 #   SHIELD_MAX_PARALLEL_CHAINS  chains of one stage to run at once (default: all)
 #   SHIELD_MAX_CITIES  locations of a batch to run at once (default: 5)
+#   SHIELD_MANAGER_STORE  shared store of data-manager releases
+#                      (/mnt/jheem_nas_share/data_manager_releases)
+#
+# With an installation profile, census is the installation's release and the
+# syphilis manager is the release your committed shield_source_code.R names
+# (SYPHILIS.MANAGER.RELEASE.TAG), both from the shared store.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,11 +36,14 @@ SHIELD_HOME="${SHIELD_HOME:-$SCRIPT_DIR}"
 if [[ -e "$SHIELD_HOME/installation.json" || -L "$SHIELD_HOME/installation.json" ]]; then
   profile="$(python3 "$SCRIPT_DIR/installation_profile.py" show "$SHIELD_HOME")" || exit 1
   IFS=$'\t' read -r profile_image state_namespace profile_census profile_syphilis profile_seed <<< "$profile"
-  for selection in SHIELD_IMAGE CENSUS_TAG SYPHILIS_TAG; do
+  [[ -z "${SYPHILIS_TAG:-}" ]] || {
+    echo "shield-run: the syphilis manager comes from SYPHILIS.MANAGER.RELEASE.TAG in your committed shield_source_code.R; unset SYPHILIS_TAG." >&2
+    exit 1
+  }
+  for selection in SHIELD_IMAGE CENSUS_TAG; do
     case "$selection" in
       SHIELD_IMAGE) wanted="$profile_image" ;;
       CENSUS_TAG) wanted="$profile_census" ;;
-      SYPHILIS_TAG) wanted="$profile_syphilis" ;;
     esac
     [[ -z "${!selection:-}" || "${!selection}" == "$wanted" ]] || {
       echo "shield-run: $selection differs from this installation's verified profile; use a separate prepared installation for different inputs/runtime." >&2
@@ -43,8 +52,9 @@ if [[ -e "$SHIELD_HOME/installation.json" || -L "$SHIELD_HOME/installation.json"
   done
   IMAGE="$profile_image"
   CENSUS_TAG="$profile_census"
-  SYPHILIS_TAG="$profile_syphilis"
+  SYPHILIS_SELECTION=source
   SEED="${SHIELD_RANDOM_SEED:-$profile_seed}"
+  MANAGER_STORE="${SHIELD_MANAGER_STORE:-/mnt/jheem_nas_share/data_manager_releases}"
 else
   # Preserve the original pilot's defaults, but never apply them to a new export.
   if [[ -f "$SHIELD_HOME/image/IMAGE.txt" ]] && grep -q '^input_profile=' "$SHIELD_HOME/image/IMAGE.txt"; then
@@ -55,7 +65,9 @@ else
   IMAGE="${SHIELD_IMAGE:-docker.io/library/jheem-shield:ci}"
   CENSUS_TAG="${CENSUS_TAG:-data-managers-v2026.08.26}"
   SYPHILIS_TAG="${SYPHILIS_TAG:-syphilis-manager-v2026.07.27}"
+  SYPHILIS_SELECTION="$SYPHILIS_TAG"
   SEED="${SHIELD_RANDOM_SEED:-0}"
+  MANAGER_STORE=""
 fi
 STATE_ROOT="${SHIELD_STATE_ROOT:-/mnt/jheem_nas_share/tmp/$state_namespace/$(id -un)}"
 # The team's launcher runs set.seed(00000); use the same seed by default.
@@ -94,7 +106,7 @@ select_source() {
   details="$(python3 "$SCRIPT_DIR/source_snapshot.py" \
     --root "$STATE_ROOT" --source "${SHIELD_SOURCE_DIR:-$PWD}" \
     --image "$(expected_image_id)" --census "$CENSUS_TAG" \
-    --syphilis "$SYPHILIS_TAG" --seed "$SEED" --engine-source "$engine_source" \
+    --syphilis "$SYPHILIS_SELECTION" --seed "$SEED" --engine-source "$engine_source" \
     ${resume_args[@]+"${resume_args[@]}"} "$@")" || exit 1
   IFS=$'\t' read -r SOURCE_TREE SOURCE_REF RUN_IMAGE CENSUS_TAG SYPHILIS_TAG SEED SOURCE_DIGEST \
     ENGINE_KEY ENGINE_TREE ENGINE_REF <<< "$details"
@@ -110,6 +122,16 @@ select_source() {
       --engine "$ENGINE_KEY" --image "$RUN_IMAGE" --script-dir "$SCRIPT_DIR")" || exit 1
     say "Using saved jheem2 ${ENGINE_REF:0:8}, built for this runtime."
   fi
+  [[ -z "$MANAGER_STORE" ]] || store_managers
+}
+
+# Put the run's two releases in the shared store (verified) and remember them.
+store_managers() {
+  CENSUS_RELEASE="$(python3 "$SCRIPT_DIR/manager_store.py" --store "$MANAGER_STORE" \
+    --bundled "$SHIELD_HOME/cache" census.manager.rdata "$CENSUS_TAG")" || exit 1
+  SYPHILIS_RELEASE="$(python3 "$SCRIPT_DIR/manager_store.py" --store "$MANAGER_STORE" \
+    --bundled "$SHIELD_HOME/cache" syphilis.manager.rdata "$SYPHILIS_TAG")" || exit 1
+  say "Using data managers $CENSUS_TAG and $SYPHILIS_TAG."
 }
 
 say() { printf '%s\n' "$*"; }
@@ -134,7 +156,7 @@ Ask the server administrator to run: sudo loginctl enable-linger $(id -un)"
   [[ -f "$SHIELD_HOME/image/IMAGE.txt" ]] || fail "missing $SHIELD_HOME/image/IMAGE.txt; the administrator setup isn't done."
   [[ -d "$SHIELD_HOME/cache/data-managers" ]] || fail "missing $SHIELD_HOME/cache; the administrator setup isn't done."
   [[ "$STATE_ROOT" == /* ]] || fail "SHIELD_STATE_ROOT must be an absolute path."
-  if [[ "$STATE_ROOT" == /mnt/jheem_nas_share/* ]]; then
+  if [[ "$STATE_ROOT" == /mnt/jheem_nas_share/* || "$MANAGER_STORE" == /mnt/jheem_nas_share/* ]]; then
     [[ "$(findmnt -n -o FSTYPE -T /mnt/jheem_nas_share 2>/dev/null)" == cifs ]] \
       || fail "the NAS is not mounted; no pilot state was created."
   fi
@@ -172,7 +194,14 @@ cmd_setup() {
     check_image || fail "the loaded image doesn't match IMAGE.txt."
     say "Image loaded."
   fi
-  say "Inputs: $CENSUS_TAG / $SYPHILIS_TAG; seed: $SEED"
+  if [[ -n "$MANAGER_STORE" ]]; then
+    python3 "$SCRIPT_DIR/manager_store.py" --store "$MANAGER_STORE" \
+      --bundled "$SHIELD_HOME/cache" census.manager.rdata "$CENSUS_TAG" >/dev/null || exit 1
+    say "Inputs: census $CENSUS_TAG; syphilis: the release your committed shield_source_code.R names; seed: $SEED"
+    say "Data managers are kept in: $MANAGER_STORE"
+  else
+    say "Inputs: $CENSUS_TAG / $SYPHILIS_TAG; seed: $SEED"
+  fi
   say "Outputs will go to: $STATE_ROOT"
   say "Setup is complete."
 }
@@ -240,10 +269,21 @@ prepare_runtime() {
     )
   fi
 
+  # Only this run's two releases, at the cache layout the runtime reads.
+  local cache_args=(--mount "type=bind,src=$SHIELD_HOME/cache,dst=/work/cache,readonly")
+  if [[ -n "$MANAGER_STORE" ]]; then
+    local store_opts=""
+    on_cifs "$MANAGER_STORE" || store_opts=",relabel=shared"
+    cache_args=(
+      --mount "type=bind,src=$CENSUS_RELEASE,dst=/work/cache/data-managers/census.manager.rdata/$CENSUS_TAG,readonly$store_opts"
+      --mount "type=bind,src=$SYPHILIS_RELEASE,dst=/work/cache/data-managers/syphilis.manager.rdata/$SYPHILIS_TAG,readonly$store_opts"
+    )
+  fi
+
   RUNTIME_ARGS=(
     --userns=keep-id --group-add keep-groups --network none \
     --user "$(id -u):$(id -g)" \
-    --mount "type=bind,src=$SHIELD_HOME/cache,dst=/work/cache,readonly" \
+    "${cache_args[@]}" \
     --mount "type=bind,src=$STATE_ROOT,dst=/work/state$state_opts" \
     --mount "type=bind,src=$STATE_ROOT/run_sources,dst=/work/state/run_sources,readonly$source_opts" \
     --mount "type=bind,src=$SOURCE_TREE,dst=/opt/run-source/jheem_analyses,readonly$source_opts" \

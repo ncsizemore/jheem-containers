@@ -28,6 +28,10 @@ REQUIRED = (
 )
 ENGINE_REQUIRED = ("DESCRIPTION", "NAMESPACE")
 IMAGE_ENGINE = "image"
+# The syphilis manager a run uses is the one its committed SHIELD source names.
+FROM_SOURCE = "source"
+SOURCE_CODE = "applications/SHIELD/shield_source_code.R"
+DECLARATION = re.compile(r"SYPHILIS\.MANAGER\.RELEASE\.TAG\s*(?:<-|=)\s*(.*?)\s*(?:#.*)?")
 
 
 def digest(path):
@@ -192,6 +196,29 @@ def capture(store, source, name="jheem_analyses", required=REQUIRED, label="anal
         return key
 
 
+def declared_syphilis(tree):
+    """The release named by the last top-level SYPHILIS.MANAGER.RELEASE.TAG assignment.
+
+    Indented assignments (such as the recorded-run override inside an if block)
+    and comments are not declarations. A run needs one specific release.
+    """
+    path = tree / SOURCE_CODE
+    if not path.is_file():
+        raise ValueError(SOURCE_CODE + " is missing, so the syphilis manager can't be selected")
+    values = [m.group(1) for line in path.read_text().splitlines()
+              if (m := DECLARATION.fullmatch(line))]
+    if not values:
+        raise ValueError(SOURCE_CODE + " does not set SYPHILIS.MANAGER.RELEASE.TAG")
+    value = values[-1]
+    quoted = re.fullmatch(r"\"([^\"]*)\"|'([^']*)'", value)
+    if value == "NULL":
+        raise ValueError(SOURCE_CODE + " sets SYPHILIS.MANAGER.RELEASE.TAG to NULL (the promoted "
+                         "release); set it to a dated release such as syphilis-manager-v2026.10.09")
+    if not quoted:
+        raise ValueError(SOURCE_CODE + " must set SYPHILIS.MANAGER.RELEASE.TAG to a quoted release tag")
+    return quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
+
+
 def engine_checkout(source, engine_source):
     if engine_source:
         return Path(engine_source)
@@ -252,6 +279,8 @@ def select(root, source, codes, image, census, syphilis, seed, resume=False, exp
                 engines.mkdir(exist_ok=True)
                 engine = capture(engines, engine_checkout(source, engine_source), "jheem2",
                                  ENGINE_REQUIRED, "jheem2")
+            if syphilis == FROM_SOURCE:
+                syphilis = declared_syphilis(verify_bundle(store, snapshot, "jheem_analyses")[0])
             selection = {"snapshot": snapshot, "engine": engine, "image": image,
                          "census": census, "syphilis": syphilis, "seed": str(seed)}
         tree, revision, engine_tree, engine_revision = verify(store, selection)
@@ -272,7 +301,9 @@ def main():
     parser.add_argument("--source", default=".")
     parser.add_argument("--image", required=True)
     parser.add_argument("--census", required=True)
-    parser.add_argument("--syphilis", required=True)
+    parser.add_argument("--syphilis", required=True,
+                        help="a release tag, or 'source' for the release the captured "
+                             "SHIELD source declares")
     parser.add_argument("--seed", default="0")
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--engine-source", default="",
