@@ -38,9 +38,9 @@ def repo(tmp_path):
 
 
 def select(root, repo, codes=("stage0",), engine_source="image", census="data-managers-v2026.08.26",
-           **kwargs):
+           syphilis="syphilis-manager-v2026.07.27", **kwargs):
     return snap.select(root, repo, codes, IMAGE, census,
-                       "syphilis-manager-v2026.07.27", "0", engine_source=engine_source, **kwargs)
+                       syphilis, "0", engine_source=engine_source, **kwargs)
 
 
 @pytest.mark.parametrize("census,valid", [("census-manager-v2026.10.08", True),
@@ -293,3 +293,66 @@ def test_requesting_the_image_engine_for_a_captured_run_is_refused(tmp_path, rep
     select(root, repo, engine_source=None)
     with pytest.raises(ValueError, match="requested engine differs"):
         select(root, repo, resume=True, engine_source="image")
+
+
+SOURCE_CODE = """# WHICH SYPHILIS MANAGER SHOULD WE USE?
+# SYPHILIS.MANAGER.RELEASE.TAG <- "syphilis-manager-v2026.09.09"
+SYPHILIS.MANAGER.RELEASE.TAG <- {value}   # pinned for this calibration
+
+if (SHIELD.RECORDED.RUN) {{
+  SYPHILIS.MANAGER.RELEASE.TAG <- SHIELD.RECORDED.CONFIG$syphilis_tag
+}}
+"""
+
+
+def declare(repo, value='"syphilis-manager-v2026.10.09"', message="declare syphilis manager"):
+    path = repo / snap.SOURCE_CODE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(SOURCE_CODE.format(value=value))
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", message)
+
+
+def test_new_selection_uses_the_syphilis_release_the_committed_source_names(tmp_path, repo):
+    declare(repo)
+    first = select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert first["syphilis"] == "syphilis-manager-v2026.10.09"
+    # A later commit names a newer release: existing calibration codes keep theirs,
+    # a new code gets the new one.
+    declare(repo, '"syphilis-manager-v2026.11.01"', "newer manager")
+    again = select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert again["syphilis"] == "syphilis-manager-v2026.10.09"
+    newer = select(tmp_path / "runs", repo, ("stage1",), syphilis=snap.FROM_SOURCE)
+    assert newer["syphilis"] == "syphilis-manager-v2026.11.01"
+
+
+@pytest.mark.parametrize("value,message", [
+    ("NULL", "dated release"),
+    ("SOME.OTHER.TAG", "quoted release tag"),
+    ('"syphilis-manager-latest"', "manager release"),
+    ('"census-manager-v2026.10.08"', "manager release"),
+])
+def test_unusable_declarations_are_refused(tmp_path, repo, value, message):
+    declare(repo, value)
+    with pytest.raises(ValueError, match=message):
+        select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert not (tmp_path / "runs/run_sources/selections.json").exists()
+
+
+def test_missing_declaration_is_refused(tmp_path, repo):
+    with pytest.raises(ValueError, match="missing"):
+        select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    path = repo / snap.SOURCE_CODE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("# SYPHILIS.MANAGER.RELEASE.TAG <- \"syphilis-manager-v2026.09.09\"\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "commented only")
+    with pytest.raises(ValueError, match="does not set"):
+        select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+
+
+def test_single_quotes_and_equals_are_declarations(tmp_path):
+    tree = tmp_path / "tree"
+    (tree / snap.SOURCE_CODE).parent.mkdir(parents=True)
+    (tree / snap.SOURCE_CODE).write_text("SYPHILIS.MANAGER.RELEASE.TAG = 'syphilis-manager-v2026.10.09'\n")
+    assert snap.declared_syphilis(tree) == "syphilis-manager-v2026.10.09"

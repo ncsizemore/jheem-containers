@@ -137,7 +137,7 @@ def test_changed_installed_selection_is_rejected(home):
 
 
 def install_wrapper(home, tmp_path):
-    for name in ("shield-run.sh", "installation_profile.py"):
+    for name in ("shield-run.sh", "installation_profile.py", "manager_store.py"):
         shutil.copyfile(ROOT / name, home / name)
     binary = tmp_path / "bin"
     binary.mkdir()
@@ -150,6 +150,7 @@ def install_wrapper(home, tmp_path):
     env = {key: value for key, value in os.environ.items()
            if key not in ("SHIELD_HOME", "SHIELD_IMAGE", "CENSUS_TAG", "SYPHILIS_TAG", "SHIELD_RANDOM_SEED")}
     env.update(FAKE_LOG=str(log), SHIELD_STATE_ROOT=str(tmp_path / "runs"),
+               SHIELD_MANAGER_STORE=str(tmp_path / "store"),
                PATH=str(binary) + os.pathsep + env["PATH"])
     return env, log
 
@@ -160,22 +161,29 @@ def test_installed_wrapper_selects_its_own_profile_without_operator_overrides(ho
     result = subprocess.run(["bash", str(home / "shield-run.sh"), "setup"],
                             env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert "syphilis-manager-v2026.09.09; seed: 0" in result.stdout
+    assert ("Inputs: census data-managers-v2026.08.26; syphilis: the release your committed "
+            "shield_source_code.R names; seed: 0") in result.stdout
+    # Setup puts the installation's census in the shared store.
+    stored = tmp_path / "store/census.manager.rdata/data-managers-v2026.08.26/census.manager.rdata"
+    assert stored.read_bytes() == b"synthetic census.manager.rdata"
     assert IMAGE in log.read_text()
     assert "ci" not in log.read_text()
     assert "run " not in log.read_text()
 
 
-@pytest.mark.parametrize("selection,value", [("SYPHILIS_TAG", "syphilis-manager-v2026.07.27"),
-                          ("CENSUS_TAG", "latest"), ("SHIELD_IMAGE", "jheem-shield:ci")])
-def test_conflicting_environment_selection_stops_before_any_container_operation(home, tmp_path, selection, value):
+@pytest.mark.parametrize("selection,value,message", [
+    ("SYPHILIS_TAG", "syphilis-manager-v2026.07.27", "unset SYPHILIS_TAG"),
+    ("CENSUS_TAG", "latest", "CENSUS_TAG differs"),
+    ("SHIELD_IMAGE", "jheem-shield:ci", "SHIELD_IMAGE differs")])
+def test_conflicting_environment_selection_stops_before_any_container_operation(home, tmp_path, selection,
+                                                                              value, message):
     installation.prepare(home)
     env, log = install_wrapper(home, tmp_path)
     env[selection] = value
     result = subprocess.run(["bash", str(home / "shield-run.sh"), "setup"],
                             env=env, capture_output=True, text=True)
     assert result.returncode == 1
-    assert selection + " differs" in result.stderr
+    assert message in result.stderr
     assert not log.exists()
 
 
@@ -196,7 +204,8 @@ def test_workflow_exports_only_a_unique_alias_of_the_tested_image():
     assert 'echo "image_tag=docker.io/library/$pilot_tag"' in workflow
 
 
-def test_profile_flows_through_real_source_selection_and_detached_wrapper_launch(home, tmp_path):
+@pytest.mark.parametrize("declared", ["syphilis-manager-v2026.09.09", "syphilis-manager-v2026.10.09"])
+def test_profile_flows_through_real_source_selection_and_detached_wrapper_launch(home, tmp_path, declared):
     installation.prepare(home)
     env, log = install_wrapper(home, tmp_path)
     shutil.copyfile(ROOT / "source_snapshot.py", home / "source_snapshot.py")
@@ -208,6 +217,16 @@ def test_profile_flows_through_real_source_selection_and_detached_wrapper_launch
         path = source / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("# synthetic source-selection fixture\n")
+    (source / "applications/SHIELD/shield_source_code.R").write_text(
+        f'SYPHILIS.MANAGER.RELEASE.TAG <- "{declared}"\n')
+    if declared != "syphilis-manager-v2026.09.09":
+        # Not bundled with this installation: already in the shared store (no network in tests).
+        release = tmp_path / "store/syphilis.manager.rdata" / declared
+        release.mkdir(parents=True)
+        (release / "syphilis.manager.rdata").write_bytes(b"newer syphilis manager")
+        (release / "resolution.json").write_text(json.dumps({
+            "repository": "tfojo1/jheem_analyses", "manager": "syphilis.manager.rdata",
+            "resolved_tag": declared, "sha256": hashlib.sha256(b"newer syphilis manager").hexdigest()}))
     for args in (("init", "-q"), ("config", "user.email", "test@example.invalid"),
                  ("config", "user.name", "Fixture"), ("add", "."), ("commit", "-qm", "fixture")):
         subprocess.run(["git", "-C", str(source), *args], check=True, capture_output=True)
@@ -236,9 +255,15 @@ elif args[0] != "ps":
     calls = [json.loads(line) for line in log.read_text().splitlines()]
     runs = [args for args in calls if args[0] == "run"]
     assert len(runs) == 2 and "--rm" in runs[0] and "-d" in runs[1]
+    store = tmp_path / "store"
     for args in runs:
         assert IMAGE in args
-        assert "JHEEM_SYPHILIS_MANAGER_TAG=syphilis-manager-v2026.09.09" in args
+        assert "JHEEM_SYPHILIS_MANAGER_TAG=" + declared in args
+        assert "JHEEM_CENSUS_MANAGER_TAG=data-managers-v2026.08.26" in args
+        mounts = [value for value in args if value.startswith("type=bind,src=")]
+        assert f"type=bind,src={store}/syphilis.manager.rdata/{declared},dst=/work/cache/data-managers/syphilis.manager.rdata/{declared},readonly,relabel=shared" in mounts
+        assert f"type=bind,src={store}/census.manager.rdata/data-managers-v2026.08.26,dst=/work/cache/data-managers/census.manager.rdata/data-managers-v2026.08.26,readonly,relabel=shared" in mounts
+        assert not any("dst=/work/cache," in value for value in mounts)
         assert "SHIELD_RANDOM_SEED=0" in args
         assert any("dst=/opt/run-source/jheem_analyses,readonly" in value for value in args)
     assert all("jheem-shield:ci" not in arg for call in calls for arg in call)
