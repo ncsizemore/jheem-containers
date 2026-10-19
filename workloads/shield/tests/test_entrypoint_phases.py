@@ -81,8 +81,13 @@ def test_fresh_stage_runs_setup_parallel_chains_then_assembly(env):
         ("run", 3, "succeeded"), ("run", 4, "succeeded"), ("setup", None, "succeeded")]
     assert all(len(a["runner"]["entrypoint_sha256"]) == 64 for a in records)
     logs = Path(env["JHEEM_ROOT_DIR"]) / "run_records/shield/C.12580/stage3/logs"
-    assert sorted(p.read_text() for p in logs.iterdir()) == [
+    assert sorted(p.read_text() for p in logs.glob("*-chain*.log")) == [
         "sampling chain %d\n" % chain for chain in (1, 2, 3, 4)]
+    # Setup and assembly also leave logs, named like their attempt records.
+    attempt_dir = Path(env["JHEEM_ROOT_DIR"]) / "run_records/shield/C.12580/stage3/attempts"
+    for phase in ("setup", "assemble"):
+        record = next(attempt_dir.glob("*-" + phase + ".json"))
+        assert (logs / (record.stem + ".log")).exists()
     assert "chain 3 finished (exit 0)" in result.stdout
 
 

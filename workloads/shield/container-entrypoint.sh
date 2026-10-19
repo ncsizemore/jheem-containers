@@ -92,8 +92,10 @@ entrypoint_sha256="$(sha256_or_empty "$0")"
 
 # Run one recorded R process (preflight, then the SHIELD launcher) for a phase,
 # and record it as an attempt. Arguments: location, calibration, run mode,
-# phase (all, setup, run, assemble), chain (or empty), and an optional log file
-# (empty: this container's output). Returns the R exit status.
+# phase (all, setup, run, assemble), chain (or empty), and an optional log file.
+# Without one, output goes to this container's output and to a log in the
+# stage's run_records/.../logs/, named like its attempt record, so the run can
+# be reviewed from the output folder. Returns the R exit status.
 run_phase() {
   stage_location="$1" stage_calibration="$2" stage_mode="$3" stage_phase="$4" stage_chain="$5"
   phase_log="${6:-}"
@@ -119,8 +121,15 @@ run_phase() {
     SHIELD_RUN_MODE="$stage_mode" SHIELD_RECORDED_PHASE="$stage_phase" SHIELD_RECORDED_CHAIN="$stage_chain" \
       launch_r "$stage_location" "$stage_calibration" >"$phase_log" 2>&1 || stage_exit=$?
   else
-    SHIELD_RUN_MODE="$stage_mode" SHIELD_RECORDED_PHASE="$stage_phase" SHIELD_RECORDED_CHAIN="$stage_chain" \
-      launch_r "$stage_location" "$stage_calibration" || stage_exit=$?
+    mkdir -p "$stage_records/logs" || fail "cannot create $stage_records/logs"
+    shared_log="$stage_records/logs/$(basename "$attempt_file" .json).log"
+    # POSIX sh has no pipefail: keep R's exit status in a file across the tee.
+    status_file="$(mktemp)"
+    { SHIELD_RUN_MODE="$stage_mode" SHIELD_RECORDED_PHASE="$stage_phase" SHIELD_RECORDED_CHAIN="$stage_chain" \
+        launch_r "$stage_location" "$stage_calibration" 2>&1; echo "$?" > "$status_file"; } \
+      | tee -a "$shared_log"
+    stage_exit="$(cat "$status_file")"
+    rm -f "$status_file"
   fi
 
   if [ "$stage_exit" -eq 0 ]; then stage_status=succeeded; else stage_status=failed; fi

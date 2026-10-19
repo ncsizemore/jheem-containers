@@ -127,7 +127,10 @@ def test_pipeline_reuses_one_selection_and_rejects_mixed_selections(tmp_path, re
     first = select(root, repo)
     (repo / "model.R").write_text("parameter <- 2\n")
     git(repo, "commit", "-qam", "update")
-    assert select(root, repo, ("stage0", "stage1")) == first
+    selection = lambda result: {k: v for k, v in result.items() if k not in ("mixed", "pending")}
+    pipeline = select(root, repo, ("stage0", "stage1"))
+    assert selection(pipeline) == selection(first)
+    assert first["mixed"] == "no" and pipeline["mixed"] == "yes"
     select(root, repo, ("other",))
     with pytest.raises(ValueError, match="different saved"):
         select(root, repo, ("stage0", "other"))

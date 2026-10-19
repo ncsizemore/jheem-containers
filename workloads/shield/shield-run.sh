@@ -77,6 +77,23 @@ LAUNCH_LOCKS=()
 release_launch_locks() {
   local lock
   for lock in ${LAUNCH_LOCKS[@]+"${LAUNCH_LOCKS[@]}"}; do rmdir -- "$lock"; done
+  LAUNCH_LOCKS=()
+}
+
+# The batch worker's form of lock_launch: reserve these calibrations of one
+# location for a check-and-launch, or return 1 if another launch holds any.
+reserve_launch() {
+  local location="$1" code lock
+  shift
+  mkdir -p "$STATE_ROOT/run_locks"
+  for code in "$@"; do
+    lock="$STATE_ROOT/run_locks/$location--$code"
+    if ! mkdir -- "$lock" 2>/dev/null; then
+      release_launch_locks
+      return 1
+    fi
+    LAUNCH_LOCKS+=("$lock")
+  done
 }
 
 lock_launch() {
@@ -104,13 +121,15 @@ select_source() {
   [[ "$mode" != resume ]] || resume_args=(--resume)
   engine_source="${SHIELD_JHEEM2_DIR:-}"
   [[ "${SHIELD_ENGINE:-}" != image ]] || engine_source=image
+  # New calibration codes are bound to this selection only after their checks pass.
+  PENDING_SELECTION="$STATE_ROOT/run_sources/.pending-$(date -u +%Y%m%dT%H%M%S)-$$.json"
   details="$(python3 "$SCRIPT_DIR/source_snapshot.py" \
-    --root "$STATE_ROOT" --source "${SHIELD_SOURCE_DIR:-$PWD}" \
+    --root "$STATE_ROOT" --source "${SHIELD_SOURCE_DIR:-$PWD}" --pending "$PENDING_SELECTION" \
     --image "$(expected_image_id)" --census "$CENSUS_TAG" \
     --syphilis "$SYPHILIS_SELECTION" --seed "$SEED" --engine-source "$engine_source" \
     ${resume_args[@]+"${resume_args[@]}"} "$@")" || exit 1
   IFS=$'\t' read -r SOURCE_TREE SOURCE_REF RUN_IMAGE CENSUS_TAG SYPHILIS_TAG SEED SOURCE_DIGEST \
-    ENGINE_KEY ENGINE_TREE ENGINE_REF <<< "$details"
+    ENGINE_KEY ENGINE_TREE ENGINE_REF PENDING_SELECTION MIXED_SELECTION <<< "$details"
   have="$(podman image inspect --format '{{.Id}}' "$RUN_IMAGE" 2>/dev/null || true)"
   [[ "sha256:${have#sha256:}" == "$RUN_IMAGE" ]] \
     || fail "the run's recorded image $RUN_IMAGE is not loaded; restore that exact image before continuing."
@@ -133,6 +152,30 @@ store_managers() {
   SYPHILIS_RELEASE="$(python3 "$SCRIPT_DIR/manager_store.py" --store "$MANAGER_STORE" \
     --bundled "$SHIELD_HOME/cache" syphilis.manager.rdata "$SYPHILIS_TAG")" || exit 1
   say "Using data managers $CENSUS_TAG and $SYPHILIS_TAG."
+}
+
+# Save the selection of calibration codes new to this output folder.
+commit_selection() {
+  [[ "${PENDING_SELECTION:--}" == - ]] && return 0
+  python3 "$SCRIPT_DIR/source_snapshot.py" --root "$STATE_ROOT" --commit-pending "$PENDING_SELECTION" || exit 1
+  PENDING_SELECTION=-
+}
+
+# A file in the output folder's run_logs/ for one command or check.
+command_log() {
+  mkdir -p "$STATE_ROOT/run_logs" || fail "can't create $STATE_ROOT/run_logs."
+  printf '%s/run_logs/%s-%s-%s.log' "$STATE_ROOT" "$(date -u +%Y%m%dT%H%M%SZ)" "$1" "$$"
+}
+
+# Keep a transcript of a command that changes runs, beside the runs, so it can
+# be reviewed later. Skipped until the output folder exists (first setup).
+start_transcript() {
+  local log
+  [[ -d "$STATE_ROOT" ]] || return 0
+  log="$(command_log "$1" 2>/dev/null)" || return 0
+  printf '# shield-run.sh %s\n# %s on %s, %s; in %s; installation %s\n' "$*" "$(id -un)" \
+    "$(hostname -s)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PWD" "$SHIELD_HOME" > "$log" 2>/dev/null || return 0
+  exec > >(tee -a "$log") 2> >(tee -a "$log" >&2)
 }
 
 say() { printf '%s\n' "$*"; }
@@ -299,6 +342,7 @@ prepare_runtime() {
     --env "SHIELD_IMAGE_ID=$RUN_IMAGE" \
     --env "SHIELD_OPERATOR=$(id -un)" \
     --env "SHIELD_HOST=$(hostname -s)" \
+    --env RENV_CONFIG_SYNCHRONIZED_CHECK=FALSE \
     ${smoke_env[@]+"${smoke_env[@]}"} ${freq_env[@]+"${freq_env[@]}"} ${mode_env[@]+"${mode_env[@]}"}
     ${engine_args[@]+"${engine_args[@]}"} ${parallel_env[@]+"${parallel_env[@]}"}
   )
@@ -307,10 +351,26 @@ prepare_runtime() {
 # Load the selected specification and calibration definitions read-only before
 # any sampling; one check covers every location of these calibrations.
 check_compatibility() {
+  local log mixed=""
   say "Checking the selected code, inputs, and calibration definitions..."
-  podman run --rm "${RUNTIME_ARGS[@]}" "$RUN_IMAGE" shell -c \
-    'Rscript /opt/shield/preflight.R && Rscript /opt/shield/check_source_compatibility.R "$@"' \
-    shield-source-check $1 || fail "source compatibility check failed; no calibration was launched. Preserve the saved selection and logs."
+  log="$(command_log check)"
+  if podman run --rm "${RUNTIME_ARGS[@]}" "$RUN_IMAGE" shell -c \
+      'Rscript /opt/shield/preflight.R && Rscript /opt/shield/check_source_compatibility.R "$@"' \
+      shield-source-check $1 > "$log" 2>&1; then
+    grep -h 'SHIELD source compatibility passed' "$log" || say "Checks passed."
+    say "  (details: ${log#"$STATE_ROOT"/})"
+    commit_selection
+    return 0
+  fi
+  tail -n 25 "$log" >&2
+  [[ "${PENDING_SELECTION:--}" == - ]] || rm -f -- "$PENDING_SELECTION"
+  [[ "${MIXED_SELECTION:-no}" != yes ]] || mixed="
+Some of these calibrations already ran with the code saved for them (${SOURCE_REF:0:8}),
+so the others were checked against that code. To run new or changed calibrations,
+commit them and run only the new codes, for example:
+  shield-run.sh batch <locations> <new calibration codes>
+Completed earlier stages in this output folder are found from their records."
+  fail "source compatibility check failed; no calibration was launched. Full output: $log$mixed"
 }
 
 # Start one detached container. Arguments: name prefix, location, calibrations,
@@ -429,6 +489,21 @@ running_container() {
 }
 
 batch_dir() { printf '%s/run_batches/%s' "$STATE_ROOT" "$1"; }
+
+# Whether a batch covers any of these locations (comma-separated) with any of these calibrations.
+batch_overlaps() {
+  local dir city code
+  dir="$(batch_dir "$1")"
+  local list="$2"
+  shift 2
+  for city in ${list//,/ }; do
+    grep -qx -- "$city" "$dir/locations.txt" 2>/dev/null || continue
+    for code in "$@"; do
+      grep -qx -- "$code" "$dir/calibrations.txt" 2>/dev/null && return 0
+    done
+  done
+  return 1
+}
 batch_worker_alive() {
   local pid
   pid="$(cat "$(batch_dir "$1")/worker.pid" 2>/dev/null || true)"
@@ -453,6 +528,15 @@ cmd_batch() {
     [[ "$code" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "invalid calibration code: '$code'"
   done
   check_prerequisites
+  local other
+  for other in $(ls -1 "$STATE_ROOT/run_batches" 2>/dev/null); do
+    batch_worker_alive "$other" || continue
+    if batch_overlaps "$other" "$list" "$@"; then
+      fail "batch $other is still running some of these locations and calibrations.
+Check it with shield-run.sh status, wait for it to finish, or stop it with
+shield-run.sh stop-batch $other; then run this batch again to continue."
+    fi
+  done
   for city in "${cities[@]}"; do
     if code="$(unrecorded_state "$city" "$@")"; then
       fail "$code for $city has saved results that weren't started by this container:
@@ -485,7 +569,7 @@ Leave that location out of the batch, or use a separate SHIELD_STATE_ROOT; do no
 
 batch_worker() {
   local id="$1" dir line city name state code i running waiting max poll
-  local locations=() codes=() states=()
+  local locations=() codes=() states=() lockwaits=()
   dir="$(batch_dir "$id")"
   [[ -f "$dir/locations.txt" ]] || fail "no batch $id in $STATE_ROOT."
   printf '%s\n' "$$" > "$dir/worker.pid"
@@ -497,7 +581,8 @@ batch_worker() {
   note "batch $id: ${#locations[@]} locations, at most $max at a time: ${codes[*]}"
   select_source pipeline "${codes[@]}"
   prepare_runtime "${codes[*]}" ""
-  for city in "${locations[@]}"; do states+=(waiting); done
+  trap release_launch_locks EXIT
+  for city in "${locations[@]}"; do states+=(waiting); lockwaits+=(0); done
   while :; do
     running=0
     for i in "${!locations[@]}"; do
@@ -516,6 +601,15 @@ batch_worker() {
       (( running < max )) || break
       [[ "${states[$i]}" == waiting ]] || continue
       city="${locations[$i]}"
+      # The same per-location locks as start and pipeline, held across the check and launch.
+      if ! reserve_launch "$city" "${codes[@]}"; then
+        lockwaits[$i]=$(( ${lockwaits[$i]} + 1 ))
+        if (( ${lockwaits[$i]} >= 10 )); then
+          states[$i]="skipped (another launch kept its lock; inspect $STATE_ROOT/run_locks)"
+          note "$city skipped: another launch kept its lock for 10 checks"
+        fi
+        continue
+      fi
       if name="$(running_container "$city" "${codes[@]}")"; then
         states[$i]="skipped (already running: $name)"
         note "$city skipped: already running in $name"
@@ -531,6 +625,7 @@ batch_worker() {
         states[$i]="skipped (could not start)"
         note "$city could not start"
       fi
+      release_launch_locks
     done
     for i in "${!locations[@]}"; do printf '%s %s\n' "${locations[$i]}" "${states[$i]}"; done \
       > "$dir/status.txt.tmp" && mv "$dir/status.txt.tmp" "$dir/status.txt"
@@ -545,8 +640,12 @@ batch_worker() {
 batch_summary() {
   local id="$1" status counts
   status="$(batch_dir "$id")/status.txt"
-  counts="$(awk '{ if ($2 == "finished" && $0 !~ /\(exit 0\)$/) print "failed"; else print $2 }' "$status" 2>/dev/null \
-    | sort | uniq -c | awk '{printf "%s%s %s", (NR>1 ? ", " : ""), $1, $2}')"
+  counts=""
+  # The worker writes status.txt after its first pass, about a minute in.
+  if [[ -f "$status" ]]; then
+    counts="$(awk '{ if ($2 == "finished" && $0 !~ /\(exit 0\)$/) print "failed"; else print $2 }' "$status" \
+      | sort | uniq -c | awk '{printf "%s%s %s", (NR>1 ? ", " : ""), $1, $2}')"
+  fi
   if batch_worker_alive "$id"; then
     say "batch $id: scheduling (${counts:-starting})"
   else
@@ -649,7 +748,32 @@ cmd_where() {
   say "(or Sys.unsetenv(\"JHEEM_ROOT_DIR\")) to go back to the usual results."
 }
 
-cmd_logs() { podman logs --tail 40 "$(container_for "$1" "$2")"; }
+# The latest output of a run, from its log files in the output folder (so any
+# account that can read the folder can review it), or else from its container.
+cmd_logs() {
+  local location="$1" calibration="$2" dir latest file name seen=" "
+  dir="$(records_dir "$location" "$calibration")/logs"
+  latest="$(ls -1t "$dir"/*.log 2>/dev/null | head -n 1 || true)"
+  if [[ -n "$latest" ]]; then
+    if [[ "$latest" == *-chain[0-9]*.log ]]; then
+      # Chains run in parallel: show the newest log of each.
+      while read -r file; do
+        name="$(basename "$file")"; name="${name#*-}"
+        [[ "$seen" != *" $name "* ]] || continue
+        seen="$seen$name "
+        say "== ${file#"$STATE_ROOT"/}"
+        tail -n 12 "$file"
+      done < <(ls -1t "$dir"/*-chain[0-9]*.log)
+    else
+      say "== ${latest#"$STATE_ROOT"/}"
+      tail -n 40 "$latest"
+    fi
+    return
+  fi
+  name="$(find_container "$location" "$calibration")"
+  [[ -n "$name" ]] || fail "no output yet for $calibration $location. A batch starts each location about a minute after it begins; see shield-run.sh status."
+  podman logs --tail 40 "$name"
+}
 
 cmd_stop() {
   local name
@@ -664,6 +788,9 @@ cmd_stop() {
   fi
 }
 
+case "${1:-}" in
+  setup|start|resume|pipeline|stop|batch|stop-batch) start_transcript "$@" ;;
+esac
 case "${1:-}" in
   setup)    cmd_setup ;;
   start)    [[ $# -eq 3 ]] || fail "usage: shield-run.sh start <location> <calibration>"; cmd_stage fresh "$2" "$3" ;;

@@ -46,7 +46,9 @@ elif args[0] == "run" and "/opt/shield/build_engine.sh" in args:
     os.makedirs(os.path.join(target, "jheem2"))
     open(os.path.join(target, "jheem2", "DESCRIPTION"), "w").write("Package: jheem2\n")
 elif args[0] == "run" and "--rm" in args:
-    pass
+    if os.environ.get("FAKE_CHECK_FAIL"):
+        print("Error: calibration 'stage1b' is not registered")
+        sys.exit(37)
 elif args[0] == "run" and "-d" in args:
     name = args[args.index("--name") + 1]
     location = args[-len(args) + args.index("pipeline") + 1]
@@ -211,3 +213,77 @@ def test_where_points_analyses_at_container_results(env):
     local = shield_run(env, "where")
     assert local.returncode == 0 and "JHEEM_ROOT_DIR" not in local.stdout
     assert env["SHIELD_STATE_ROOT"] in local.stdout
+
+
+def test_a_held_launch_lock_keeps_the_batch_from_launching_that_location(env):
+    # As if start or pipeline were launching C.35620 stage0 at the same moment.
+    locks = Path(env["SHIELD_STATE_ROOT"]) / "run_locks"
+    locks.mkdir(parents=True)
+    (locks / "C.35620--stage0").mkdir()
+    assert shield_run(env, "batch", "C.12580,C.35620", "stage0").returncode == 0
+    batch = finished_batch(env)
+    assert (Path(env["FAKE_STATE"]) / "launches.log").read_text().split()[0::2] == ["C.12580"]
+    assert "C.35620 skipped (another launch kept its lock" in (batch / "status.txt").read_text()
+    assert (locks / "C.35620--stage0").is_dir() and not (locks / "C.12580--stage0").exists()
+
+
+def test_a_second_overlapping_batch_is_refused_while_the_first_runs(env):
+    first = shield_run(env, "batch", "C.12580,C.35620", "stage0", SHIELD_MAX_CITIES="1",
+                       FAKE_RUN_POLLS="100000", SHIELD_BATCH_POLL_SECONDS="0.2")
+    assert first.returncode == 0, first.stderr
+    deadline = time.monotonic() + 30
+    while not (Path(env["FAKE_STATE"]) / "launches.log").exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    again = shield_run(env, "batch", "C.35620", "stage0")
+    assert again.returncode == 1 and "is still running some of these locations" in again.stderr
+    other = shield_run(env, "batch", "C.12060", "stage0", FAKE_RUN_POLLS="1")
+    assert other.returncode == 0, other.stderr
+    for batch in (Path(env["SHIELD_STATE_ROOT"]) / "run_batches").iterdir():
+        shield_run(env, "stop-batch", batch.name)
+
+
+def test_a_failed_check_binds_nothing_and_the_repaired_code_uses_new_code(env):
+    assert shield_run(env, "batch", "C.12580", "stage0").returncode == 0
+    finished_batch(env)
+    registry = Path(env["SHIELD_STATE_ROOT"]) / "run_sources/selections.json"
+    repo = Path(env["SHIELD_SOURCE_DIR"])
+    (repo / "stage1b.R").write_text("# a new registration\n")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "register stage1b")
+    # Listing the completed stage with the new one checks the new one against the old code.
+    mixed = shield_run(env, "batch", "C.12580", "stage0", "stage1b", FAKE_CHECK_FAIL="1")
+    assert mixed.returncode == 1
+    assert "not registered" in mixed.stderr and "run only the new codes" in mixed.stderr
+    assert "stage1b" not in json.loads(registry.read_text())["calibrations"]
+    assert not list(registry.parent.glob(".pending-*"))
+    # The repair: run only the new code, which captures the current commit.
+    repaired = shield_run(env, "batch", "C.12580", "stage1b")
+    assert repaired.returncode == 0, repaired.stderr
+    saved = json.loads(registry.read_text())["calibrations"]
+    assert saved["stage1b"]["snapshot"] != saved["stage0"]["snapshot"]
+
+
+def test_status_reports_a_batch_before_its_first_pass(env):
+    batch = Path(env["SHIELD_STATE_ROOT"]) / "run_batches/20261019T000000Z-1"
+    batch.mkdir(parents=True)
+    result = shield_run(env, "status")
+    assert result.returncode == 0, result.stderr
+    assert "batch 20261019T000000Z-1:" in result.stdout
+
+
+def test_logs_read_the_output_folder(env):
+    logs = Path(env["SHIELD_STATE_ROOT"]) / "run_records/shield/C.12580/stage3/logs"
+    logs.mkdir(parents=True)
+    for name, text in (("20261019T100000Z-setup.log", "setup done\n"),
+                       ("20261019T100100Z-chain1.log", "old chain 1\n"),
+                       ("20261019T100200Z-chain1.log", "chain 1 iteration 9\n"),
+                       ("20261019T100200Z-chain2.log", "chain 2 iteration 8\n")):
+        (logs / name).write_text(text)
+        time.sleep(0.05)
+    result = shield_run(env, "logs", "C.12580", "stage3")
+    assert result.returncode == 0, result.stderr
+    assert "chain 1 iteration 9" in result.stdout and "chain 2 iteration 8" in result.stdout
+    assert "old chain 1" not in result.stdout and "setup done" not in result.stdout
+    missing = shield_run(env, "logs", "C.12580", "stage9")
+    assert missing.returncode == 1 and "no output yet" in missing.stderr
+    assert "name or ID cannot be empty" not in missing.stderr
