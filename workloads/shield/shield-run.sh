@@ -168,13 +168,17 @@ command_log() {
 }
 
 # Keep a transcript of a command that changes runs, beside the runs, so it can
-# be reviewed later. Skipped until the output folder exists (first setup).
+# be reviewed later. For a new output folder it starts once the prerequisite
+# checks have created the folder.
+TRANSCRIPT_ARGS=()
 start_transcript() {
   local log
+  TRANSCRIPT_ARGS=("$@")
   [[ -d "$STATE_ROOT" ]] || return 0
   log="$(command_log "$1" 2>/dev/null)" || return 0
   printf '# shield-run.sh %s\n# %s on %s, %s; in %s; installation %s\n' "$*" "$(id -un)" \
     "$(hostname -s)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PWD" "$SHIELD_HOME" > "$log" 2>/dev/null || return 0
+  TRANSCRIPT_ARGS=()
   exec > >(tee -a "$log") 2> >(tee -a "$log" >&2)
 }
 
@@ -210,6 +214,7 @@ Ask the server administrator to run: sudo loginctl enable-linger $(id -un)"
     fail "containers can't reach the NAS on this server yet.
 Ask the server administrator to run: sudo setsebool -P virt_use_samba on"
   fi
+  (( ${#TRANSCRIPT_ARGS[@]} == 0 )) || start_transcript "${TRANSCRIPT_ARGS[@]}"
 }
 
 expected_image_id() { sed -n 's/^image_id=//p' "$SHIELD_HOME/image/IMAGE.txt"; }

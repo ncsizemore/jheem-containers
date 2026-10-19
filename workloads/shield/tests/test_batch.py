@@ -287,3 +287,15 @@ def test_logs_read_the_output_folder(env):
     missing = shield_run(env, "logs", "C.12580", "stage9")
     assert missing.returncode == 1 and "no output yet" in missing.stderr
     assert "name or ID cannot be empty" not in missing.stderr
+
+
+def test_commands_that_change_runs_keep_a_transcript_even_in_a_new_output_folder(env):
+    assert not Path(env["SHIELD_STATE_ROOT"]).exists()
+    assert shield_run(env, "batch", "C.12580", "stage0").returncode == 0
+    finished_batch(env)
+    transcripts = list((Path(env["SHIELD_STATE_ROOT"]) / "run_logs").glob("*-batch-*.log"))
+    assert len(transcripts) == 1
+    text = transcripts[0].read_text()
+    assert text.startswith("# shield-run.sh batch C.12580 stage0\n") and "Started batch" in text
+    assert shield_run(env, "status").returncode == 0
+    assert len(list((Path(env["SHIELD_STATE_ROOT"]) / "run_logs").glob("*-status-*.log"))) == 0
