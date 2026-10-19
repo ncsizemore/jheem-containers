@@ -26,9 +26,10 @@
 #   SHIELD_MANAGER_STORE  shared store of data-manager releases
 #                      (/mnt/jheem_nas_share/data_manager_releases)
 #
-# With an installation profile, census is the installation's release and the
-# syphilis manager is the release your committed shield_source_code.R names
-# (SYPHILIS.MANAGER.RELEASE.TAG), both from the shared store.
+# With an installation profile, a run uses the data-manager releases its committed
+# code declares in applications/SHIELD/data_managers.csv (older commits: the
+# SYPHILIS.MANAGER.RELEASE.TAG line of shield_source_code.R). An unpinned census is
+# the installation's release. Releases come from the shared store.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -197,7 +198,8 @@ cmd_setup() {
   if [[ -n "$MANAGER_STORE" ]]; then
     python3 "$SCRIPT_DIR/manager_store.py" --store "$MANAGER_STORE" \
       --bundled "$SHIELD_HOME/cache" census.manager.rdata "$CENSUS_TAG" >/dev/null || exit 1
-    say "Inputs: census $CENSUS_TAG; syphilis: the release your committed shield_source_code.R names; seed: $SEED"
+    say "Inputs: the data managers your committed code declares (applications/SHIELD/data_managers.csv);"
+    say "  census $CENSUS_TAG unless that file pins one; seed: $SEED"
     say "Data managers are kept in: $MANAGER_STORE"
   else
     say "Inputs: $CENSUS_TAG / $SYPHILIS_TAG; seed: $SEED"

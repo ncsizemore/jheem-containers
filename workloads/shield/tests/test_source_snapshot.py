@@ -356,3 +356,72 @@ def test_single_quotes_and_equals_are_declarations(tmp_path):
     (tree / snap.SOURCE_CODE).parent.mkdir(parents=True)
     (tree / snap.SOURCE_CODE).write_text("SYPHILIS.MANAGER.RELEASE.TAG = 'syphilis-manager-v2026.10.09'\n")
     assert snap.declared_syphilis(tree) == "syphilis-manager-v2026.10.09"
+
+
+MANAGERS_CSV = """# Data managers SHIELD uses. "unpinned" keeps the installation's census.
+name,file,release
+census,census.manager.rdata,{census}
+syphilis,syphilis.manager.rdata,{syphilis}
+"""
+
+
+def declare_managers(repo, census="unpinned", syphilis="syphilis-manager-v2026.10.09", text=None,
+                     message="declare data managers"):
+    path = repo / snap.MANAGERS_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text if text is not None else MANAGERS_CSV.format(census=census, syphilis=syphilis))
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", message)
+
+
+def test_declared_list_selects_syphilis_and_keeps_installation_census_when_unpinned(tmp_path, repo):
+    declare_managers(repo)
+    selected = select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert selected["syphilis"] == "syphilis-manager-v2026.10.09"
+    assert selected["census"] == "data-managers-v2026.08.26"
+
+
+def test_pinned_census_replaces_the_installation_census(tmp_path, repo):
+    declare_managers(repo, census="census-manager-v2026.10.08")
+    selected = select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert selected["census"] == "census-manager-v2026.10.08"
+    # A later commit pins newer releases: the saved code keeps its selection.
+    declare_managers(repo, census="census-manager-v2026.11.01", syphilis="syphilis-manager-v2026.11.01",
+                     message="newer managers")
+    assert select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)["census"] == "census-manager-v2026.10.08"
+    assert select(tmp_path / "runs", repo, ("stage1",), syphilis=snap.FROM_SOURCE)["census"] == \
+        "census-manager-v2026.11.01"
+
+
+def test_declared_list_takes_precedence_over_the_older_tag_line(tmp_path, repo):
+    declare(repo, '"syphilis-manager-v2026.09.09"')
+    declare_managers(repo)
+    assert select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)["syphilis"] == "syphilis-manager-v2026.10.09"
+
+
+def test_commits_without_the_list_use_the_tag_line_and_the_installation_census(tmp_path, repo):
+    declare(repo)
+    selected = select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert selected["syphilis"] == "syphilis-manager-v2026.10.09"
+    assert selected["census"] == "data-managers-v2026.08.26"
+
+
+@pytest.mark.parametrize("text,message", [
+    ("census,census.manager.rdata,unpinned\n", "columns name,file,release"),
+    ("name,file,release\ncensus,census.manager.rdata,unpinned\n", "does not list syphilis"),
+    ("name,file,release\ncensus,census.manager.rdata,unpinned\nsyphilis,syphilis.manager.rdata,unpinned\n",
+     "leaves syphilis unpinned"),
+    ("name,file,release\ncensus,census.manager.rdata,unpinned\nsyphilis,other.rdata,syphilis-manager-v2026.10.09\n",
+     "must be syphilis.manager.rdata"),
+    ("name,file,release\ncensus,census.manager.rdata,unpinned\ncensus,census.manager.rdata,unpinned\n"
+     "syphilis,syphilis.manager.rdata,syphilis-manager-v2026.10.09\n", "twice"),
+    ("name,file,release\ncensus,census.manager.rdata,\nsyphilis,syphilis.manager.rdata,syphilis-manager-v2026.10.09\n",
+     "no release"),
+    ("name,file,release\ncensus,census.manager.rdata,census-latest\nsyphilis,syphilis.manager.rdata,"
+     "syphilis-manager-v2026.10.09\n", "manager release"),
+])
+def test_unusable_declared_lists_are_refused(tmp_path, repo, text, message):
+    declare_managers(repo, text=text)
+    with pytest.raises(ValueError, match=message):
+        select(tmp_path / "runs", repo, syphilis=snap.FROM_SOURCE)
+    assert not (tmp_path / "runs/run_sources/selections.json").exists()
