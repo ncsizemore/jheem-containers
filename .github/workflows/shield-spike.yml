@@ -15,6 +15,11 @@ on:
       - .github/workflows/shield-spike.yml
   workflow_dispatch:
     inputs:
+      jheem2_test_ref:
+        description: 'jheem2 branch or commit whose tests/*.R to build and run in this runtime (empty: skip)'
+        required: false
+        default: ''
+        type: string
       export_image:
         description: 'Save the tested image as a workflow artifact (for a server pilot)'
         required: false
@@ -204,6 +209,11 @@ jobs:
           SHIELD_CACHE: ${{ runner.temp }}/shield-cache
           SHIELD_STATE: ${{ runner.temp }}/shield-state
         run: bash workloads/shield/tests/test_multichain.sh
+      - name: test a jheem2 commit in this runtime
+        if: inputs.jheem2_test_ref != ''
+        env:
+          JHEEM2_TEST_REF: ${{ inputs.jheem2_test_ref }}
+        run: bash workloads/shield/tests/test_jheem2_ref.sh jheem-shield:ci "$JHEEM2_TEST_REF"
       - name: upload canary diagnostics and run records
         if: always()
         uses: actions/upload-artifact@v4

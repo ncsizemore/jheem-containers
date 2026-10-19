@@ -243,3 +243,17 @@ esac''',
     assert not log.exists(), log.read_text() if log.exists() else ""
     after = {p.relative_to(state): p.read_bytes() for p in state.rglob("*") if p.is_file()}
     assert after == before
+
+
+def test_jheem2_commits_can_be_tested_in_the_runtime_on_request():
+    workflow = yaml.load(WORKFLOW.read_text(), Loader=yaml.BaseLoader)
+    ref = workflow["on"]["workflow_dispatch"]["inputs"]["jheem2_test_ref"]
+    assert ref["default"] == ""
+    build = workflow["jobs"]["build-recorded"]
+    step = next(s for s in build["steps"] if s.get("name") == "test a jheem2 commit in this runtime")
+    assert step["if"] == "inputs.jheem2_test_ref != ''"
+    assert "test_jheem2_ref.sh jheem-shield:ci" in step["run"]
+    script = (ROOT / "tests" / "test_jheem2_ref.sh").read_text()
+    # Built the way run engines are built, offline, as the invoking user.
+    assert "build_engine.sh" in script and "--network none" in script and '--user "$(id -u):$(id -g)"' in script
+    assert "tests/*.R" in script
