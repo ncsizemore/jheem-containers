@@ -10,6 +10,7 @@ scientific state repair, or package installation.
 """
 
 import argparse
+import csv
 import errno
 import hashlib
 import json
@@ -28,10 +29,15 @@ REQUIRED = (
 )
 ENGINE_REQUIRED = ("DESCRIPTION", "NAMESPACE")
 IMAGE_ENGINE = "image"
-# The syphilis manager a run uses is the one its committed SHIELD source names.
+# The data managers a run uses are the ones its committed SHIELD source declares:
+# applications/SHIELD/data_managers.csv, or, in commits from before that file, the
+# SYPHILIS.MANAGER.RELEASE.TAG line of shield_source_code.R.
 FROM_SOURCE = "source"
 SOURCE_CODE = "applications/SHIELD/shield_source_code.R"
 DECLARATION = re.compile(r"SYPHILIS\.MANAGER\.RELEASE\.TAG\s*(?:<-|=)\s*(.*?)\s*(?:#.*)?")
+MANAGERS_FILE = "applications/SHIELD/data_managers.csv"
+UNPINNED = "unpinned"
+DECLARED_FILES = {"census": "census.manager.rdata", "syphilis": "syphilis.manager.rdata"}
 
 
 def digest(path):
@@ -219,6 +225,39 @@ def declared_syphilis(tree):
     return quoted.group(1) if quoted.group(1) is not None else quoted.group(2)
 
 
+def declared_managers(tree):
+    """{"census": release or None, "syphilis": release} declared by the captured source.
+
+    None means unpinned: the run uses the installation's census. Syphilis must be a
+    dated release. Commits from before data_managers.csv declare syphilis only.
+    """
+    path = tree / MANAGERS_FILE
+    if not path.is_file():
+        return {"census": None, "syphilis": declared_syphilis(tree)}
+    lines = [line for line in path.read_text().splitlines()
+             if line.strip() and not line.lstrip().startswith("#")]
+    if not lines or [h.strip() for h in next(csv.reader(lines[:1]))] != ["name", "file", "release"]:
+        raise ValueError(MANAGERS_FILE + " must have the columns name,file,release")
+    rows = list(csv.DictReader(lines))
+    declared = {}
+    for row in rows:
+        name, file, release = (row.get(k, "").strip() for k in ("name", "file", "release"))
+        if name in declared:
+            raise ValueError(MANAGERS_FILE + " lists '" + name + "' twice")
+        if name in DECLARED_FILES and file != DECLARED_FILES[name]:
+            raise ValueError(MANAGERS_FILE + ": '" + name + "' must be " + DECLARED_FILES[name])
+        if not release:
+            raise ValueError(MANAGERS_FILE + ": '" + name + "' has no release")
+        declared[name] = None if release == UNPINNED else release
+    missing = [name for name in ("census", "syphilis") if name not in declared]
+    if missing:
+        raise ValueError(MANAGERS_FILE + " does not list " + " or ".join(missing))
+    if declared["syphilis"] is None:
+        raise ValueError(MANAGERS_FILE + " leaves syphilis unpinned; a run needs a dated release "
+                         "such as syphilis-manager-v2026.10.09")
+    return {"census": declared["census"], "syphilis": declared["syphilis"]}
+
+
 def engine_checkout(source, engine_source):
     if engine_source:
         return Path(engine_source)
@@ -280,7 +319,10 @@ def select(root, source, codes, image, census, syphilis, seed, resume=False, exp
                 engine = capture(engines, engine_checkout(source, engine_source), "jheem2",
                                  ENGINE_REQUIRED, "jheem2")
             if syphilis == FROM_SOURCE:
-                syphilis = declared_syphilis(verify_bundle(store, snapshot, "jheem_analyses")[0])
+                # The source's declarations; a pinned census replaces the installation's.
+                declared = declared_managers(verify_bundle(store, snapshot, "jheem_analyses")[0])
+                syphilis = declared["syphilis"]
+                census = declared["census"] or census
             selection = {"snapshot": snapshot, "engine": engine, "image": image,
                          "census": census, "syphilis": syphilis, "seed": str(seed)}
         tree, revision, engine_tree, engine_revision = verify(store, selection)

@@ -161,8 +161,8 @@ def test_installed_wrapper_selects_its_own_profile_without_operator_overrides(ho
     result = subprocess.run(["bash", str(home / "shield-run.sh"), "setup"],
                             env=env, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
-    assert ("Inputs: census data-managers-v2026.08.26; syphilis: the release your committed "
-            "shield_source_code.R names; seed: 0") in result.stdout
+    assert "the data managers your committed code declares (applications/SHIELD/data_managers.csv)" in result.stdout
+    assert "census data-managers-v2026.08.26 unless that file pins one; seed: 0" in result.stdout
     # Setup puts the installation's census in the shared store.
     stored = tmp_path / "store/census.manager.rdata/data-managers-v2026.08.26/census.manager.rdata"
     assert stored.read_bytes() == b"synthetic census.manager.rdata"
