@@ -96,8 +96,17 @@ separately. The wrapper defaults to its own directory and the profile's
 root; operators need no manager/image overrides. A different output root or seed
 is an explicit run choice, not an edit to the installed profile.
 
-The current installation is `/home/jheem-shared/shield-container-20261009`
-(installed 2026-10-09). It uses the
+The current installation is `/home/jheem-shared/shield-container-20261012`
+(installed 2026-10-12). It uses the October 9 release and census below, with the
+wrapper and helpers from `39649e9f`: the syphilis release comes from the run's
+committed analysis code through the [data-manager store](#data-manager-store).
+An isolated administrator batch (analyses `c302e4ae`, `jheem2` `85b73171`) ran two
+cities through the three smoke stages, including four-chain stage 3, in 10
+minutes; records carried `syphilis-manager-v2026.10.09` and the October census,
+and a repeated pipeline verified and skipped every stage without changing any file.
+
+The previous installation, `/home/jheem-shared/shield-container-20261009`
+(installed 2026-10-09), uses the
 [October 9 release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.09-r37958480247)
 (image `sha256:e48097ab021bca06a4a41056295f563e00dfa3eeed1d6dcda53fede0a8341156`,
 built from this repository at `ae9a9d9f` and tested with analyses `ec1e8213`) with
@@ -116,7 +125,7 @@ four-chain stage 3, in 10 minutes; records show the October census digest, engin
 seed, and stage lineage, and a repeated pipeline verified and skipped every stage
 without changing any file.
 
-The previous installation, `/home/jheem-shared/shield-container-20261008`
+The installation before it, `/home/jheem-shared/shield-container-20261008`
 (installed 2026-10-08), uses the October 4 image, inputs, and profile,
 with the wrapper and helpers from this repository at
 `87eae47d62e584e89292af0f6e7af00319a09704`: captured `jheem2` builds, phased
@@ -141,12 +150,16 @@ manager cache, or active calibration is switched automatically.
 ## Data-manager store
 
 Installations with a profile do not fix the syphilis manager. A new run uses the
-release named by `SYPHILIS.MANAGER.RELEASE.TAG` in its committed
-`applications/SHIELD/shield_source_code.R`. The selection saved for its
-calibration codes keeps that release, so continuations and later stages of the
-same pipeline use it even after the checkout moves. The setting must name a dated
-release; `NULL` (the promoted release) is refused. Census is the installation
-profile's release.
+releases its committed analysis code declares, in
+`applications/SHIELD/data_managers.csv` (columns `name,file,release`; lines
+starting with `#` are comments). Syphilis must name a dated release. Census
+`unpinned` means the installation profile's release; a dated census release
+replaces it. A commit without that file uses `SYPHILIS.MANAGER.RELEASE.TAG` in
+`applications/SHIELD/shield_source_code.R` instead, where `NULL` (the promoted
+release) is refused. Wrappers before `82260b5` (including the 2026-10-12
+installation) read only that setting. The selection saved for a run's calibration
+codes keeps its releases, so continuations and later stages of the same pipeline
+use them even after the checkout moves.
 
 Both releases come from a shared store, by default
 `/mnt/jheem_nas_share/data_manager_releases/<manager>/<release>/` (override with
@@ -164,6 +177,25 @@ new download. Remove releases only deliberately, after checking that no records
 you keep refer to them, and exempt the store from bulk NAS cleanup. The first run
 that uses a release not yet stored needs GitHub access from the server; a failed
 download launches nothing and never substitutes another release.
+
+## Logs
+
+Logs live in the output root, so an administrator can review an operator's run
+over SSH without their terminal:
+
+- `run_logs/<UTC time>-<command>-<pid>.log`: a transcript of each `setup`,
+  `start`, `resume`, `pipeline`, `stop`, `batch`, and `stop-batch` command, headed
+  by the command line, account, host, working directory, and installation; and the
+  full output of each compatibility check (`-check-`), which the terminal shows
+  only as a summary, or its last 25 lines on failure.
+- `run_records/shield/<location>/<code>/logs/<attempt>.log`: the output of each
+  phase (`setup`, `chain1`…, `assemble`, or the whole stage). `logs <location>
+  <code>` prints the newest of each.
+- `run_batches/<id>/batch.log`: a batch scheduler's launches and exits.
+
+Wrappers before the hardening change (including the 2026-10-12 installation) keep
+the batch log and parallel chain logs on the NAS; other stage output is only in
+the container log, which `logs` reads while the container exists.
 
 ## Original October 1 installation (reference)
 
@@ -220,11 +252,11 @@ Do not disable lingering or the NAS boolean while other containers depend on the
 ## Verify before inviting operators
 
 Use the selected installation's wrapper as a non-root administrator, with a
-fresh isolated state root. For the October 9 installation, from a clean
+fresh isolated state root. For the October 12 installation, from a clean
 committed `jheem_analyses` checkout with a clean committed `jheem2` beside it:
 
 ```bash
-SHIELD_INSTALL=/home/jheem-shared/shield-container-20261009
+SHIELD_INSTALL=/home/jheem-shared/shield-container-20261012
 SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37958480247/ADMIN-HANDOFF-TEST.XXXXXX) || exit 1
 export SHIELD_STATE_ROOT
 cd /path/to/clean/committed/jheem_analyses
@@ -264,14 +296,24 @@ separate from this short installation check.
 - Keep that state-root setting for subsequent commands. `status` lists the
   account's containers in that root, not other accounts' jobs. Startup locks
   serialize launches of the same location/code, but are not lifetime locks
-  against arbitrary or cross-account writers. Keep run roots per-user.
+  against arbitrary or cross-account writers. Keep run roots per-user. A batch is
+  refused while another live batch in the same root covers any of its
+  location/code pairs.
 - New calibration codes capture the committed checkout used at first launch;
   existing codes retain their source, image, manager tags, and seed. A pipeline
   selects its stages together. Preserve `run_sources/` with records and results.
   Reusing a code for a deliberately different experiment requires a new state
   root. Do not edit the selection registry to switch an existing run's source.
+- New codes are saved to the selection only after the compatibility check passes,
+  so a failed check binds nothing. A request that lists stages already run with
+  new codes checks the new codes against the earlier stages' saved code, which
+  fails if only the current commit registers them. Commit the new codes and run
+  them alone; they capture the current commit and find completed earlier stages
+  from their records. Wrappers before the hardening change saved new codes before
+  the check, so a failed mixed request there kept them bound to the old code.
 - A source-compatibility failure does not launch MCMC. Fix or choose source with
-  its owners, then use a new state root for a different selection. A compatibility
+  its owners; new codes from a corrected commit can run in the same root, but an
+  existing code with different source needs a new state root. A compatibility
   pass is not scientific validation. New package/dependency requirements may
   require a tested image: use the CI `jheem_analyses_ref` input with a full SHA,
   pass the canary, and retain that exact image before its Actions artifact expires.
@@ -279,7 +321,12 @@ separate from this short installation check.
   Confirm that no launcher or run is active and preserve evidence before an
   administrator removes the specific abandoned lock; never clear locks blindly.
 - Install another candidate separately. Do not retag/replace active users'
-  images or change inputs beneath a checkpointed run. Do not automatically
+  images or change inputs beneath a checkpointed run. Never modify a file of an
+  installation in place: a batch worker executes the installation's
+  `shield-run.sh` for the life of the batch, and Bash reads a script as it runs
+  (overwriting a test copy under a running worker made it fail with a syntax
+  error), and each launch calls the installation's helpers. Do not remove an
+  installation while batches started from it are running. Do not automatically
   delete stopped containers or outputs: they may hold diagnostic evidence.
 
 Retaining the runtime does not archive its scientific outputs or run records.
