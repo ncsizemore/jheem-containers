@@ -80,6 +80,21 @@ release_launch_locks() {
   LAUNCH_LOCKS=()
 }
 
+# On exit, release launch locks and let the transcript finish writing, so its
+# last lines reach the terminal before the prompt returns.
+on_exit() {
+  local pid tries
+  release_launch_locks
+  (( ${#TRANSCRIPT_PIDS[@]} )) || return 0
+  exec >&- 2>&-
+  for pid in "${TRANSCRIPT_PIDS[@]}"; do
+    for (( tries = 0; tries < 50; tries++ )); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+  done
+}
+
 # The batch worker's form of lock_launch: reserve these calibrations of one
 # location for a check-and-launch, or return 1 if another launch holds any.
 reserve_launch() {
@@ -104,7 +119,7 @@ lock_launch() {
     [[ "$code" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || fail "invalid calibration code"
   done
   mkdir -p "$STATE_ROOT/run_locks"
-  trap release_launch_locks EXIT
+  trap on_exit EXIT
   for code in "$@"; do
     lock="$STATE_ROOT/run_locks/$location--$code"
     mkdir -- "$lock" 2>/dev/null || fail "a launch is already in progress for $location $code; inspect an interrupted launch before retrying."
@@ -133,7 +148,13 @@ select_source() {
   have="$(podman image inspect --format '{{.Id}}' "$RUN_IMAGE" 2>/dev/null || true)"
   [[ "sha256:${have#sha256:}" == "$RUN_IMAGE" ]] \
     || fail "the run's recorded image $RUN_IMAGE is not loaded; restore that exact image before continuing."
-  say "Using saved analysis code ${SOURCE_REF:0:8} (all requested stages and locations)."
+  if [[ "$MIXED_SELECTION" == yes ]]; then
+    say "Using analysis code ${SOURCE_REF:0:8}, saved earlier for some of these calibrations; a pipeline's stages share one code."
+  elif [[ "$PENDING_SELECTION" != - ]]; then
+    say "Using analysis code ${SOURCE_REF:0:8} from your current commit; it is saved for these calibrations once the checks pass."
+  else
+    say "Using saved analysis code ${SOURCE_REF:0:8} (all requested stages and locations)."
+  fi
   if [[ "$ENGINE_KEY" == image ]]; then
     ENGINE_LIBRARY=""
     say "Using the runtime image's built-in jheem2."
@@ -171,6 +192,7 @@ command_log() {
 # be reviewed later. For a new output folder it starts once the prerequisite
 # checks have created the folder.
 TRANSCRIPT_ARGS=()
+TRANSCRIPT_PIDS=()
 start_transcript() {
   local log
   TRANSCRIPT_ARGS=("$@")
@@ -179,7 +201,11 @@ start_transcript() {
   printf '# shield-run.sh %s\n# %s on %s, %s; in %s; installation %s\n' "$*" "$(id -un)" \
     "$(hostname -s)" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$PWD" "$SHIELD_HOME" > "$log" 2>/dev/null || return 0
   TRANSCRIPT_ARGS=()
-  exec > >(tee -a "$log") 2> >(tee -a "$log" >&2)
+  exec > >(tee -a "$log")
+  TRANSCRIPT_PIDS+=("${!:-}")
+  exec 2> >(tee -a "$log" >&2)
+  TRANSCRIPT_PIDS+=("${!:-}")
+  trap on_exit EXIT
 }
 
 say() { printf '%s\n' "$*"; }
@@ -586,7 +612,7 @@ batch_worker() {
   note "batch $id: ${#locations[@]} locations, at most $max at a time: ${codes[*]}"
   select_source pipeline "${codes[@]}"
   prepare_runtime "${codes[*]}" ""
-  trap release_launch_locks EXIT
+  trap on_exit EXIT
   for city in "${locations[@]}"; do states+=(waiting); lockwaits+=(0); done
   while :; do
     running=0

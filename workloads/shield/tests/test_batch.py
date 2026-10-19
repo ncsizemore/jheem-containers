@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import time
@@ -129,9 +130,9 @@ def finished_batch(env, timeout=60):
     batches = Path(env["SHIELD_STATE_ROOT"]) / "run_batches"
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        logs = list(batches.glob("*/batch.log"))
-        if logs and "finished\n" in logs[0].read_text().split("] batch ")[-1]:
-            return logs[0].parent
+        logs = sorted(batches.glob("*/batch.log"))
+        if logs and all("finished\n" in log.read_text().split("] batch ")[-1] for log in logs):
+            return logs[-1].parent
         time.sleep(0.1)
     raise AssertionError("batch did not finish: " + "".join(p.read_text() for p in batches.glob("*/batch.log")))
 
@@ -243,7 +244,11 @@ def test_a_second_overlapping_batch_is_refused_while_the_first_runs(env):
 
 
 def test_a_failed_check_binds_nothing_and_the_repaired_code_uses_new_code(env):
-    assert shield_run(env, "batch", "C.12580", "stage0").returncode == 0
+    first = shield_run(env, "batch", "C.12580", "stage0")
+    assert first.returncode == 0 and "from your current commit" in first.stdout
+    finished_batch(env)
+    again = shield_run(env, "batch", "C.12580", "stage0")
+    assert again.returncode == 0 and "Using saved analysis code" in again.stdout
     finished_batch(env)
     registry = Path(env["SHIELD_STATE_ROOT"]) / "run_sources/selections.json"
     repo = Path(env["SHIELD_SOURCE_DIR"])
@@ -252,13 +257,13 @@ def test_a_failed_check_binds_nothing_and_the_repaired_code_uses_new_code(env):
     git(repo, "commit", "-qm", "register stage1b")
     # Listing the completed stage with the new one checks the new one against the old code.
     mixed = shield_run(env, "batch", "C.12580", "stage0", "stage1b", FAKE_CHECK_FAIL="1")
-    assert mixed.returncode == 1
+    assert mixed.returncode == 1 and "saved earlier for some of these calibrations" in mixed.stdout
     assert "not registered" in mixed.stderr and "run only the new codes" in mixed.stderr
     assert "stage1b" not in json.loads(registry.read_text())["calibrations"]
     assert not list(registry.parent.glob(".pending-*"))
     # The repair: run only the new code, which captures the current commit.
     repaired = shield_run(env, "batch", "C.12580", "stage1b")
-    assert repaired.returncode == 0, repaired.stderr
+    assert repaired.returncode == 0 and "from your current commit" in repaired.stdout, repaired.stderr
     saved = json.loads(registry.read_text())["calibrations"]
     assert saved["stage1b"]["snapshot"] != saved["stage0"]["snapshot"]
 
@@ -299,3 +304,28 @@ def test_commands_that_change_runs_keep_a_transcript_even_in_a_new_output_folder
     assert text.startswith("# shield-run.sh batch C.12580 stage0\n") and "Started batch" in text
     assert shield_run(env, "status").returncode == 0
     assert len(list((Path(env["SHIELD_STATE_ROOT"]) / "run_logs").glob("*-status-*.log"))) == 0
+
+
+def test_a_command_finishes_writing_its_output_before_it_exits(env, tmp_path):
+    # A transcript writer that is slow to start, so output would otherwise trail the exit.
+    slow = tmp_path / "slow-bin"
+    slow.mkdir()
+    (slow / "tee").write_text("#!/bin/sh\nsleep 1\nexec " + shutil.which("tee") + ' "$@"\n')
+    (slow / "tee").chmod(0o755)
+    first = shield_run(env, "batch", "C.12580", "stage0", FAKE_RUN_POLLS="100000",
+                       SHIELD_BATCH_POLL_SECONDS="0.2")
+    assert first.returncode == 0, first.stderr
+    deadline = time.monotonic() + 30
+    while not (Path(env["FAKE_STATE"]) / "launches.log").exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    output = tmp_path / "terminal.txt"
+    with output.open("w") as terminal:
+        again = subprocess.Popen(["bash", str(SHIELD / "shield-run.sh"), "batch", "C.12580", "stage0"],
+                                 env=dict(env, PATH=str(slow) + os.pathsep + env["PATH"]),
+                                 stdout=terminal, stderr=terminal)
+        assert again.wait(timeout=60) == 1
+    assert "is still running some of these locations" in output.read_text()
+    transcripts = (Path(env["SHIELD_STATE_ROOT"]) / "run_logs").glob("*-batch-*.log")
+    assert any("is still running some of these locations" in t.read_text() for t in transcripts)
+    for batch in (Path(env["SHIELD_STATE_ROOT"]) / "run_batches").iterdir():
+        shield_run(env, "stop-batch", batch.name)
