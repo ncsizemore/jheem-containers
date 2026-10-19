@@ -270,7 +270,13 @@ def engine_checkout(source, engine_source):
 
 
 def select(root, source, codes, image, census, syphilis, seed, resume=False, expected=None,
-           engine_source=None):
+           engine_source=None, pending=None):
+    """Select (or reuse) the saved source and runtime for these calibration codes.
+
+    With `pending`, bindings for codes not yet saved are written to that file instead
+    of the registry; commit_pending() saves them once the launch's checks pass, so a
+    failed check never binds a code.
+    """
     root = Path(root).resolve()
     if any(c in str(root) for c in ("\n", "\t", ",")):
         raise ValueError("state path cannot contain tabs, newlines or commas")
@@ -326,13 +332,44 @@ def select(root, source, codes, image, census, syphilis, seed, resume=False, exp
             selection = {"snapshot": snapshot, "engine": engine, "image": image,
                          "census": census, "syphilis": syphilis, "seed": str(seed)}
         tree, revision, engine_tree, engine_revision = verify(store, selection)
-        if any(code not in saved for code in codes):
-            for code in codes:
+        new_codes = [code for code in codes if code not in saved]
+        proposal = "-"
+        if new_codes and pending is not None:
+            write_json(Path(pending), {"schema_version": 1, "codes": new_codes, "selection": selection})
+            proposal = str(pending)
+        elif new_codes:
+            for code in new_codes:
                 saved[code] = selection
             write_json(path, registry)
         return dict(selection, engine=engine_of(selection), path=str(tree), commit=revision,
                     engine_path=str(engine_tree) if engine_tree else "-",
-                    engine_commit=engine_revision or "-")
+                    engine_commit=engine_revision or "-", pending=proposal,
+                    mixed="yes" if existing and new_codes else "no")
+    finally:
+        lock.rmdir()
+
+
+def commit_pending(root, pending):
+    """Save the bindings a launch proposed, after its checks passed."""
+    store = Path(root).resolve() / "run_sources"
+    proposal = read_json(Path(pending))
+    if proposal.get("schema_version") != 1 or not proposal.get("codes"):
+        raise ValueError("invalid pending selection")
+    lock = store / ".selection-lock"
+    try:
+        lock.mkdir()
+    except FileExistsError:
+        raise ValueError("source selection is locked; retry later, or inspect an interrupted setup")
+    try:
+        path = store / "selections.json"
+        registry = read_json(path) if path.exists() else {"schema_version": 1, "calibrations": {}}
+        saved = registry["calibrations"]
+        for code in proposal["codes"]:
+            if code in saved and saved[code] != proposal["selection"]:
+                raise ValueError(code + " was bound to different saved code by another launch; check status")
+            saved[code] = proposal["selection"]
+        write_json(path, registry)
+        Path(pending).unlink()
     finally:
         lock.rmdir()
 
@@ -340,10 +377,12 @@ def select(root, source, codes, image, census, syphilis, seed, resume=False, exp
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True)
+    parser.add_argument("--commit-pending", help="save the bindings in this pending file, then exit")
+    parser.add_argument("--pending", help="write bindings for new codes here instead of saving them")
     parser.add_argument("--source", default=".")
-    parser.add_argument("--image", required=True)
-    parser.add_argument("--census", required=True)
-    parser.add_argument("--syphilis", required=True,
+    parser.add_argument("--image")
+    parser.add_argument("--census")
+    parser.add_argument("--syphilis",
                         help="a release tag, or 'source' for the release the captured "
                              "SHIELD source declares")
     parser.add_argument("--seed", default="0")
@@ -351,19 +390,27 @@ def main():
     parser.add_argument("--engine-source", default="",
                         help="jheem2 checkout to capture (default: sibling of the analysis "
                              "checkout), or 'image' for the runtime image's built-in engine")
-    parser.add_argument("codes", nargs="+")
+    parser.add_argument("codes", nargs="*")
     args = parser.parse_args()
+    if args.commit_pending:
+        try:
+            commit_pending(args.root, args.commit_pending)
+        except (ValueError, OSError, KeyError) as error:
+            parser.exit(1, "shield-run source: " + str(error) + "\n")
+        return
+    if not (args.image and args.census and args.syphilis and args.codes):
+        parser.error("--image, --census, --syphilis and at least one calibration code are required")
     expected = {field: os.environ[env] for field, env in
                 (("census", "CENSUS_TAG"), ("syphilis", "SYPHILIS_TAG"), ("seed", "SHIELD_RANDOM_SEED"))
                 if env in os.environ}
     try:
         result = select(args.root, args.source, args.codes, args.image, args.census,
                         args.syphilis, args.seed, args.resume, expected,
-                        args.engine_source or None)
+                        args.engine_source or None, args.pending)
         # Tab is IFS whitespace in the wrapper, so absent values print as "-".
         print("\t".join(result[key] for key in
                         ("path", "commit", "image", "census", "syphilis", "seed", "snapshot",
-                         "engine", "engine_path", "engine_commit")))
+                         "engine", "engine_path", "engine_commit", "pending", "mixed")))
     except (ValueError, OSError, KeyError, TypeError, subprocess.CalledProcessError) as error:
         parser.exit(1, "shield-run source: " + str(error) + "\n")
 

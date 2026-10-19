@@ -242,7 +242,10 @@ esac''',
     assert "remove that folder" not in result.stderr.lower()
     assert not log.exists(), log.read_text() if log.exists() else ""
     after = {p.relative_to(state): p.read_bytes() for p in state.rglob("*") if p.is_file()}
-    assert after == before
+    # The command's transcript is the only addition.
+    transcripts = [p for p in after if p.parts[0] == "run_logs"]
+    assert len(transcripts) == 1 and ("# shield-run.sh " + action).encode() in after[transcripts[0]]
+    assert {p: v for p, v in after.items() if p.parts[0] != "run_logs"} == before
 
 
 def test_jheem2_commits_can_be_tested_in_the_runtime_on_request():
