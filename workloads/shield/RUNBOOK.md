@@ -96,8 +96,25 @@ separately. The wrapper defaults to its own directory and the profile's
 root; operators need no manager/image overrides. A different output root or seed
 is an explicit run choice, not an edit to the installed profile.
 
-The current installation is `/home/jheem-shared/shield-container-20261012`
-(installed 2026-10-12). It uses the October 9 release and census below, with the
+The current installation is `/home/jheem-shared/shield-container-20261019`
+(installed 2026-10-20 00:27 UTC). It uses the October 9 release, census, and output
+namespace below, with the wrapper and helpers from `0c2672bc`: runs read the
+managers declared in `data_managers.csv`, bind new codes only after their check,
+refuse overlapping batches, and keep their [logs](#logs) in the output root. Its
+payload manifest (`CHECKSUMS.sha256`) digest is
+`7445225cfa87970c8fbb4aa18ecaecacf314b73cc43216805ba20b86e834162a`; only
+`shield-run.sh`, `source_snapshot.py`, and `container-entrypoint.sh` differ from the
+2026-10-12 payload. Both operator accounts passed the access checks. An isolated
+administrator batch (analyses `8cdb5e7f`, `jheem2` `6e12e34e`) ran two cities
+through the three smoke stages, including four-chain stage 3, in 9 minutes; a
+repeated pipeline verified and skipped every stage without changing any of 5,143
+files. Smoke stages need analyses with jheem_analyses #10 (or a commit that still
+registers `calib.10.1`): before it, their handoff canary stops the compatibility
+check once `calib.10.1` is retired. Real calibrations do not load the smoke
+registrations.
+
+The installation before it, `/home/jheem-shared/shield-container-20261012`
+(installed 2026-10-12), uses the October 9 release and census below, with the
 wrapper and helpers from `39649e9f`: the syphilis release comes from the run's
 committed analysis code through the [data-manager store](#data-manager-store).
 An isolated administrator batch (analyses `c302e4ae`, `jheem2` `85b73171`) ran two
@@ -105,7 +122,7 @@ cities through the three smoke stages, including four-chain stage 3, in 10
 minutes; records carried `syphilis-manager-v2026.10.09` and the October census,
 and a repeated pipeline verified and skipped every stage without changing any file.
 
-The previous installation, `/home/jheem-shared/shield-container-20261009`
+The installation before that, `/home/jheem-shared/shield-container-20261009`
 (installed 2026-10-09), uses the
 [October 9 release](https://github.com/ncsizemore/jheem-containers/releases/tag/shield-pilot-2026.10.09-r37958480247)
 (image `sha256:e48097ab021bca06a4a41056295f563e00dfa3eeed1d6dcda53fede0a8341156`,
@@ -125,7 +142,7 @@ four-chain stage 3, in 10 minutes; records show the October census digest, engin
 seed, and stage lineage, and a repeated pipeline verified and skipped every stage
 without changing any file.
 
-The installation before it, `/home/jheem-shared/shield-container-20261008`
+The first of these, `/home/jheem-shared/shield-container-20261008`
 (installed 2026-10-08), uses the October 4 image, inputs, and profile,
 with the wrapper and helpers from this repository at
 `87eae47d62e584e89292af0f6e7af00319a09704`: captured `jheem2` builds, phased
@@ -252,11 +269,11 @@ Do not disable lingering or the NAS boolean while other containers depend on the
 ## Verify before inviting operators
 
 Use the selected installation's wrapper as a non-root administrator, with a
-fresh isolated state root. For the October 12 installation, from a clean
+fresh isolated state root. For the October 19 installation, from a clean
 committed `jheem_analyses` checkout with a clean committed `jheem2` beside it:
 
 ```bash
-SHIELD_INSTALL=/home/jheem-shared/shield-container-20261012
+SHIELD_INSTALL=/home/jheem-shared/shield-container-20261019
 SHIELD_STATE_ROOT=$(mktemp -d /mnt/jheem_nas_share/tmp/shield-container-r37958480247/ADMIN-HANDOFF-TEST.XXXXXX) || exit 1
 export SHIELD_STATE_ROOT
 cd /path/to/clean/committed/jheem_analyses
